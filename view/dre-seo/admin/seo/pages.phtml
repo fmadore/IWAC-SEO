@@ -1,0 +1,88 @@
+<?php
+/**
+ * @var \Laminas\View\Renderer\PhpRenderer $this
+ * @var \Omeka\Api\Representation\SiteRepresentation $site
+ * @var \Omeka\Api\Representation\SitePageRepresentation[] $pages
+ * @var array<int,array<string,mixed>> $overrides
+ * @var \Laminas\Form\Form $form
+ */
+
+$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'DRESeo'));
+
+$robotsOptions = [
+    ''               => $this->translate('Default (indexable)'),
+    'index, follow'  => $this->translate('Index, follow'),
+    'noindex, follow' => $this->translate('Noindex'),
+];
+
+$form->setAttribute('action', $this->url('admin/dre-seo/pages'));
+$form->setAttribute('method', 'post');
+$form->prepare();
+?>
+<?php echo $this->pageTitle($this->translate('Static-page SEO'), 1, $this->translate('SEO')); ?>
+
+<div class="active section" role="tabpanel">
+    <p>
+        <?php echo $this->translate('Override the title, description, share image and indexing for individual static pages. Leave a field blank to fall back to the page’s own content and the site-wide defaults set in Configure. Resource (item) pages derive their SEO automatically and are not listed here.'); ?>
+    </p>
+
+    <?php echo $this->form()->openTag($form); ?>
+    <?php echo $this->formElement($form->get('csrf')); ?>
+
+    <table class="tablesaw" data-tablesaw-mode="stack">
+        <thead>
+            <tr>
+                <th><?php echo $this->translate('Page'); ?></th>
+                <th><?php echo $this->translate('Meta title'); ?></th>
+                <th><?php echo $this->translate('Meta description'); ?></th>
+                <th><?php echo $this->translate('Share image (asset ID)'); ?></th>
+                <th><?php echo $this->translate('Indexing'); ?></th>
+            </tr>
+        </thead>
+        <tbody>
+            <?php foreach ($pages as $page): ?>
+                <?php
+                $id = $page->id();
+                $o = $overrides[$id] ?? [];
+                $base = 'pages[' . $id . ']';
+                ?>
+                <tr>
+                    <td>
+                        <strong><?php echo $this->escapeHtml($page->title()); ?></strong><br>
+                        <code><?php echo $this->escapeHtml('/' . $page->slug()); ?></code>
+                    </td>
+                    <td>
+                        <input type="text" name="<?php echo $this->escapeHtmlAttr($base . '[title]'); ?>"
+                            value="<?php echo $this->escapeHtmlAttr($o['title'] ?? ''); ?>"
+                            placeholder="<?php echo $this->escapeHtmlAttr($page->title()); ?>">
+                    </td>
+                    <td>
+                        <textarea name="<?php echo $this->escapeHtmlAttr($base . '[description]'); ?>" rows="2"
+                            placeholder="<?php echo $this->escapeHtmlAttr($this->translate('150–160 characters')); ?>"><?php echo $this->escapeHtml($o['description'] ?? ''); ?></textarea>
+                    </td>
+                    <td>
+                        <input type="number" min="0" step="1" class="dre-seo-asset"
+                            name="<?php echo $this->escapeHtmlAttr($base . '[image]'); ?>"
+                            value="<?php echo $this->escapeHtmlAttr((string) ($o['image'] ?? '')); ?>">
+                    </td>
+                    <td>
+                        <select name="<?php echo $this->escapeHtmlAttr($base . '[robots]'); ?>">
+                            <?php foreach ($robotsOptions as $value => $label): ?>
+                                <option value="<?php echo $this->escapeHtmlAttr($value); ?>"
+                                    <?php echo ($o['robots'] ?? '') === $value ? 'selected' : ''; ?>>
+                                    <?php echo $this->escapeHtml($label); ?>
+                                </option>
+                            <?php endforeach; ?>
+                        </select>
+                    </td>
+                </tr>
+            <?php endforeach; ?>
+            <?php if (!count($pages)): ?>
+                <tr><td colspan="5"><?php echo $this->translate('This site has no pages yet.'); ?></td></tr>
+            <?php endif; ?>
+        </tbody>
+    </table>
+
+    <button type="submit" class="button"><?php echo $this->translate('Save'); ?></button>
+    <?php echo $this->form()->closeTag(); ?>
+</div>

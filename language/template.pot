@@ -1,0 +1,94 @@
+# DRE SEO – translation template
+#
+# This file is distributed under the same license as the DRE SEO module.
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: DRE SEO\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: \n"
+"Plural-Forms: nplurals=2; plural=(n != 1);\n"
+
+msgid "SEO"
+msgstr ""
+
+msgid "Static pages"
+msgstr ""
+
+msgid "Static-page SEO"
+msgstr ""
+
+msgid "Status"
+msgstr ""
+
+msgid "Feature"
+msgstr ""
+
+msgid "State"
+msgstr ""
+
+msgid "On"
+msgstr ""
+
+msgid "Off"
+msgstr ""
+
+msgid "Google Search Console verification"
+msgstr ""
+
+msgid "schema.org JSON-LD"
+msgstr ""
+
+msgid "XML sitemap & robots.txt"
+msgstr ""
+
+msgid "IndexNow ping"
+msgstr ""
+
+msgid "Sitemap"
+msgstr ""
+
+msgid "Edit per-page SEO"
+msgstr ""
+
+msgid "Configure defaults & verification"
+msgstr ""
+
+msgid "Page"
+msgstr ""
+
+msgid "Meta title"
+msgstr ""
+
+msgid "Meta description"
+msgstr ""
+
+msgid "Share image (asset ID)"
+msgstr ""
+
+msgid "Indexing"
+msgstr ""
+
+msgid "Default (indexable)"
+msgstr ""
+
+msgid "Index, follow"
+msgstr ""
+
+msgid "Noindex"
+msgstr ""
+
+msgid "Save"
+msgstr ""
+
+msgid "Sitemap cache cleared — it will be rebuilt on the next request."
+msgstr ""
+
+msgid "Static-page SEO saved."
+msgstr ""
+
+msgid "Invalid form submission."
+msgstr ""

@@ -1,0 +1,39 @@
+/* DRE SEO — admin screens (status dashboard + static-page table). */
+
+.dre-seo-on {
+    color: #009260;
+    font-weight: 600;
+}
+
+.dre-seo-off {
+    color: #9a9a9a;
+    font-weight: 600;
+}
+
+.dre-seo-links {
+    list-style: none;
+    margin: 0 0 1rem;
+    padding: 0;
+}
+
+.dre-seo-links li {
+    margin: 0.15rem 0;
+    font-family: monospace;
+    word-break: break-all;
+}
+
+#content table.tablesaw td textarea,
+#content table.tablesaw td input[type="text"] {
+    width: 100%;
+    min-width: 12rem;
+    box-sizing: border-box;
+}
+
+#content table.tablesaw td input.dre-seo-asset {
+    width: 6rem;
+}
+
+#content table.tablesaw td code {
+    color: #6a6a6a;
+    font-size: 0.85em;
+}

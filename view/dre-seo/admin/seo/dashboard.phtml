@@ -1,0 +1,112 @@
+<?php
+/**
+ * @var \Laminas\View\Renderer\PhpRenderer $this
+ * @var \Omeka\Api\Representation\SiteRepresentation|null $site
+ * @var bool $gscConfigured
+ * @var bool $jsonLdEnabled
+ * @var bool $citationEnabled
+ * @var bool $sitemapEnabled
+ * @var bool $noindexSite
+ * @var bool $pingEnabled
+ * @var string $indexNowKey
+ * @var string $sitemapUrl
+ * @var string $robotsUrl
+ * @var array{items:int,itemSets:int,pages:int} $counts
+ * @var \Laminas\Form\Form $confirmForm
+ */
+
+$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'DRESeo'));
+$yes = $this->translate('Yes');
+$no = $this->translate('No');
+$on = '<span class="dre-seo-on">' . $this->translate('On') . '</span>';
+$off = '<span class="dre-seo-off">' . $this->translate('Off') . '</span>';
+$configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' => 'configure'], ['query' => ['id' => 'DRESeo']]);
+?>
+<?php echo $this->pageTitle($this->translate('SEO'), 1); ?>
+
+<div class="active section" role="tabpanel">
+
+    <?php if ($noindexSite): ?>
+    <p class="messages"><span class="message warning"><?php echo $this->translate('Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production.'); ?></span></p>
+    <?php endif; ?>
+
+    <h2><?php echo $this->translate('Status'); ?></h2>
+    <table class="tablesaw" data-tablesaw-mode="stack">
+        <thead>
+            <tr>
+                <th><?php echo $this->translate('Feature'); ?></th>
+                <th><?php echo $this->translate('State'); ?></th>
+            </tr>
+        </thead>
+        <tbody>
+            <tr>
+                <td><?php echo $this->translate('Google Search Console verification'); ?></td>
+                <td><?php echo $gscConfigured ? $on : $off; ?>
+                    <?php if (!$gscConfigured): ?>
+                        — <a href="<?php echo $this->escapeHtmlAttr($configureUrl); ?>"><?php echo $this->translate('paste your snippet in Configure'); ?></a>
+                    <?php endif; ?>
+                </td>
+            </tr>
+            <tr>
+                <td><?php echo $this->translate('schema.org JSON-LD'); ?></td>
+                <td><?php echo $jsonLdEnabled ? $on : $off; ?></td>
+            </tr>
+            <tr>
+                <td><?php echo $this->translate('Citation tags (Zotero / Scholar)'); ?></td>
+                <td><?php echo $citationEnabled ? $on : $off; ?></td>
+            </tr>
+            <tr>
+                <td><?php echo $this->translate('XML sitemap & robots.txt'); ?></td>
+                <td><?php echo $sitemapEnabled ? $on : $off; ?></td>
+            </tr>
+            <tr>
+                <td><?php echo $this->translate('IndexNow ping'); ?></td>
+                <td>
+                    <?php echo $pingEnabled ? $on : $off; ?>
+                    <?php if ($pingEnabled && $indexNowKey === ''): ?>
+                        — <span class="dre-seo-off"><?php echo $this->translate('no key set'); ?></span>
+                    <?php endif; ?>
+                </td>
+            </tr>
+        </tbody>
+    </table>
+
+    <?php if ($sitemapEnabled && $sitemapUrl): ?>
+    <h2><?php echo $this->translate('Sitemap'); ?></h2>
+    <ul class="dre-seo-links">
+        <li>
+            <a href="<?php echo $this->escapeHtmlAttr($sitemapUrl); ?>" target="_blank" rel="noopener">
+                <?php echo $this->escapeHtml($sitemapUrl); ?>
+            </a>
+        </li>
+        <li>
+            <a href="<?php echo $this->escapeHtmlAttr($robotsUrl); ?>" target="_blank" rel="noopener">
+                <?php echo $this->escapeHtml($robotsUrl); ?>
+            </a>
+        </li>
+    </ul>
+    <p>
+        <?php echo sprintf(
+            $this->translate('Covering %1$s public items, %2$s item sets and %3$s pages.'),
+            '<strong>' . number_format($counts['items']) . '</strong>',
+            '<strong>' . number_format($counts['itemSets']) . '</strong>',
+            '<strong>' . number_format($counts['pages']) . '</strong>'
+        ); ?>
+    </p>
+    <p><?php echo $this->translate('The sitemap is cached. Clear the cache to rebuild it immediately after a large content change.'); ?></p>
+    <?php
+    $confirmForm->setAttribute('action', $this->url('admin/dre-seo/regenerate'));
+    echo $this->form($confirmForm);
+    ?>
+    <?php endif; ?>
+
+    <h2><?php echo $this->translate('Static pages'); ?></h2>
+    <p>
+        <a class="button" href="<?php echo $this->escapeHtmlAttr($this->url('admin/dre-seo/pages')); ?>">
+            <?php echo $this->translate('Edit per-page SEO'); ?>
+        </a>
+        <a class="button" href="<?php echo $this->escapeHtmlAttr($configureUrl); ?>">
+            <?php echo $this->translate('Configure defaults & verification'); ?>
+        </a>
+    </p>
+</div>
