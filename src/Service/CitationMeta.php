@@ -70,6 +70,14 @@ class CitationMeta
             $headMeta->appendName('citation_author', $author);
         }
 
+        // Editors (e.g. the book's editors for a chapter). Zotero's Embedded
+        // Metadata translator maps repeated citation_editor tags to the Editor
+        // role; DC.contributor would mis-file them as non-citation contributors,
+        // so the Highwire tag is the correct channel.
+        foreach ($this->people($resource, ['bibo:editorList', 'marcrel:edt']) as $editor) {
+            $headMeta->appendName('citation_editor', $editor);
+        }
+
         $this->single($headMeta, 'citation_publication_date',
             $this->firstString($resource, ['dcterms:issued', 'dcterms:date', 'dcterms:created']));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
