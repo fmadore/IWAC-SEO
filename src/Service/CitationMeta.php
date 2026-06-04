@@ -159,8 +159,10 @@ class CitationMeta
             $resource->resourceClass() ? $resource->resourceClass()->label() : null);
         $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));
 
-        $doi = $this->doi($resource);
-        $this->single($headMeta, 'DC.identifier', $doi !== null ? 'https://doi.org/' . $doi : $canonical);
+        // DC.identifier is the resource's own (canonical) URL. The DOI is
+        // conveyed solely through citation_doi → Zotero's DOI field; emitting it
+        // here as well made Zotero copy it into the Extra field redundantly.
+        $this->single($headMeta, 'DC.identifier', $canonical);
 
         foreach ($this->labels($resource, 'dcterms:subject') as $subject) {
             $headMeta->appendName('DC.subject', $subject);

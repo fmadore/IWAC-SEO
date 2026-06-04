@@ -159,8 +159,15 @@ class HeadMetadata
         // Self-referential canonical (full current URL) keeps facet/sort
         // variants from looking like duplicate content while staying safe for
         // paginated pages (no collapsing page 2 onto page 1).
-        $this->setCanonical($view, $view->serverUrl(true));
-        if ($this->boolSetting('dre_seo_noindex_browse')) {
+        $current = $view->serverUrl(true);
+        $this->setCanonical($view, $current);
+
+        // Only noindex faceted / paginated / sorted variants (which carry a
+        // query string). Clean landing pages stay indexable — crucially the
+        // item-set pages (/item-set/{id}), which are listed in the sitemap;
+        // marking them noindex made Search Console reject that sitemap.
+        $hasQuery = ((string) (parse_url($current, PHP_URL_QUERY) ?? '')) !== '';
+        if ($hasQuery && $this->boolSetting('dre_seo_noindex_browse')) {
             $this->setRobots($view, 'noindex, follow');
         }
     }
