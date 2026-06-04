@@ -51,7 +51,28 @@ class SitemapController extends AbstractActionController
         if (!$site) {
             return $this->notFound();
         }
-        return $this->xml($this->generator->buildPages($this->siteUrl($site), $site->id(), $this->ttl()));
+
+        // Pass the site navigation tree + homepage so the sitemap mirrors the
+        // menu structure (order + depth-based priority). Guarded so a missing
+        // method or empty nav simply degrades to listing every public page.
+        $navTree = [];
+        $homepageId = null;
+        try {
+            $nav = $site->navigation();
+            $navTree = is_array($nav) ? $nav : [];
+            $homepage = $site->homepage();
+            $homepageId = $homepage ? $homepage->id() : null;
+        } catch (\Throwable $e) {
+            // degrade gracefully
+        }
+
+        return $this->xml($this->generator->buildPages(
+            $this->siteUrl($site),
+            $site->id(),
+            $this->ttl(),
+            $navTree,
+            $homepageId
+        ));
     }
 
     public function itemSetsAction(): Response

@@ -63,26 +63,100 @@ class SitemapGenerator
 
     // ─── Child sitemaps ───────────────────────────────────────────────────
 
-    public function buildPages(string $siteUrl, int $siteId, int $ttl): string
-    {
-        return $this->cached('pages', $ttl, function () use ($siteUrl, $siteId) {
-            $urls = [];
-            // Home page first, highest priority.
-            $urls[] = [
-                'loc'        => $siteUrl . '/',
-                'changefreq' => $this->changefreq('home'),
-                'priority'   => $this->priority('home'),
-            ];
+    /**
+     * Pages sitemap, driven by the site navigation so it mirrors the real site
+     * structure: home first, then menu pages in order with a priority that
+     * reflects their menu depth (top-level entries outrank submenu items), then
+     * any remaining public pages (demoted, so nothing is silently dropped).
+     *
+     * @param array<mixed> $navTree the site's o:navigation tree
+     */
+    public function buildPages(
+        string $siteUrl,
+        int $siteId,
+        int $ttl,
+        array $navTree = [],
+        ?int $homepageId = null
+    ): string {
+        return $this->cached('pages', $ttl, function () use ($siteUrl, $siteId, $navTree, $homepageId) {
+            // All public pages, keyed by id.
+            $pagesById = [];
             foreach ($this->fetchPages($siteId) as $row) {
-                $urls[] = [
+                $pagesById[(int) $row['id']] = $row;
+            }
+
+            $urls = [];
+            $emitted = [];
+            $pageUrl = function (array $row, ?string $priority, ?string $changefreq) use ($siteUrl): array {
+                return [
                     'loc'        => $siteUrl . '/page/' . rawurlencode((string) $row['slug']),
                     'lastmod'    => $this->w3c($row['modified'] ?? null),
-                    'changefreq' => $this->changefreq('page'),
-                    'priority'   => $this->priority('page'),
+                    'changefreq' => $changefreq,
+                    'priority'   => $priority,
+                ];
+            };
+
+            // Home first, at its canonical /page/{slug}. The bare site root only
+            // redirects there, so listing the page URL avoids both a redirect and
+            // a duplicate entry. Falls back to the root if the homepage is unknown.
+            if ($homepageId !== null && isset($pagesById[$homepageId])) {
+                $urls[] = $pageUrl($pagesById[$homepageId], $this->priority('home'), $this->changefreq('home'));
+                $emitted[$homepageId] = true;
+            } else {
+                $urls[] = [
+                    'loc'        => $siteUrl . '/',
+                    'changefreq' => $this->changefreq('home'),
+                    'priority'   => $this->priority('home'),
                 ];
             }
+
+            // Navigation pages, in menu order; priority by depth.
+            foreach ($this->flattenNav($navTree) as $nav) {
+                $id = $nav['id'];
+                if (isset($emitted[$id]) || !isset($pagesById[$id])) {
+                    continue;
+                }
+                $priority = $nav['depth'] === 0 ? $this->priority('section') : $this->priority('page');
+                $urls[] = $pageUrl($pagesById[$id], $priority, $this->changefreq('page'));
+                $emitted[$id] = true;
+            }
+
+            // Public pages not reachable from the navigation (e.g. a search
+            // page) — kept for coverage but demoted.
+            foreach ($pagesById as $id => $row) {
+                if (isset($emitted[$id])) {
+                    continue;
+                }
+                $urls[] = $pageUrl($row, $this->priority('browse'), $this->changefreq('page'));
+            }
+
             return $this->renderUrlset($urls);
         });
+    }
+
+    /**
+     * Flattens the Omeka navigation tree into an ordered list of page links with
+     * their menu depth. Only `page`-type links are followed; url / browse links
+     * are not emitted as canonical pages here.
+     *
+     * @param array<mixed> $tree
+     * @param array<array{id:int,depth:int}> $acc
+     * @return array<array{id:int,depth:int}>
+     */
+    private function flattenNav(array $tree, int $depth = 0, array &$acc = []): array
+    {
+        foreach ($tree as $link) {
+            if (!is_array($link)) {
+                continue;
+            }
+            if (($link['type'] ?? null) === 'page' && isset($link['data']['id'])) {
+                $acc[] = ['id' => (int) $link['data']['id'], 'depth' => $depth];
+            }
+            if (!empty($link['links']) && is_array($link['links'])) {
+                $this->flattenNav($link['links'], $depth + 1, $acc);
+            }
+        }
+        return $acc;
     }
 
     public function buildItemSets(string $siteUrl, int $siteId, int $ttl): string
@@ -141,7 +215,7 @@ class SitemapGenerator
         return [
             'items'    => $this->countItems($siteId),
             'itemSets' => count($this->fetchItemSets($siteId)),
-            'pages'    => count($this->fetchPages($siteId)) + 1, // + home
+            'pages'    => count($this->fetchPages($siteId)), // home is one of these
         ];
     }
 
