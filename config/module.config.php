@@ -193,6 +193,7 @@ return [
                 18 => 'Review',           // book review
                 19 => 'BlogPosting',      // online post
                 20 => 'Dataset',          // research data
+                21 => 'PodcastEpisode',   // podcasts (fabio:AudioDocument)
             ],
         ],
         'citation' => [
@@ -217,6 +218,7 @@ return [
                 18 => 'article',      // book review
                 19 => 'post',         // online post
                 20 => 'dataset',      // research data
+                21 => 'podcast',      // podcast episode
             ],
         ],
     ],

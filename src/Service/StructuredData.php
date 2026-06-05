@@ -155,11 +155,14 @@ class StructuredData
         SiteRepresentation $site,
         PhpRenderer $view
     ): void {
-        $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator', 'marcrel:aut'], $site, 'Person');
+        // marcrel:hst / :spk are the podcast host / guest(s); they trail the
+        // scholarly author roles so they only fill in when those are absent.
+        $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator', 'marcrel:aut', 'marcrel:hst', 'marcrel:spk'], $site, 'Person');
         if ($authors) {
             $data['author'] = $authors;
         }
-        $contributors = $this->links($resource, ['dcterms:contributor', 'bibo:editorList', 'marcrel:edt'], $site, 'Person');
+        // marcrel:sde is the podcast sound engineer (a production contributor).
+        $contributors = $this->links($resource, ['dcterms:contributor', 'bibo:editorList', 'marcrel:edt', 'marcrel:sde'], $site, 'Person');
         if ($contributors) {
             $data['contributor'] = $contributors;
         }

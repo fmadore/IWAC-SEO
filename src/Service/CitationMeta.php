@@ -137,6 +137,29 @@ class CitationMeta
             case 'report':
                 $this->single($headMeta, 'citation_technical_report_institution', $publisher ?? $container);
                 break;
+            case 'podcast':
+                // Zotero has no Highwire container tag for podcasts, so the
+                // item type rides on Dublin Core instead: the Embedded
+                // Metadata translator hands DC.type to its RDF backend, which
+                // accepts any exact Zotero type id (ZU.itemTypeExists). This
+                // wins over the generic class-label DC.type set in dublinCore()
+                // and over citation_title's journalArticle fall-back guess.
+                // (seriesTitle / episodeNumber have no flat-meta equivalent —
+                // Zotero only reads those from a nested RDF Series node.)
+                $this->single($headMeta, 'DC.type', 'podcast');
+
+                // Host = podcaster (Zotero's primary podcast creator), then
+                // guests. Both ride citation_author; Zotero folds the base
+                // "author" role onto the podcast's creator types (there is no
+                // citation_guest channel). The generic citation_author block
+                // above finds nothing here — podcasts use marcrel:hst / :spk.
+                foreach ($this->people($resource, ['marcrel:hst']) as $host) {
+                    $headMeta->appendName('citation_author', $host);
+                }
+                foreach ($this->people($resource, ['marcrel:spk']) as $guest) {
+                    $headMeta->appendName('citation_author', $guest);
+                }
+                break;
             // 'dataset', 'post', 'item': title/author/date/abstract already cover them.
         }
     }

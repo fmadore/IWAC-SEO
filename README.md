@@ -122,6 +122,7 @@ Driven by `config/module.config.php → dre_seo.structured_data.template_types` 
 | Research sections (7) | `Collection` |
 | Research items (10) | `CreativeWork` |
 | Publications (11–20) | `ScholarlyArticle` / `Book` / `Chapter` / `Thesis` / `Dataset` / `Review` / `BlogPosting` … |
+| Podcasts (21) | `PodcastEpisode` (host/guest ← `marcrel:hst` / `:spk`) |
 
 Creative works also carry `author`/`contributor` (from `bibo:authorList`, `dcterms:creator`,
 `marcrel:*`), `datePublished`/`dateCreated`, `inLanguage`, `keywords`, `spatialCoverage`,
@@ -151,6 +152,15 @@ The Highwire item-type mapping lives in `dre_seo.citation.template_kinds`
 **public** PDF media, so restricted bitstreams are never exposed. Toggle the whole feature with
 **Emit citation meta tags** in Configure (on by default). The same tags double as
 [Google Scholar](https://scholar.google.com) indexing signals.
+
+**Podcasts** (template 21) are the one type Zotero detects from Dublin Core rather than
+Highwire: there is no `citation_*` container tag for a podcast, so `DC.type` is set to the
+literal `podcast` (Zotero's *Embedded Metadata* translator accepts any exact Zotero item-type
+id there). Host and guests ride `citation_author`, which Zotero folds onto the podcast's
+*podcaster* role. The series title and episode number have no flat-`<meta>` equivalent that
+Zotero reads (it picks up `seriesTitle` / `episodeNumber` only from a nested RDF Series node),
+so they are omitted from the citation tags; the series is still exposed in the resource's
+JSON-LD via `isPartOf`.
 
 ---
 
