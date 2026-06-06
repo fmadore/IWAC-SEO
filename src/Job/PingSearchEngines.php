@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Job;
+namespace IwacSeo\Job;
 
-use DRESeo\Service\Pinger;
+use IwacSeo\Service\Pinger;
 use Omeka\Job\AbstractJob;
 
 /**
@@ -25,17 +25,17 @@ class PingSearchEngines extends AbstractJob
         $settings = $services->get('Omeka\Settings');
         $logger = $services->get('Omeka\Logger');
 
-        if ((string) $settings->get('dre_seo_ping_enabled', '0') !== '1') {
+        if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
             return;
         }
-        $key = trim((string) $settings->get('dre_seo_indexnow_key', ''));
+        $key = trim((string) $settings->get('iwac_seo_indexnow_key', ''));
         if ($key === '') {
-            $logger->warn('DRESeo: IndexNow ping enabled but no key is configured.');
+            $logger->warn('IwacSeo: IndexNow ping enabled but no key is configured.');
             return;
         }
 
-        $pending = $settings->get('dre_seo_ping_pending', []);
-        $settings->set('dre_seo_ping_pending', []); // claim & clear the queue
+        $pending = $settings->get('iwac_seo_ping_pending', []);
+        $settings->set('iwac_seo_ping_pending', []); // claim & clear the queue
         if (!is_array($pending) || $pending === []) {
             return;
         }
@@ -43,7 +43,7 @@ class PingSearchEngines extends AbstractJob
         $urls = array_values(array_unique(array_filter($pending)));
         if (count($urls) >= self::FLOOD_CAP) {
             $logger->info(sprintf(
-                'DRESeo: skipped IndexNow ping for a bulk change (%d URLs); the sitemap covers discovery.',
+                'IwacSeo: skipped IndexNow ping for a bulk change (%d URLs); the sitemap covers discovery.',
                 count($urls)
             ));
             return;
@@ -59,7 +59,7 @@ class PingSearchEngines extends AbstractJob
 
         $ok = $services->get(Pinger::class)->submitIndexNow($host, $key, $keyLocation, $urls);
         $logger->info(sprintf(
-            'DRESeo: IndexNow ping %s for %d URL(s).',
+            'IwacSeo: IndexNow ping %s for %d URL(s).',
             $ok ? 'accepted' : 'failed',
             count($urls)
         ));

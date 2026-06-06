@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service;
+namespace IwacSeo\Service;
 
 use Laminas\Http\Client as HttpClient;
 

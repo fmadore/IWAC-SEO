@@ -1,9 +1,9 @@
 {
-  "name": "am-digital-research-environment/dre-seo",
-  "description": "SEO metadata, schema.org JSON-LD, Zotero/Google Scholar citation tags, XML sitemap, robots.txt and Google Search Console verification for the Africa Multiple DRE Omeka S instance.",
+  "name": "frederickmadore/iwac-seo",
+  "description": "SEO metadata, schema.org JSON-LD, Zotero/Google Scholar citation tags, XML sitemap, robots.txt and Google Search Console verification for the Islam West Africa Collection (IWAC) Omeka S instance.",
   "type": "omeka-module",
   "license": "GPL-3.0-or-later",
-  "homepage": "https://github.com/AM-Digital-Research-Environment/DRE-SEO",
+  "homepage": "https://github.com/fmadore/IWAC-SEO",
   "authors": [
     {
       "name": "Frédérick Madore",
@@ -18,7 +18,7 @@
   },
   "autoload": {
     "psr-4": {
-      "DRESeo\\": "src/"
+      "IwacSeo\\": "src/"
     }
   }
 }

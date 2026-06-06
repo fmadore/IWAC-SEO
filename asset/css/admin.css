@@ -1,22 +1,22 @@
-/* DRE SEO — admin screens (status dashboard + static-page table). */
+/* IWAC SEO — admin screens (status dashboard + static-page table). */
 
-.dre-seo-on {
+.iwac-seo-on {
     color: #009260;
     font-weight: 600;
 }
 
-.dre-seo-off {
+.iwac-seo-off {
     color: #9a9a9a;
     font-weight: 600;
 }
 
-.dre-seo-links {
+.iwac-seo-links {
     list-style: none;
     margin: 0 0 1rem;
     padding: 0;
 }
 
-.dre-seo-links li {
+.iwac-seo-links li {
     margin: 0.15rem 0;
     font-family: monospace;
     word-break: break-all;
@@ -29,7 +29,7 @@
     box-sizing: border-box;
 }
 
-#content table.tablesaw td input.dre-seo-asset {
+#content table.tablesaw td input.iwac-seo-asset {
     width: 6rem;
 }
 

@@ -1,7 +1,7 @@
-# DRE SEO
+# IWAC SEO
 
-Search-engine optimisation and XML sitemap for the **Africa Multiple DRE** Omeka S
-instance ([data.africamultiple.uni-bayreuth.de](https://data.africamultiple.uni-bayreuth.de)).
+Search-engine optimisation and XML sitemap for the **Islam West Africa Collection
+(IWAC)** Omeka S instance ([islam.zmo.de](https://islam.zmo.de/s/afrique_ouest/page/accueil)).
 
 The site ships almost no SEO metadata out of the box: pages have a `<title>` but no
 description, no Open Graph / Twitter cards, no canonical link, no structured data, no
@@ -9,9 +9,14 @@ Google Search Console verification, and there is no `sitemap.xml` or `robots.txt
 module fills all of that in — **manually for static pages, automatically for every
 resource page** — and adds a sitemap, a robots file, and an optional IndexNow ping.
 
-It is a self-contained, settings-only module in the DRE family (alongside `DRESearch`,
-`ResourceVisualizations`, `DRE-theme`). No third-party Composer dependencies, no database
-tables, no theme edits.
+It is a self-contained, settings-only module. No third-party Composer dependencies, no
+database tables, no theme edits.
+
+> **IWAC is bilingual.** The same collection is published as two Omeka sites —
+> `afrique_ouest` (French, the default the host root redirects to) and `westafrica`
+> (English). The module resolves the current site at request time, so every signal
+> (site title, locale, canonical, breadcrumbs) is emitted in the right language with no
+> extra configuration.
 
 ---
 
@@ -21,36 +26,51 @@ tables, no theme edits.
 |---|---|
 | **Meta tags** | `<title>`, `<meta name="description">`, canonical link on every public page. |
 | **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. |
-| **schema.org JSON-LD** | Per-resource structured data typed from the resource template (Person, Place, Organization, ResearchProject, CreativeWork, Dataset, scholarly types …), plus `WebSite` + `SearchAction` on the home page and `BreadcrumbList` on resource pages. |
-| **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item/publication as a properly-typed reference (with authors, date, container, DOI, PDF …). |
-| **og:image** | The first image attached to an item; falls back to a site-wide default share image. |
+| **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` + `SearchAction` on the home page and `BreadcrumbList` on resource pages. |
+| **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
+| **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (chunked at 50k). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
 | **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. A staging switch can `Disallow: /` the whole site. |
 | **Google Search Console** | Paste the verification snippet in the module config; the `<meta name="google-site-verification">` tag is injected site-wide. |
-| **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (throttled; skips bulk syncs). |
+| **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (throttled; skips bulk imports). |
 
 Static-page SEO is **set by hand** (a central admin table); resource-page SEO is **derived
 automatically** from each item's metadata, with the configurable defaults filling any gaps.
 
 ---
 
+## Why dispatch on resource *class*, not template
+
+Both the schema.org typing and the citation typing key off the Omeka **resource class**
+(the RDF type), not the data-entry template. IWAC's templates are not 1:1 with classes:
+
+- Template 8 ("Newspaper article") historically held **both** newspaper articles
+  (class 36 `bibo:Article`) and Islamic-publication issues (class 60 `bibo:Issue`); the
+  latter now also has its own template 21, but class is still the reliable split.
+- The bibliographic references share templates across classes (e.g. template 10 covers
+  `bibo:Book`, `bibo:EditedBook` and `bibo:Thesis`).
+
+So the maps in `config/module.config.php` are keyed by class id. This matches how the
+IWAC → Hugging Face pipeline derives its subsets (also by class). See the `iwac-data`
+skill (`omeka-structure.md`) for the full class catalogue.
+
+---
+
 ## Installation
 
-The module folder **must be named `DRESeo`** inside Omeka's `modules/` directory (the folder
-name has to match the namespace, exactly like `DRESearch`). Deploy it the same way as the
-other DRE modules (the `omeka-s-docker` sideload / `EXTRA_MODULES` mechanism or the
-ansible-bootstrap copy), then:
+The module folder **must be named `IwacSeo`** inside Omeka's `modules/` directory (the
+folder name has to match the namespace). Then:
 
-1. **Admin → Modules → DRE SEO → Install.**
-2. **Configure** (see below) — at minimum paste your Google Search Console snippet and pick a
-   default share image.
+1. **Admin → Modules → IWAC SEO → Install.**
+2. **Configure** (see below) — at minimum paste your Google Search Console snippet and pick
+   a default share image.
 3. Visit `/sitemap.xml` and `/robots.txt` to confirm they render.
 
 No web-server changes are needed: nginx's `try_files … /index.php` already routes the
 `.xml`/`.txt` endpoints to Omeka because no such static files exist.
 
 There are no third-party dependencies, so `composer install` is **not** required — Omeka
-autoloads the `DRESeo\` namespace from `src/`.
+autoloads the `IwacSeo\` namespace from `src/`.
 
 **Requirements:** Omeka S `^4.2.0`, PHP `>= 8.2`.
 
@@ -58,8 +78,8 @@ autoloads the `DRESeo\` namespace from `src/`.
 
 ## Configuration
 
-**Modules → DRE SEO → Configure.** Every field is optional; sensible defaults are applied on
-install.
+**Modules → IWAC SEO → Configure.** Every field is optional; sensible defaults are applied
+on install.
 
 | Setting | Purpose |
 |---|---|
@@ -71,6 +91,7 @@ install.
 | **Discourage indexing (whole site)** | Staging switch: every page becomes `noindex,nofollow` and robots.txt disallows everything. **Off in production.** |
 | **Noindex filtered/paginated browse** | Keeps facet/pagination URLs out of the index while still following links to resources. On by default. |
 | **Emit schema.org JSON-LD** | Toggle structured data. On by default. |
+| **Emit citation meta tags** | Toggle Zotero / Scholar tags. On by default. |
 | **Serve /sitemap.xml & /robots.txt** | Toggle the sitemap/robots endpoints. On by default. |
 | **Sitemap cache lifetime** | Seconds before the cached sitemap is rebuilt. Default 86400 (24h). |
 | **Ping IndexNow when content changes** | Off by default. See the caveat below. |
@@ -97,96 +118,122 @@ The head signals are written into Omeka's request-global head placeholder helper
 `<head>` — so **no theme template needs to change**.
 
 * **Resource pages** (`view.show.after` on the Item/ItemSet/Media controllers): title from
-  `displayTitle()`, description from `dcterms:description` / `dcterms:abstract` (truncated to
-  ~160 chars), canonical from the resource's site URL, `og:image` from the primary media, and
-  JSON-LD from the resource template.
+  `displayTitle()`, description from `bibo:shortDescription` (the AI summary on newspaper
+  articles) / `dcterms:abstract` / `dcterms:description` (truncated to ~160 chars),
+  canonical from the resource's site URL, `og:image` from the primary media, and JSON-LD
+  from the resource class.
 * **Static pages** (`view.show.after` on the Page controller): the editor's per-page
   overrides, else defaults; `WebSite` JSON-LD on the home page.
 * **Browse/search pages** (`view.browse.after`): self-referential canonical and optional
-  `noindex`.
+  `noindex` on faceted/paginated variants.
 * **Every page** (`view.layout`): site-wide constants (`og:site_name`, `og:locale`,
   `twitter:card`, verification tags) and gap-fills for anything not already set. Resource
   values always win because the resource listeners run before the layout listener.
 
 ### schema.org `@type` map
 
-Driven by `config/module.config.php → dre_seo.structured_data.template_types` (overridable via
-`config/local.config.php`), keyed by Omeka resource-template id:
+Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (overridable via
+`config/local.config.php`), keyed by Omeka **resource class** id:
 
-| Template | `@type` |
+| Resource class | `@type` |
 |---|---|
-| Organisation (2) | `Organization` |
-| Location (3) | `Place` (+ `geo` when coordinates exist) |
-| Persons (4) | `Person` (+ `affiliation`, `sameAs` ← `dre:wisskiUrl` / `dre:rdspaceHandle`) |
-| Projects (5) | `ResearchProject` |
-| Research sections (7) | `Collection` |
-| Research items (10) | `CreativeWork` |
-| Publications (11–20) | `ScholarlyArticle` / `Book` / `Chapter` / `Thesis` / `Dataset` / `Review` / `BlogPosting` … |
-| Podcasts (21) | `PodcastEpisode` (host/guest ← `marcrel:hst` / `:spk`) |
+| `foaf:Person` (94) | `Person` (+ `givenName`/`familyName`, `affiliation`) |
+| `dcterms:Location` (9) | `Place` (+ `geo` from `curation:coordinates`) |
+| `foaf:Organization` (96) | `Organization` (+ `parentOrganization`) |
+| `bibo:Event` (54) | `Event` (+ `startDate`, `location`) |
+| `fabio:AuthorityFile` (244) | `DefinedTerm` (subjects / authority files) |
+| `bibo:Article` (36) | `NewsArticle` (newspaper article) |
+| `bibo:Issue` (60) | `PublicationIssue` (Islamic-publication issue) |
+| `bibo:AudioVisualDocument` (38) | `VideoObject` (+ `duration`, `uploadDate`) |
+| `bibo:Document` (49) | `DigitalDocument` |
+| `bibo:AcademicArticle` (35) | `ScholarlyArticle` |
+| `fabio:BookReview` (178) | `Review` |
+| `bibo:Chapter` (43) | `Chapter` |
+| `bibo:Book` (40) / `bibo:EditedBook` (52) | `Book` |
+| `bibo:Thesis` (88) | `Thesis` |
+| `bibo:Report` (82) | `Report` |
+| `bibo:PersonalCommunication` (77) | `CreativeWork` |
+| `fabio:BlogPost` (305) | `BlogPosting` |
 
-Creative works also carry `author`/`contributor` (from `bibo:authorList`, `dcterms:creator`,
-`marcrel:*`), `datePublished`/`dateCreated`, `inLanguage`, `keywords`, `spatialCoverage`,
-`isPartOf` and `publisher` when present.
+Creative works also carry `author`/`editor`/`contributor` (from `bibo:authorList`,
+`dcterms:creator`, `bibo:editorList`, `dcterms:contributor`), `datePublished`, `inLanguage`,
+`keywords`, `spatialCoverage`, `isPartOf` (the journal/newspaper/book/event) and `publisher`
+when present. Every record carries `sameAs` from its `dcterms:identifier` **URI** values
+(Wikidata, GeoNames, VIAF …) — opaque internal ids like `iwac-article-0000001` are skipped.
 
 ---
 
 ## Citation metadata (Zotero, Google Scholar, …)
 
 So that the **Zotero Connector** and similar tools capture a resource page as a reference,
-each item/publication page also emits embedded bibliographic `<meta>` tags — the two
-vocabularies Zotero's *Embedded Metadata* translator reads:
+each item page also emits embedded bibliographic `<meta>` tags — the two vocabularies
+Zotero's *Embedded Metadata* translator reads:
 
-* **Highwire Press** (`citation_title`, repeated `citation_author`, `citation_publication_date`,
-  `citation_journal_title` / `citation_inbook_title` / `citation_conference_title`,
+* **Highwire Press** (`citation_title`, repeated `citation_author` / `citation_editor`,
+  `citation_publication_date`, `citation_journal_title` / `citation_inbook_title`,
   `citation_volume`, `citation_issue`, `citation_firstpage`/`citation_lastpage`,
-  `citation_doi`, `citation_isbn`, `citation_issn`, `citation_publisher`, `citation_language`,
-  `citation_keywords`, `citation_abstract`, `citation_pdf_url`, `citation_public_url`). The tag
-  set is chosen per resource template so Zotero infers the right **item type** (journal article,
-  book section, book, conference paper, thesis, report, dataset, …).
+  `citation_publisher`, `citation_dissertation_institution`,
+  `citation_technical_report_institution`, `citation_doi`, `citation_language`,
+  `citation_keywords`, `citation_abstract`, `citation_pdf_url`, `citation_public_url`).
 * **Dublin Core** (`DC.title`, `DC.creator`, `DC.date`, `DC.publisher`, `DC.type`,
   `DC.language`, `DC.identifier`, `DC.subject`, `DC.description`) — emitted for **every**
-  resource, including person/place/organisation pages, as a generic fallback.
+  resource, including authority pages, as a generic fallback.
 
-The Highwire item-type mapping lives in `dre_seo.citation.template_kinds`
-(`config/module.config.php`) and is overridable. `citation_pdf_url` is emitted only for a
-**public** PDF media, so restricted bitstreams are never exposed. Toggle the whole feature with
-**Emit citation meta tags** in Configure (on by default). The same tags double as
-[Google Scholar](https://scholar.google.com) indexing signals.
+IWAC's field conventions are baked into the per-kind tags (see `src/Service/CitationMeta.php`):
 
-**Podcasts** (template 21) are the one type Zotero detects from Dublin Core rather than
-Highwire: there is no `citation_*` container tag for a podcast, so `DC.type` is set to the
-literal `podcast` (Zotero's *Embedded Metadata* translator accepts any exact Zotero item-type
-id there). Host and guests ride `citation_author`, which Zotero folds onto the podcast's
-*podcaster* role. The series title and episode number have no flat-`<meta>` equivalent that
-Zotero reads (it picks up `seriesTitle` / `episodeNumber` only from a nested RDF Series node),
-so they are omitted from the citation tags; the series is still exposed in the resource's
-JSON-LD via `isPartOf`.
+- the **journal / newspaper / publication title** lives in `dcterms:publisher` (often a
+  linked item set), not `dcterms:isPartOf`;
+- a **book chapter's book title** lives in `dcterms:alternative`;
+- **DOIs** live in `bibo:doi` (a URI value); **ISBN/ISSN are not recorded** in IWAC, so
+  those tags are not emitted.
+
+The citation kind per class lives in `iwac_seo.citation.class_kinds` and is overridable.
+`citation_pdf_url` is emitted only for a **public** PDF media, so restricted bitstreams are
+never exposed. Toggle the whole feature with **Emit citation meta tags** in Configure.
+
+### Newspaper articles & magazine issues — correct Zotero typing
+
+Newspaper articles (class 36) and Islamic-publication issues (class 60) are the bulk of the
+archive, but Highwire Press has **no** container tag for a newspaper or magazine — and any
+`citation_*` container tag forces Zotero's item type to `journalArticle` (in the Embedded
+Metadata translator, the Highwire type wins over `DC.type`). So those kinds instead:
+
+- set **`DC.type`** to a valid Zotero item-type id (`newspaperArticle` / `magazineArticle`),
+  which the translator's RDF backend honours **because no Highwire container tag is present**; and
+- route the publication name through **`prism.publicationName`** → Zotero's `publicationTitle`.
+
+The same DC.type technique types blog posts (`blogPost`), audiovisual (`videoRecording`) and
+scientific communications (`presentation`). The scholarly references (journal article, book,
+chapter, thesis, report, review) use the standard Highwire container tags, which type them
+precisely on their own.
 
 ---
 
 ## Sitemap
 
 * `/sitemap.xml` — sitemap **index** listing the children below.
-* `/sitemap-pages.xml` — the home page + all public site pages.
+* `/sitemap-pages.xml` — the home page + all public site pages (driven by the site
+  navigation, so menu order and depth set the priority).
 * `/sitemap-item-sets.xml` — public item-set browse pages.
-* `/sitemap-items-{n}.xml` — public items, chunked at 50,000 URLs per file.
+* `/sitemap-items-{n}.xml` — public items, chunked at 50,000 URLs per file (IWAC's ~22,600
+  public items fit in a single chunk).
 
 Resource ids + modified timestamps are read with one lean DBAL query per type (public
-resources scoped to the site), so even ~9k items render in well under a second. Output is
-cached under `files/dre-seo-cache/`; any cache failure falls back to live generation.
+resources scoped to the site), so the whole sitemap renders in well under a second. Output is
+cached under `files/iwac-seo-cache/`; any cache failure falls back to live generation.
 
 ---
 
-## IndexNow ping — and the bulk-sync caveat
+## IndexNow ping — and the bulk-import caveat
 
 When **Ping IndexNow** is on, public item/page **create** and **update** events queue the
 changed URL; a background job submits the queue to IndexNow at most once every 15 minutes.
 
-> **This site's content arrives mainly through the `MongoDB2OmekaS` bulk sync, which writes
-> thousands of items.** The queue is therefore capped (200) and the job *skips* pinging when
-> it looks like a bulk change — those URLs are discovered through the sitemap instead.
-> IndexNow is meant for occasional **manual** edits. If in doubt, leave it **off** and rely on
-> the sitemap + Search Console.
+> **IWAC content arrives mainly through bulk imports that write thousands of items at once.**
+> The queue is therefore capped (200) and the job *skips* pinging when it looks like a bulk
+> change — those URLs are discovered through the sitemap instead. IndexNow is meant for
+> occasional **manual** edits. If in doubt, leave it **off** and rely on the sitemap +
+> Search Console.
 
 Google is **not** pinged: its sitemap-ping endpoint was retired in 2023. Google discovers
 content via the robots.txt `Sitemap:` line and Search Console.
@@ -196,12 +243,12 @@ content via the robots.txt `Sitemap:` line and Search Console.
 ## Project layout
 
 ```
-DRESeo/
+IwacSeo/
 ├── Module.php                       # listeners, ACL, install/uninstall, config form
-├── composer.json                    # type omeka-module; PSR-4 DRESeo\ -> src/ (no runtime deps)
+├── composer.json                    # type omeka-module; PSR-4 IwacSeo\ -> src/ (no runtime deps)
 ├── config/
 │   ├── module.ini
-│   └── module.config.php            # routes, services, navigation, dre_seo defaults
+│   └── module.config.php            # routes, services, navigation, iwac_seo defaults
 ├── src/
 │   ├── Controller/
 │   │   ├── SitemapController.php     # /sitemap*.xml, /robots.txt, /{key}.txt
@@ -210,12 +257,13 @@ DRESeo/
 │   ├── Job/PingSearchEngines.php
 │   └── Service/
 │       ├── HeadMetadata.php          # computes + injects all <head> SEO
-│       ├── StructuredData.php        # schema.org JSON-LD
+│       ├── StructuredData.php        # schema.org JSON-LD (by resource class)
+│       ├── CitationMeta.php          # Highwire + Dublin Core citation tags
 │       ├── SitemapGenerator.php      # lean queries + XML + cache
 │       ├── PageSeoStore.php          # per-page overrides (site setting)
 │       ├── Pinger.php                # IndexNow submit
 │       └── *Factory.php
-├── view/dre-seo/admin/seo/{dashboard,pages}.phtml
+├── view/iwac-seo/admin/seo/{dashboard,pages}.phtml
 ├── asset/css/admin.css
 └── language/template.pot
 ```
@@ -224,40 +272,37 @@ DRESeo/
 
 ## Verifying a deployment
 
-1. `curl -s https://HOST/sitemap.xml | head` → a `<sitemapindex>`; the child sitemaps list
-   `<url>` entries with `<lastmod>`.
-2. `curl -s https://HOST/robots.txt` → `Disallow: /admin/` and a `Sitemap:` line.
-3. View-source an item page (`/s/amira/item/100`): confirm `<title>`, `description`, `og:*`,
-   `twitter:*`, `<link rel="canonical">` and a `application/ld+json` block. Validate the JSON-LD
-   with the [Rich Results Test](https://search.google.com/test/rich-results).
-4. Home page: `og:site_name` and a `WebSite` JSON-LD block; the GSC tag once a token is set.
-5. **Admin → SEO → Static pages**: set a title/description on a page → confirm it appears in
-   that page's `<head>`.
+1. `curl -s https://islam.zmo.de/sitemap.xml | head` → a `<sitemapindex>`; the child sitemaps
+   list `<url>` entries with `<lastmod>`.
+2. `curl -s https://islam.zmo.de/robots.txt` → `Disallow: /admin/` and a `Sitemap:` line.
+3. View-source an item page (`/s/afrique_ouest/item/2231`): confirm `<title>`, `description`,
+   `og:*`, `twitter:*`, `<link rel="canonical">` and an `application/ld+json` block. Validate
+   the JSON-LD with the [Rich Results Test](https://search.google.com/test/rich-results).
+4. Open a reference page (e.g. a journal article) with the **Zotero Connector** and confirm it
+   saves as the right item type with authors, date, container and DOI; open a newspaper article
+   and confirm it saves as a *newspaper article* with the newspaper as the publication.
+5. Home page: `og:site_name` and a `WebSite` JSON-LD block; the GSC tag once a token is set.
 6. In Search Console: add the property, verify via the meta tag, submit `/sitemap.xml`.
 
 ---
 
 ## Roadmap
 
-* **COinS** (`<span class="Z3988">`) as a complementary reference-embedding signal for
-  translators that prefer it, and to expose multiple references on list pages.
-* **unAPI** + per-item **BibTeX / RIS** export links ("Cite / Export") for one-click download.
-* Structured-data & citation enrichment: `sameAs` ORCID / GND / VIAF on persons, `geo` from the
-  geoloc data on places, `Dataset` `distribution` / `license` for research data.
-* Per-static-page SEO fields **inline in the page editor** (currently a central table).
-* `hreflang` / multilingual metadata once localized page variants exist.
-* Image / news sitemap extensions; optional nginx-level caching of `/sitemap*.xml`.
+* **COinS** (`<span class="Z3988">`) as a complementary reference-embedding signal, and to
+  expose references on list pages.
+* unAPI + per-item **BibTeX / RIS** export links ("Cite / Export").
+* `hreflang` linking the French (`afrique_ouest`) and English (`westafrica`) variants of each page.
+* Image sitemap extension for the IIIF page scans; optional nginx-level caching of `/sitemap*.xml`.
 
 ---
 
 ## Uninstalling
 
-Removes every `dre_seo_*` global setting and the per-site `dre_seo_pages` overrides. The
-sitemap cache directory (`files/dre-seo-cache/`) can be deleted manually if desired.
+Removes every `iwac_seo_*` global setting and the per-site `iwac_seo_pages` overrides. The
+sitemap cache directory (`files/iwac-seo-cache/`) can be deleted manually if desired.
 
 ---
 
 ## Licence
 
-GPL-3.0-or-later. © Frédérick Madore / Africa Multiple Cluster of Excellence, University of
-Bayreuth.
+GPL-3.0-or-later. © Frédérick Madore.

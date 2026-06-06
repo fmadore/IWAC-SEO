@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Controller\Admin;
+namespace IwacSeo\Controller\Admin;
 
-use DRESeo\Form\PageSeoForm;
-use DRESeo\Service\PageSeoStore;
-use DRESeo\Service\SitemapGenerator;
+use IwacSeo\Form\PageSeoForm;
+use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SitemapGenerator;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
@@ -33,20 +33,20 @@ class SeoController extends AbstractActionController
 
         $view = new ViewModel([
             'site'           => $site,
-            'gscConfigured'  => trim((string) $this->settings->get('dre_seo_gsc_verification', '')) !== '',
-            'jsonLdEnabled'  => $this->boolSetting('dre_seo_jsonld_enabled', true),
-            'citationEnabled' => $this->boolSetting('dre_seo_citation_meta', true),
-            'sitemapEnabled' => $this->boolSetting('dre_seo_sitemap_enabled', true),
-            'noindexSite'    => $this->boolSetting('dre_seo_noindex_site'),
-            'pingEnabled'    => $this->boolSetting('dre_seo_ping_enabled'),
-            'indexNowKey'    => trim((string) $this->settings->get('dre_seo_indexnow_key', '')),
+            'gscConfigured'  => trim((string) $this->settings->get('iwac_seo_gsc_verification', '')) !== '',
+            'jsonLdEnabled'  => $this->boolSetting('iwac_seo_jsonld_enabled', true),
+            'citationEnabled' => $this->boolSetting('iwac_seo_citation_meta', true),
+            'sitemapEnabled' => $this->boolSetting('iwac_seo_sitemap_enabled', true),
+            'noindexSite'    => $this->boolSetting('iwac_seo_noindex_site'),
+            'pingEnabled'    => $this->boolSetting('iwac_seo_ping_enabled'),
+            'indexNowKey'    => trim((string) $this->settings->get('iwac_seo_indexnow_key', '')),
             'sitemapUrl'     => $hostUrl ? $hostUrl . '/sitemap.xml' : '',
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],
             'confirmForm'    => $this->getForm(\Omeka\Form\ConfirmForm::class)
-                ->setAttribute('action', $this->url()->fromRoute('admin/dre-seo/regenerate')),
+                ->setAttribute('action', $this->url()->fromRoute('admin/iwac-seo/regenerate')),
         ]);
-        return $view->setTemplate('dre-seo/admin/seo/dashboard');
+        return $view->setTemplate('iwac-seo/admin/seo/dashboard');
     }
 
     public function regenerateAction()
@@ -61,7 +61,7 @@ class SeoController extends AbstractActionController
                 $this->messenger()->addError('Invalid form submission.'); // @translate
             }
         }
-        return $this->redirect()->toRoute('admin/dre-seo');
+        return $this->redirect()->toRoute('admin/iwac-seo');
     }
 
     public function pagesAction()
@@ -69,7 +69,7 @@ class SeoController extends AbstractActionController
         $site = $this->resolveSite();
         if (!$site) {
             $this->messenger()->addError('No site found.'); // @translate
-            return $this->redirect()->toRoute('admin/dre-seo');
+            return $this->redirect()->toRoute('admin/iwac-seo');
         }
         $this->pageSeoStore->setSite($site->id());
         $form = $this->getForm(PageSeoForm::class);
@@ -92,7 +92,7 @@ class SeoController extends AbstractActionController
                 }
                 $this->pageSeoStore->replaceAll($map);
                 $this->messenger()->addSuccess('Static-page SEO saved.'); // @translate
-                return $this->redirect()->toRoute('admin/dre-seo/pages');
+                return $this->redirect()->toRoute('admin/iwac-seo/pages');
             }
             $this->messenger()->addError('Invalid form submission.'); // @translate
         }
@@ -105,7 +105,7 @@ class SeoController extends AbstractActionController
             'overrides' => $this->pageSeoStore->all(),
             'form'      => $form,
         ]);
-        return $view->setTemplate('dre-seo/admin/seo/pages');
+        return $view->setTemplate('iwac-seo/admin/seo/pages');
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

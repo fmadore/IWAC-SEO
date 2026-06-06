@@ -1,11 +1,11 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service\Controller;
+namespace IwacSeo\Service\Controller;
 
-use DRESeo\Controller\Admin\SeoController;
-use DRESeo\Service\PageSeoStore;
-use DRESeo\Service\SitemapGenerator;
+use IwacSeo\Controller\Admin\SeoController;
+use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SitemapGenerator;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 

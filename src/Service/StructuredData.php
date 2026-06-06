@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service;
+namespace IwacSeo\Service;
 
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
@@ -11,23 +11,29 @@ use Omeka\Api\Representation\ValueRepresentation;
 /**
  * Builds schema.org JSON-LD documents for resource and site pages.
  *
- * The resource template id selects the @type (see the 'dre_seo.structured_data'
- * config map). Entity templates (Person / Place / Organization) get an entity
- * shape; everything else gets a scholarly "creative work" shape with authors,
- * dates, subjects, language, coverage and containment. All values are read
- * through the representation API, so labels of linked authority items come for
- * free via displayTitle().
+ * The **resource class** id selects the @type (see the 'iwac_seo.structured_data'
+ * config map). IWAC dispatches on class, not template: template 8 historically
+ * held both newspaper articles (class 36) and Islamic-publication issues
+ * (class 60), and the bibliographic references share templates across classes.
+ *
+ * Authority records (Person / Place / Organization / Event / subject) get an
+ * entity shape; everything else gets a "creative work" shape with authors,
+ * dates, subjects, language, coverage and containment. Container/publisher
+ * sources are class-dependent in IWAC (the journal/newspaper sits in
+ * dcterms:publisher; a book chapter's book title sits in dcterms:alternative),
+ * so the work decorator branches on the resolved @type. Linked-authority labels
+ * come for free via displayTitle().
  */
 class StructuredData
 {
-    private const ENTITY_TYPES = ['Person', 'Place', 'Organization'];
+    /** @type values that are descriptive authority records, not creative works. */
+    private const ENTITY_TYPES = ['Person', 'Place', 'Organization', 'Event', 'DefinedTerm'];
 
     /**
-     * @param array<int,string> $templateTypes resource template id => schema @type
-     * @param array<int,bool> $datasetTemplates template ids that are datasets
+     * @param array<int,string> $classTypes resource class id => schema @type
      */
     public function __construct(
-        private readonly array $templateTypes,
+        private readonly array $classTypes,
         private readonly string $defaultType = 'CreativeWork',
     ) {
     }
@@ -40,8 +46,8 @@ class StructuredData
         ?string $canonical,
         ?string $image
     ): ?array {
-        $templateId = $resource->resourceTemplate() ? $resource->resourceTemplate()->id() : null;
-        $type = $this->templateTypes[$templateId] ?? $this->defaultType;
+        $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
+        $type = $this->classTypes[$classId] ?? $this->defaultType;
 
         $data = [
             '@context' => 'https://schema.org',
@@ -54,7 +60,9 @@ class StructuredData
         if ($image) {
             $data['image'] = $image;
         }
-        $description = $this->firstLiteral($resource, ['dcterms:description', 'dcterms:abstract', 'bibo:abstract']);
+        $description = $this->firstLiteral($resource, [
+            'dcterms:abstract', 'bibo:shortDescription', 'dcterms:description', 'bibo:abstract',
+        ]);
         if ($description !== null) {
             $data['description'] = $description;
         }
@@ -65,9 +73,9 @@ class StructuredData
         }
 
         if (in_array($type, self::ENTITY_TYPES, true)) {
-            $this->decorateEntity($data, $type, $resource, $site, $view);
+            $this->decorateEntity($data, $type, $resource, $site);
         } else {
-            $this->decorateWork($data, $resource, $site, $view);
+            $this->decorateWork($data, $type, $resource, $site);
         }
 
         return $data;
@@ -116,7 +124,7 @@ class StructuredData
                 '@type'       => 'SearchAction',
                 'target'      => [
                     '@type'       => 'EntryPoint',
-                    'urlTemplate' => $home . 'dre-search?q={search_term_string}',
+                    'urlTemplate' => $home . 'search?q={search_term_string}',
                 ],
                 'query-input' => 'required name=search_term_string',
             ],
@@ -130,51 +138,85 @@ class StructuredData
         array &$data,
         string $type,
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site,
-        PhpRenderer $view
+        SiteRepresentation $site
     ): void {
         if ($type === 'Person') {
-            $affiliation = $this->firstLink($resource, 'dcterms:isPartOf', $site);
-            if ($affiliation) {
-                $data['affiliation'] = ['@type' => 'Organization', 'name' => $affiliation['name']];
+            $given = $this->firstLiteral($resource, ['foaf:firstName']);
+            if ($given !== null) {
+                $data['givenName'] = $given;
+            }
+            $family = $this->firstLiteral($resource, ['foaf:lastName']);
+            if ($family !== null) {
+                $data['familyName'] = $family;
+            }
+            $affiliations = $this->links($resource, ['dcterms:isPartOf'], $site, 'Organization');
+            if ($affiliations) {
+                $data['affiliation'] = $affiliations;
+            }
+        } elseif ($type === 'Place') {
+            // IWAC stores a place's coordinates as a single "lat, lng" literal
+            // in curation:coordinates (not separate schema:latitude/longitude).
+            $coords = $this->coordinates($resource);
+            if ($coords !== null) {
+                $data['geo'] = [
+                    '@type'     => 'GeoCoordinates',
+                    'latitude'  => $coords[0],
+                    'longitude' => $coords[1],
+                ];
+            }
+            $within = $this->firstLink($resource, 'dcterms:isPartOf', $site);
+            if ($within) {
+                $data['containedInPlace'] = array_filter([
+                    '@type' => 'Place',
+                    'name'  => $within['name'],
+                    'url'   => $within['url'],
+                ]);
+            }
+        } elseif ($type === 'Organization') {
+            $parents = $this->links($resource, ['dcterms:isPartOf'], $site, 'Organization');
+            if ($parents) {
+                $data['parentOrganization'] = $parents;
+            }
+        } elseif ($type === 'Event') {
+            $date = $this->firstLiteral($resource, ['dcterms:date']);
+            if ($date !== null) {
+                $data['startDate'] = $date;
+            }
+            $places = $this->valueLabels($resource, 'dcterms:spatial');
+            if ($places) {
+                $data['location'] = array_map(
+                    static fn (string $name) => ['@type' => 'Place', 'name' => $name],
+                    $places
+                );
             }
         }
-        if ($type === 'Place') {
-            $lat = $this->firstLiteral($resource, ['schema:latitude', 'geo:lat']);
-            $lng = $this->firstLiteral($resource, ['schema:longitude', 'geo:long']);
-            if ($lat !== null && $lng !== null) {
-                $data['geo'] = ['@type' => 'GeoCoordinates', 'latitude' => $lat, 'longitude' => $lng];
-            }
-        }
+        // DefinedTerm (subjects / authority files): name + description + sameAs
+        // from the shared base are sufficient.
     }
 
     /** @param array<mixed> $data */
     private function decorateWork(
         array &$data,
+        string $type,
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site,
-        PhpRenderer $view
+        SiteRepresentation $site
     ): void {
-        // marcrel:hst / :spk are the podcast host / guest(s); they trail the
-        // scholarly author roles so they only fill in when those are absent.
-        $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator', 'marcrel:aut', 'marcrel:hst', 'marcrel:spk'], $site, 'Person');
+        $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator'], $site, 'Person');
         if ($authors) {
             $data['author'] = $authors;
         }
-        // marcrel:sde is the podcast sound engineer (a production contributor).
-        $contributors = $this->links($resource, ['dcterms:contributor', 'bibo:editorList', 'marcrel:edt', 'marcrel:sde'], $site, 'Person');
+        $editors = $this->links($resource, ['bibo:editorList'], $site, 'Person');
+        if ($editors) {
+            $data['editor'] = $editors;
+        }
+        $contributors = $this->links($resource, ['dcterms:contributor'], $site, 'Person');
         if ($contributors) {
             $data['contributor'] = $contributors;
         }
 
-        $date = $this->firstLiteral($resource, ['dcterms:issued', 'dcterms:date']);
+        $date = $this->firstLiteral($resource, ['dcterms:date', 'dcterms:issued']);
         if ($date !== null) {
             $data['datePublished'] = $date;
-        } else {
-            $created = $this->firstLiteral($resource, ['dcterms:created']);
-            if ($created !== null) {
-                $data['dateCreated'] = $created;
-            }
         }
 
         $language = $this->firstValueLabel($resource, 'dcterms:language');
@@ -195,19 +237,91 @@ class StructuredData
             );
         }
 
-        $partOf = $this->firstLink($resource, 'dcterms:isPartOf', $site);
-        if ($partOf) {
-            $data['isPartOf'] = array_filter([
-                '@type' => 'CreativeWork',
-                'name'  => $partOf['name'],
-                'url'   => $partOf['url'],
-            ]);
+        // Audiovisual: an ISO-8601 duration and an upload date round out the
+        // VideoObject (which schema.org expects for video rich results).
+        if ($type === 'VideoObject') {
+            $duration = $this->firstLiteral($resource, ['dcterms:extent']);
+            if ($duration !== null && str_starts_with($duration, 'P')) {
+                $data['duration'] = $duration;
+            }
+            if ($date !== null) {
+                $data['uploadDate'] = $date;
+            }
         }
 
-        $publisher = $this->firstLiteralOrLabel($resource, 'dcterms:publisher');
+        $this->decorateContainer($data, $type, $resource, $site);
+
+        $publisher = $this->publisherFor($type, $resource);
         if ($publisher !== null) {
             $data['publisher'] = ['@type' => 'Organization', 'name' => $publisher];
         }
+    }
+
+    /**
+     * The container the work belongs to (schema:isPartOf). IWAC keeps it in
+     * different properties per type:
+     *   - journal article / book review → dcterms:publisher (the periodical)
+     *   - newspaper article / publication issue → dcterms:publisher (the title,
+     *     a linked item set with its own page)
+     *   - book chapter → dcterms:alternative (the book title)
+     *   - communication / talk → dcterms:isPartOf (the event)
+     *
+     * @param array<mixed> $data
+     */
+    private function decorateContainer(
+        array &$data,
+        string $type,
+        AbstractResourceEntityRepresentation $resource,
+        SiteRepresentation $site
+    ): void {
+        if (in_array($type, ['ScholarlyArticle', 'Review', 'NewsArticle', 'PublicationIssue'], true)) {
+            $periodical = $this->firstLink($resource, 'dcterms:publisher', $site);
+            if ($periodical) {
+                $data['isPartOf'] = array_filter([
+                    '@type' => 'Periodical',
+                    'name'  => $periodical['name'],
+                    'url'   => $periodical['url'],
+                ]);
+            }
+            if ($type === 'PublicationIssue') {
+                $issue = $this->firstLiteral($resource, ['bibo:issue']);
+                if ($issue !== null) {
+                    $data['issueNumber'] = $issue;
+                }
+            }
+            return;
+        }
+        if ($type === 'Chapter') {
+            $book = $this->firstLiteral($resource, ['dcterms:alternative']);
+            if ($book !== null) {
+                $data['isPartOf'] = ['@type' => 'Book', 'name' => $book];
+            }
+            return;
+        }
+        if ($type === 'CreativeWork') {
+            // Personal communication / conference talk → part of an event.
+            $event = $this->firstLink($resource, 'dcterms:isPartOf', $site);
+            if ($event) {
+                $data['isPartOf'] = array_filter([
+                    '@type' => 'Event',
+                    'name'  => $event['name'],
+                    'url'   => $event['url'],
+                ]);
+            }
+        }
+    }
+
+    /**
+     * dcterms:publisher used as the actual publisher/institution (not as the
+     * periodical container, which decorateContainer() already handled).
+     */
+    private function publisherFor(string $type, AbstractResourceEntityRepresentation $resource): ?string
+    {
+        $publisherTypes = ['Book', 'Chapter', 'Thesis', 'Report', 'BlogPosting', 'VideoObject', 'DigitalDocument'];
+        if (!in_array($type, $publisherTypes, true)) {
+            return null;
+        }
+        return $this->firstValueLabel($resource, 'dcterms:publisher');
     }
 
     // ─── Value readers ──────────────────────────────────────────────────────
@@ -241,11 +355,6 @@ class StructuredData
         return $text !== '' ? $text : null;
     }
 
-    private function firstLiteralOrLabel(AbstractResourceEntityRepresentation $resource, string $term): ?string
-    {
-        return $this->firstValueLabel($resource, $term);
-    }
-
     /** @return string[] */
     private function valueLabels(AbstractResourceEntityRepresentation $resource, string $term): array
     {
@@ -264,7 +373,7 @@ class StructuredData
     }
 
     /**
-     * Linked resources for the first of $terms that has values.
+     * Linked (or literal) resources for the first of $terms that has values.
      *
      * @param string[] $terms
      * @return array<array{@type:string,name:string,url?:string}>
@@ -328,25 +437,49 @@ class StructuredData
         return $name !== '' ? ['name' => $name, 'url' => null] : null;
     }
 
-    /** @return string[] */
+    /**
+     * Parse IWAC's "lat, lng" coordinate literal (curation:coordinates).
+     *
+     * @return array{0:float,1:float}|null
+     */
+    private function coordinates(AbstractResourceEntityRepresentation $resource): ?array
+    {
+        $raw = $this->firstLiteral($resource, ['curation:coordinates']);
+        if ($raw === null) {
+            return null;
+        }
+        $parts = array_map('trim', explode(',', $raw));
+        if (count($parts) !== 2 || !is_numeric($parts[0]) || !is_numeric($parts[1])) {
+            return null;
+        }
+        return [(float) $parts[0], (float) $parts[1]];
+    }
+
+    /**
+     * External authority links for schema:sameAs. IWAC carries these in
+     * dcterms:identifier as URI values (Wikidata, GeoNames, VIAF …). The same
+     * property also holds opaque internal ids ("iwac-article-0000001") as plain
+     * literals, so only URI-typed (or http-looking) values are emitted.
+     *
+     * @return string[]
+     */
     private function sameAs(AbstractResourceEntityRepresentation $resource): array
     {
         $out = [];
-        $wisski = $resource->value('dre:wisskiUrl');
-        if ($wisski instanceof ValueRepresentation) {
-            $uri = $wisski->uri() ?: trim((string) $wisski);
-            if ($uri !== '') {
-                $out[] = $uri;
+        foreach ($resource->value('dcterms:identifier', ['all' => true]) as $value) {
+            if (!$value instanceof ValueRepresentation) {
+                continue;
+            }
+            $uri = $value->uri();
+            if (!$uri) {
+                $candidate = trim((string) $value);
+                $uri = preg_match('#^https?://#i', $candidate) ? $candidate : null;
+            }
+            if ($uri) {
+                $out[$uri] = $uri;
             }
         }
-        $handle = $resource->value('dre:rdspaceHandle');
-        if ($handle instanceof ValueRepresentation) {
-            $h = trim((string) $handle);
-            if ($h !== '') {
-                $out[] = str_starts_with($h, 'http') ? $h : 'https://hdl.handle.net/' . ltrim($h, '/');
-            }
-        }
-        return $out;
+        return array_values($out);
     }
 
     private function homeUrl(PhpRenderer $view, SiteRepresentation $site): string

@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service;
+namespace IwacSeo\Service;
 
 use Doctrine\DBAL\Connection;
 
@@ -23,7 +23,7 @@ class SitemapGenerator
     private const MAX_URLS_PER_FILE = 50000;
 
     /**
-     * @param array<string,mixed> $config the 'dre_seo.sitemap' config block
+     * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
      */
     public function __construct(
         private readonly Connection $connection,

@@ -1,9 +1,9 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Controller;
+namespace IwacSeo\Controller;
 
-use DRESeo\Service\SitemapGenerator;
+use IwacSeo\Service\SitemapGenerator;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
@@ -106,7 +106,7 @@ class SitemapController extends AbstractActionController
     public function robotsAction(): Response
     {
         $lines = ['User-agent: *'];
-        if ($this->boolSetting('dre_seo_noindex_site')) {
+        if ($this->boolSetting('iwac_seo_noindex_site')) {
             $lines[] = 'Disallow: /';
         } else {
             $lines[] = 'Disallow: /admin/';
@@ -126,7 +126,7 @@ class SitemapController extends AbstractActionController
 
     public function indexNowKeyAction(): Response
     {
-        $configured = trim((string) $this->settings->get('dre_seo_indexnow_key', ''));
+        $configured = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
         $requested = (string) $this->params()->fromRoute('key', '');
         if ($configured === '' || !hash_equals($configured, $requested)) {
             return $this->notFound();
@@ -174,12 +174,12 @@ class SitemapController extends AbstractActionController
 
     private function ttl(): int
     {
-        return (int) $this->settings->get('dre_seo_sitemap_ttl', 86400);
+        return (int) $this->settings->get('iwac_seo_sitemap_ttl', 86400);
     }
 
     private function sitemapEnabled(): bool
     {
-        return $this->boolSetting('dre_seo_sitemap_enabled', true);
+        return $this->boolSetting('iwac_seo_sitemap_enabled', true);
     }
 
     private function boolSetting(string $key, bool $default = false): bool

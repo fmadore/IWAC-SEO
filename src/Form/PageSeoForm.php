@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Form;
+namespace IwacSeo\Form;
 
 use Laminas\Form\Element;
 use Laminas\Form\Form;

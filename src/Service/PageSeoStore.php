@@ -1,13 +1,13 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service;
+namespace IwacSeo\Service;
 
 use Omeka\Settings\SiteSettings;
 
 /**
  * Per-site-page SEO overrides — the manual values an editor sets for static
- * pages. Stored as one JSON map under the site setting `dre_seo_pages`
+ * pages. Stored as one JSON map under the site setting `iwac_seo_pages`
  * ({pageId: {title, description, image, robots, jsonld}}), so there is no
  * custom database table and uninstall is a single delete.
  *
@@ -17,7 +17,7 @@ use Omeka\Settings\SiteSettings;
  */
 class PageSeoStore
 {
-    private const KEY = 'dre_seo_pages';
+    private const KEY = 'iwac_seo_pages';
 
     public function __construct(private readonly SiteSettings $siteSettings)
     {

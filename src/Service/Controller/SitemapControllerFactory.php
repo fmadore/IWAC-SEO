@@ -1,10 +1,10 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service\Controller;
+namespace IwacSeo\Service\Controller;
 
-use DRESeo\Controller\SitemapController;
-use DRESeo\Service\SitemapGenerator;
+use IwacSeo\Controller\SitemapController;
+use IwacSeo\Service\SitemapGenerator;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 

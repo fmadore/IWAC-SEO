@@ -7,7 +7,7 @@
  * @var \Laminas\Form\Form $form
  */
 
-$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'DRESeo'));
+$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'IwacSeo'));
 
 $robotsOptions = [
     ''               => $this->translate('Default (indexable)'),
@@ -15,7 +15,7 @@ $robotsOptions = [
     'noindex, follow' => $this->translate('Noindex'),
 ];
 
-$form->setAttribute('action', $this->url('admin/dre-seo/pages'));
+$form->setAttribute('action', $this->url('admin/iwac-seo/pages'));
 $form->setAttribute('method', 'post');
 $form->prepare();
 ?>
@@ -61,7 +61,7 @@ $form->prepare();
                             placeholder="<?php echo $this->escapeHtmlAttr($this->translate('150–160 characters')); ?>"><?php echo $this->escapeHtml($o['description'] ?? ''); ?></textarea>
                     </td>
                     <td>
-                        <input type="number" min="0" step="1" class="dre-seo-asset"
+                        <input type="number" min="0" step="1" class="iwac-seo-asset"
                             name="<?php echo $this->escapeHtmlAttr($base . '[image]'); ?>"
                             value="<?php echo $this->escapeHtmlAttr((string) ($o['image'] ?? '')); ?>">
                     </td>

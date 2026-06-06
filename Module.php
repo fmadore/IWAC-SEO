@@ -2,29 +2,30 @@
 declare(strict_types=1);
 
 /**
- * DRESeo — Omeka S module.
+ * IwacSeo — Omeka S module.
  *
- * Search-engine optimisation for the Africa Multiple DRE site:
+ * Search-engine optimisation for the Islam West Africa Collection (IWAC,
+ * islam.zmo.de):
  *
  *   • Injects per-page <title>, meta description, Open Graph + Twitter cards,
  *     canonical links and schema.org JSON-LD into the <head> — derived
- *     automatically from each resource's metadata + resource template, set by
+ *     automatically from each resource's metadata + resource class, set by
  *     hand for static site pages, with site-wide defaults filling the gaps.
  *   • Serves /sitemap.xml (index + per-type children) and /robots.txt.
  *   • Injects the Google Search Console verification tag from a pasted snippet.
  *   • Optionally pings IndexNow when public content changes.
  *
- * Settings-only: it owns a handful of `dre_seo_*` settings and one site setting
- * (dre_seo_pages); install/uninstall just create and drop those. No third-party
+ * Settings-only: it owns a handful of `iwac_seo_*` settings and one site setting
+ * (iwac_seo_pages); install/uninstall just create and drop those. No third-party
  * Composer dependencies, so there is no bundled vendor/ — Omeka autoloads the
- * DRESeo\ namespace from src/.
+ * IwacSeo\ namespace from src/.
  */
 
-namespace DRESeo;
+namespace IwacSeo;
 
-use DRESeo\Job\PingSearchEngines;
-use DRESeo\Service\HeadMetadata;
-use DRESeo\Service\PageSeoStore;
+use IwacSeo\Job\PingSearchEngines;
+use IwacSeo\Service\HeadMetadata;
+use IwacSeo\Service\PageSeoStore;
 use Laminas\EventManager\EventInterface;
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\Mvc\Controller\AbstractController;
@@ -41,30 +42,30 @@ class Module extends AbstractModule
 {
     /** Global settings owned by the module (created on install, dropped on uninstall). */
     private const SETTINGS = [
-        'dre_seo_gsc_verification',
-        'dre_seo_bing_verification',
-        'dre_seo_default_description',
-        'dre_seo_default_share_image',
-        'dre_seo_twitter_site',
-        'dre_seo_noindex_site',
-        'dre_seo_noindex_browse',
-        'dre_seo_jsonld_enabled',
-        'dre_seo_citation_meta',
-        'dre_seo_sitemap_enabled',
-        'dre_seo_sitemap_ttl',
-        'dre_seo_ping_enabled',
-        'dre_seo_indexnow_key',
-        'dre_seo_ping_pending',
-        'dre_seo_ping_last',
+        'iwac_seo_gsc_verification',
+        'iwac_seo_bing_verification',
+        'iwac_seo_default_description',
+        'iwac_seo_default_share_image',
+        'iwac_seo_twitter_site',
+        'iwac_seo_noindex_site',
+        'iwac_seo_noindex_browse',
+        'iwac_seo_jsonld_enabled',
+        'iwac_seo_citation_meta',
+        'iwac_seo_sitemap_enabled',
+        'iwac_seo_sitemap_ttl',
+        'iwac_seo_ping_enabled',
+        'iwac_seo_indexnow_key',
+        'iwac_seo_ping_pending',
+        'iwac_seo_ping_last',
     ];
 
     /** Sensible defaults applied on install. */
     private const DEFAULTS = [
-        'dre_seo_sitemap_enabled' => '1',
-        'dre_seo_jsonld_enabled'  => '1',
-        'dre_seo_citation_meta'   => '1',
-        'dre_seo_noindex_browse'  => '1',
-        'dre_seo_sitemap_ttl'     => '86400',
+        'iwac_seo_sitemap_enabled' => '1',
+        'iwac_seo_jsonld_enabled'  => '1',
+        'iwac_seo_citation_meta'   => '1',
+        'iwac_seo_noindex_browse'  => '1',
+        'iwac_seo_sitemap_ttl'     => '86400',
     ];
 
     /** How often (seconds) a ping job may be dispatched, and the queue cap. */
@@ -101,7 +102,7 @@ class Module extends AbstractModule
             $sites = $services->get('Omeka\ApiManager')->search('sites')->getContent();
             foreach ($sites as $site) {
                 $siteSettings->setTargetId($site->id());
-                $siteSettings->delete('dre_seo_pages');
+                $siteSettings->delete('iwac_seo_pages');
             }
         } catch (\Throwable $e) {
             // best-effort
@@ -225,10 +226,10 @@ class Module extends AbstractModule
         $services = $this->getServiceLocator();
         $settings = $services->get('Omeka\Settings');
 
-        if ((string) $settings->get('dre_seo_ping_enabled', '0') !== '1') {
+        if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
             return;
         }
-        if (trim((string) $settings->get('dre_seo_indexnow_key', '')) === '') {
+        if (trim((string) $settings->get('iwac_seo_indexnow_key', '')) === '') {
             return;
         }
 
@@ -244,20 +245,20 @@ class Module extends AbstractModule
         }
 
         // Enqueue (deduped, capped so a bulk sync cannot grow it without bound).
-        $pending = $settings->get('dre_seo_ping_pending', []);
+        $pending = $settings->get('iwac_seo_ping_pending', []);
         if (!is_array($pending)) {
             $pending = [];
         }
         if (count($pending) < self::PING_QUEUE_CAP && !in_array($url, $pending, true)) {
             $pending[] = $url;
-            $settings->set('dre_seo_ping_pending', $pending);
+            $settings->set('iwac_seo_ping_pending', $pending);
         }
 
         // Dispatch at most once per interval; the job batches the whole queue.
-        $last = (int) $settings->get('dre_seo_ping_last', 0);
+        $last = (int) $settings->get('iwac_seo_ping_last', 0);
         $now = time();
         if ($now - $last >= self::PING_INTERVAL) {
-            $settings->set('dre_seo_ping_last', $now);
+            $settings->set('iwac_seo_ping_last', $now);
             try {
                 $services->get('Omeka\Job\Dispatcher')->dispatch(PingSearchEngines::class);
             } catch (\Throwable $e) {
@@ -276,7 +277,7 @@ class Module extends AbstractModule
 
         $data = [];
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['dre_seo_ping_pending', 'dre_seo_ping_last'], true)) {
+            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
                 continue; // internal bookkeeping, not user-facing
             }
             $data[$key] = $settings->get($key, self::DEFAULTS[$key] ?? '');
@@ -300,7 +301,7 @@ class Module extends AbstractModule
 
         $data = $form->getData();
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['dre_seo_ping_pending', 'dre_seo_ping_last'], true)) {
+            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
                 continue;
             }
             if (array_key_exists($key, $data)) {

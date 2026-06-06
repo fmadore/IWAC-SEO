@@ -1,7 +1,7 @@
 <?php
 declare(strict_types=1);
 
-namespace DRESeo\Service;
+namespace IwacSeo\Service;
 
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
@@ -54,7 +54,7 @@ class HeadMetadata
         SiteRepresentation $site
     ): void {
         $title = (string) $resource->displayTitle();
-        $description = $this->resourceDescription($resource);
+        $description = $this->resourceDescription($resource, $site);
         $canonical = $this->absoluteResourceUrl($resource, $site);
         $image = $this->resourceImage($view, $resource);
 
@@ -88,9 +88,9 @@ class HeadMetadata
 
         // Highwire Press + Dublin Core <meta> so Zotero / Google Scholar capture
         // the page as a reference.
-        if ($this->boolSetting('dre_seo_citation_meta', true)) {
-            $templateId = $resource->resourceTemplate() ? $resource->resourceTemplate()->id() : null;
-            $this->citationMeta->apply($view, $resource, $templateId, $canonical);
+        if ($this->boolSetting('iwac_seo_citation_meta', true)) {
+            $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
+            $this->citationMeta->apply($view, $resource, $classId, $canonical);
         }
     }
 
@@ -167,7 +167,7 @@ class HeadMetadata
         // item-set pages (/item-set/{id}), which are listed in the sitemap;
         // marking them noindex made Search Console reject that sitemap.
         $hasQuery = ((string) (parse_url($current, PHP_URL_QUERY) ?? '')) !== '';
-        if ($hasQuery && $this->boolSetting('dre_seo_noindex_browse')) {
+        if ($hasQuery && $this->boolSetting('iwac_seo_noindex_browse')) {
             $this->setRobots($view, 'noindex, follow');
         }
     }
@@ -179,16 +179,16 @@ class HeadMetadata
         $headMeta = $view->headMeta();
 
         // Master noindex (staging) overrides everything.
-        if ($this->boolSetting('dre_seo_noindex_site')) {
+        if ($this->boolSetting('iwac_seo_noindex_site')) {
             $this->setRobots($view, 'noindex, nofollow', true);
         }
 
         // Verification tags — site-wide, on every public page.
-        $gsc = $this->extractToken($this->stringSetting('dre_seo_gsc_verification'), 'google-site-verification');
+        $gsc = $this->extractToken($this->stringSetting('iwac_seo_gsc_verification'), 'google-site-verification');
         if ($gsc !== '') {
             $headMeta->appendName('google-site-verification', $gsc);
         }
-        $bing = $this->extractToken($this->stringSetting('dre_seo_bing_verification'), 'msvalidate.01');
+        $bing = $this->extractToken($this->stringSetting('iwac_seo_bing_verification'), 'msvalidate.01');
         if ($bing !== '') {
             $headMeta->appendName('msvalidate.01', $bing);
         }
@@ -199,14 +199,14 @@ class HeadMetadata
             $headMeta->setProperty('og:locale', $this->locale($view));
         }
         $headMeta->appendName('twitter:card', 'summary_large_image');
-        $twitter = trim($this->stringSetting('dre_seo_twitter_site'));
+        $twitter = trim($this->stringSetting('iwac_seo_twitter_site'));
         if ($twitter !== '') {
             $headMeta->appendName('twitter:site', $twitter);
         }
 
         // Gap-fills (only when phase 1 set nothing).
         if (!$this->isApplied('description')) {
-            $default = trim($this->stringSetting('dre_seo_default_description'));
+            $default = trim($this->stringSetting('iwac_seo_default_description'));
             if ($default !== '') {
                 $this->setDescription($view, $this->truncate($default));
             }
@@ -307,9 +307,15 @@ class HeadMetadata
 
     // ─── Helpers ────────────────────────────────────────────────────────────
 
-    private function resourceDescription(AbstractResourceEntityRepresentation $resource): ?string
-    {
-        foreach (['dcterms:description', 'dcterms:abstract', 'bibo:abstract'] as $term) {
+    private function resourceDescription(
+        AbstractResourceEntityRepresentation $resource,
+        SiteRepresentation $site
+    ): ?string {
+        // Newspaper articles carry their summary in bibo:shortDescription (the
+        // AI summary); references and publication issues use dcterms:abstract;
+        // authority records (persons, organisations, events) use
+        // dcterms:description. Try them in that order.
+        foreach (['bibo:shortDescription', 'dcterms:abstract', 'dcterms:description', 'bibo:abstract'] as $term) {
             $value = $resource->value($term);
             if ($value !== null) {
                 $text = trim(strip_tags((string) $value));
@@ -318,12 +324,15 @@ class HeadMetadata
                 }
             }
         }
-        // Fallback: a typed, human-readable boilerplate so the tag is never empty.
-        $type = $resource->resourceClass() ? $resource->resourceClass()->label() : 'Record';
-        return $this->truncate(sprintf(
-            '%s in the Africa Multiple Interactive Research Atlas (AMIRA).',
-            (string) $resource->displayTitle() ?: $type
-        ));
+        // Fallback so the tag is never empty and stays unique per page: the
+        // title within the collection. Built from the (already localised) site
+        // title, so it reads correctly on both the French and English IWAC
+        // sites without needing translation here.
+        $title = (string) $resource->displayTitle();
+        if ($title === '') {
+            $title = $resource->resourceClass() ? $resource->resourceClass()->label() : 'Record';
+        }
+        return $this->truncate(sprintf('%s — %s', $title, $site->title()));
     }
 
     private function resourceImage(PhpRenderer $view, AbstractResourceEntityRepresentation $resource): ?string
@@ -373,7 +382,7 @@ class HeadMetadata
             return $this->defaultImageUrl;
         }
         $this->defaultImageResolved = true;
-        $assetId = (int) $this->stringSetting('dre_seo_default_share_image');
+        $assetId = (int) $this->stringSetting('iwac_seo_default_share_image');
         if ($assetId > 0) {
             $this->defaultImageUrl = $this->assetUrl($view, $assetId);
         }
@@ -435,7 +444,7 @@ class HeadMetadata
 
     private function jsonLdEnabled(): bool
     {
-        return $this->boolSetting('dre_seo_jsonld_enabled', true);
+        return $this->boolSetting('iwac_seo_jsonld_enabled', true);
     }
 
     private function boolSetting(string $key, bool $default = false): bool

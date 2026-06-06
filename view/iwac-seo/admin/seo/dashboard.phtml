@@ -15,12 +15,12 @@
  * @var \Laminas\Form\Form $confirmForm
  */
 
-$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'DRESeo'));
+$this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'IwacSeo'));
 $yes = $this->translate('Yes');
 $no = $this->translate('No');
-$on = '<span class="dre-seo-on">' . $this->translate('On') . '</span>';
-$off = '<span class="dre-seo-off">' . $this->translate('Off') . '</span>';
-$configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' => 'configure'], ['query' => ['id' => 'DRESeo']]);
+$on = '<span class="iwac-seo-on">' . $this->translate('On') . '</span>';
+$off = '<span class="iwac-seo-off">' . $this->translate('Off') . '</span>';
+$configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' => 'configure'], ['query' => ['id' => 'IwacSeo']]);
 ?>
 <?php echo $this->pageTitle($this->translate('SEO'), 1); ?>
 
@@ -64,7 +64,7 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
                 <td>
                     <?php echo $pingEnabled ? $on : $off; ?>
                     <?php if ($pingEnabled && $indexNowKey === ''): ?>
-                        — <span class="dre-seo-off"><?php echo $this->translate('no key set'); ?></span>
+                        — <span class="iwac-seo-off"><?php echo $this->translate('no key set'); ?></span>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -73,7 +73,7 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
 
     <?php if ($sitemapEnabled && $sitemapUrl): ?>
     <h2><?php echo $this->translate('Sitemap'); ?></h2>
-    <ul class="dre-seo-links">
+    <ul class="iwac-seo-links">
         <li>
             <a href="<?php echo $this->escapeHtmlAttr($sitemapUrl); ?>" target="_blank" rel="noopener">
                 <?php echo $this->escapeHtml($sitemapUrl); ?>
@@ -95,14 +95,14 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
     </p>
     <p><?php echo $this->translate('The sitemap is cached. Clear the cache to rebuild it immediately after a large content change.'); ?></p>
     <?php
-    $confirmForm->setAttribute('action', $this->url('admin/dre-seo/regenerate'));
+    $confirmForm->setAttribute('action', $this->url('admin/iwac-seo/regenerate'));
     echo $this->form($confirmForm);
     ?>
     <?php endif; ?>
 
     <h2><?php echo $this->translate('Static pages'); ?></h2>
     <p>
-        <a class="button" href="<?php echo $this->escapeHtmlAttr($this->url('admin/dre-seo/pages')); ?>">
+        <a class="button" href="<?php echo $this->escapeHtmlAttr($this->url('admin/iwac-seo/pages')); ?>">
             <?php echo $this->translate('Edit per-page SEO'); ?>
         </a>
         <a class="button" href="<?php echo $this->escapeHtmlAttr($configureUrl); ?>">

@@ -2,15 +2,15 @@
 declare(strict_types=1);
 
 /**
- * DRE SEO module configuration.
+ * IWAC SEO module configuration.
  *
  * Wires the public sitemap/robots/IndexNow endpoints (top-level routes that
  * fall through to Omeka), the admin SEO dashboard + static-page table, the head
  * metadata / structured-data / sitemap services, and the instance-specific
- * `dre_seo` config block (overridable, key by key, via config/local.config.php).
+ * `iwac_seo` config block (overridable, key by key, via config/local.config.php).
  */
 
-namespace DRESeo;
+namespace IwacSeo;
 
 use Laminas\Router\Http\Literal;
 use Laminas\Router\Http\Segment;
@@ -47,28 +47,28 @@ return [
             // routes these to Omeka (the .xml/.txt extensions are not served as
             // static files because no such files exist), so no web-server
             // configuration is required.
-            'dre-seo-sitemap' => [
+            'iwac-seo-sitemap' => [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/sitemap.xml',
                     'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'index'],
                 ],
             ],
-            'dre-seo-sitemap-pages' => [
+            'iwac-seo-sitemap-pages' => [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/sitemap-pages.xml',
                     'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'pages'],
                 ],
             ],
-            'dre-seo-sitemap-item-sets' => [
+            'iwac-seo-sitemap-item-sets' => [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/sitemap-item-sets.xml',
                     'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'itemSets'],
                 ],
             ],
-            'dre-seo-sitemap-items' => [
+            'iwac-seo-sitemap-items' => [
                 'type'    => Segment::class,
                 'options' => [
                     'route'       => '/sitemap-items-:chunk.xml',
@@ -76,7 +76,7 @@ return [
                     'defaults'    => ['controller' => Controller\SitemapController::class, 'action' => 'items'],
                 ],
             ],
-            'dre-seo-robots' => [
+            'iwac-seo-robots' => [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/robots.txt',
@@ -85,7 +85,7 @@ return [
             ],
             // IndexNow ownership key at /{key}.txt. Constrained to a hex key so
             // it cannot shadow robots.txt; low priority so literals match first.
-            'dre-seo-indexnow' => [
+            'iwac-seo-indexnow' => [
                 'type'     => Segment::class,
                 'priority' => -100,
                 'options'  => [
@@ -98,12 +98,12 @@ return [
             // ── Admin: SEO dashboard + static-page table.
             'admin' => [
                 'child_routes' => [
-                    'dre-seo' => [
+                    'iwac-seo' => [
                         'type'    => Literal::class,
                         'options' => [
-                            'route'    => '/dre-seo',
+                            'route'    => '/iwac-seo',
                             'defaults' => [
-                                '__NAMESPACE__' => 'DRESeo\Controller\Admin',
+                                '__NAMESPACE__' => 'IwacSeo\Controller\Admin',
                                 'controller'    => Controller\Admin\SeoController::class,
                                 'action'        => 'dashboard',
                             ],
@@ -142,25 +142,24 @@ return [
         'AdminModule' => [
             [
                 'label'    => 'SEO', // @translate
-                'route'    => 'admin/dre-seo',
+                'route'    => 'admin/iwac-seo',
                 'resource' => Controller\Admin\SeoController::class,
                 'class'    => 'o-icon-search',
                 'pages'    => [
-                    ['route' => 'admin/dre-seo/pages', 'label' => 'Static pages'], // @translate
-                    ['route' => 'admin/dre-seo/regenerate', 'visible' => false],
+                    ['route' => 'admin/iwac-seo/pages', 'label' => 'Static pages'], // @translate
+                    ['route' => 'admin/iwac-seo/regenerate', 'visible' => false],
                 ],
             ],
         ],
     ],
 
     // ── Instance configuration (override via config/local.config.php) ───────
-    'dre_seo' => [
+    'iwac_seo' => [
         'sitemap' => [
             'item_chunk_size' => 50000,
             'priority' => [
                 'home'    => '1.0',
-                'section' => '0.8',
-                'project' => '0.8',
+                'section' => '0.8', // item sets (collections) + top-level menu pages
                 'item'    => '0.6',
                 'page'    => '0.5',
                 'browse'  => '0.4',
@@ -173,52 +172,67 @@ return [
             ],
         ],
         'structured_data' => [
-            // schema.org @type per Omeka resource template id (see
-            // MongoDB2OmekaS/config/config.py RESOURCE_TEMPLATES + PUBLICATION_TEMPLATES).
-            'default_type'   => 'CreativeWork',
-            'template_types' => [
-                2  => 'Organization',     // organisation (foaf:Organization)
-                3  => 'Place',            // location
-                4  => 'Person',           // persons
-                5  => 'ResearchProject',  // projects
-                7  => 'Collection',       // research sections
-                10 => 'CreativeWork',     // research items
-                11 => 'ScholarlyArticle', // article (fabio:JournalArticle)
-                12 => 'CreativeWork',     // working paper
-                13 => 'ScholarlyArticle', // conference paper
-                14 => 'Chapter',          // book chapter
-                15 => 'Book',             // book
-                16 => 'Thesis',           // doctoral thesis
-                17 => 'PublicationIssue', // journal issue
-                18 => 'Review',           // book review
-                19 => 'BlogPosting',      // online post
-                20 => 'Dataset',          // research data
-                21 => 'PodcastEpisode',   // podcasts (fabio:AudioDocument)
+            // schema.org @type per Omeka **resource class** id. IWAC dispatches
+            // on class, not template: template 8 historically held both newspaper
+            // articles (class 36) and Islamic-publication issues (class 60), and
+            // the references share templates across classes. See the iwac-data
+            // skill (omeka-structure.md) for the class catalogue.
+            'default_type' => 'CreativeWork',
+            'class_types'  => [
+                // Authority / index entities
+                94  => 'Person',          // foaf:Person          — Personnes
+                9   => 'Place',           // dcterms:Location     — Lieux
+                96  => 'Organization',    // foaf:Organization    — Organisations
+                54  => 'Event',           // bibo:Event           — Événements
+                244 => 'DefinedTerm',     // fabio:AuthorityFile  — Sujets / Notices d'autorité
+                // Primary sources
+                36  => 'NewsArticle',     // bibo:Article         — newspaper article
+                60  => 'PublicationIssue',// bibo:Issue           — Islamic publication issue
+                38  => 'VideoObject',     // bibo:AudioVisualDocument
+                49  => 'DigitalDocument', // bibo:Document
+                58  => 'ImageObject',     // bibo:Image           — photographs (not published)
+                // Bibliographic references
+                35  => 'ScholarlyArticle',// bibo:AcademicArticle — Article de revue
+                178 => 'Review',          // fabio:BookReview     — Compte rendu
+                43  => 'Chapter',         // bibo:Chapter         — Chapitre
+                40  => 'Book',            // bibo:Book            — Livre
+                52  => 'Book',            // bibo:EditedBook      — Ouvrage collectif
+                88  => 'Thesis',          // bibo:Thesis          — Thèse
+                82  => 'Report',          // bibo:Report          — Rapport
+                77  => 'CreativeWork',    // bibo:PersonalCommunication — Communication
+                305 => 'BlogPosting',     // fabio:BlogPost       — Article de blog
             ],
         ],
         'citation' => [
-            // Highwire Press citation kind per resource template id. Entity
-            // kinds (person/place/organization/project/section) emit Dublin Core
-            // only; the rest emit kind-specific citation_* tags for Zotero.
-            'default_kind'   => 'item',
-            'template_kinds' => [
-                2  => 'organization', // organisation
-                3  => 'place',        // location
-                4  => 'person',       // persons
-                5  => 'project',      // projects
-                7  => 'section',      // research sections
-                10 => 'item',         // research items (generic document)
-                11 => 'article',      // journal article
-                12 => 'report',       // working paper
-                13 => 'conference',   // conference paper
-                14 => 'chapter',      // book chapter
-                15 => 'book',         // book
-                16 => 'thesis',       // doctoral thesis
-                17 => 'article',      // journal issue
-                18 => 'article',      // book review
-                19 => 'post',         // online post
-                20 => 'dataset',      // research data
-                21 => 'podcast',      // podcast episode
+            // Highwire Press / Dublin Core citation kind per Omeka **resource
+            // class** id. Entity kinds (person/place/organization/event/subject)
+            // emit Dublin Core only; the rest emit kind-specific citation_* tags
+            // so the Zotero Connector and Google Scholar capture a typed
+            // reference. The newspaper/magazine kinds force the Zotero item type
+            // through DC.type + prism.publicationName (see CitationMeta).
+            'default_kind' => 'item',
+            'class_kinds'  => [
+                // Authority / index entities → Dublin Core only
+                94  => 'person',
+                9   => 'place',
+                96  => 'organization',
+                54  => 'event',
+                244 => 'subject',
+                // Primary sources
+                36  => 'newspaper',   // newspaper article
+                60  => 'magazine',    // Islamic-publication issue (periodical)
+                38  => 'av',          // audiovisual document
+                49  => 'document',
+                // Bibliographic references
+                35  => 'article',     // journal article (container in dcterms:publisher)
+                178 => 'review',      // book review (container in dcterms:publisher)
+                43  => 'chapter',     // book chapter (book title in dcterms:alternative)
+                40  => 'book',
+                52  => 'book',        // edited book
+                88  => 'thesis',      // institution in dcterms:publisher
+                82  => 'report',      // institution in dcterms:publisher
+                77  => 'communication',
+                305 => 'post',        // blog post
             ],
         ],
     ],
