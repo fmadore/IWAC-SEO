@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller;
 
+use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\SitemapGenerator;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
@@ -27,6 +28,7 @@ class SitemapController extends AbstractActionController
         private readonly SitemapGenerator $generator,
         private readonly ApiManager $api,
         private readonly Settings $settings,
+        private readonly Hreflang $hreflang,
     ) {
     }
 
@@ -84,7 +86,13 @@ class SitemapController extends AbstractActionController
         if (!$site) {
             return $this->notFound();
         }
-        return $this->xml($this->generator->buildItemSets($this->siteUrl($site), $site->id(), $this->ttl()));
+        return $this->xml($this->generator->buildItemSets(
+            $this->siteUrl($site),
+            $site->id(),
+            $this->ttl(),
+            $this->altBases($site),
+            $this->xDefaultBase($site)
+        ));
     }
 
     public function itemsAction(): Response
@@ -100,7 +108,14 @@ class SitemapController extends AbstractActionController
         if ($chunk < 1 || $chunk > $this->generator->itemChunkCount($site->id())) {
             return $this->notFound();
         }
-        return $this->xml($this->generator->buildItems($this->siteUrl($site), $site->id(), $chunk, $this->ttl()));
+        return $this->xml($this->generator->buildItems(
+            $this->siteUrl($site),
+            $site->id(),
+            $chunk,
+            $this->ttl(),
+            $this->altBases($site),
+            $this->xDefaultBase($site)
+        ));
     }
 
     public function robotsAction(): Response
@@ -170,6 +185,35 @@ class SitemapController extends AbstractActionController
             $host .= ':' . $parts['port'];
         }
         return $host;
+    }
+
+    /**
+     * Per-language site bases for hreflang annotations in the sitemap, e.g.
+     * ['lang' => 'fr', 'base' => 'https://host/s/afrique_ouest']. Each shared
+     * resource has the same path under every base. Empty when hreflang is off.
+     *
+     * @return array<int,array{lang:string,base:string}>
+     */
+    private function altBases(SiteRepresentation $site): array
+    {
+        if (!$this->hreflang->isEnabled()) {
+            return [];
+        }
+        $host = $this->hostUrl($site);
+        $bases = [];
+        foreach ($this->hreflang->sites() as $slug => $lang) {
+            $bases[] = ['lang' => (string) $lang, 'base' => $host . '/s/' . $slug];
+        }
+        return $bases;
+    }
+
+    private function xDefaultBase(SiteRepresentation $site): ?string
+    {
+        if (!$this->hreflang->isEnabled()) {
+            return null;
+        }
+        $slug = $this->hreflang->xDefaultSlug();
+        return $slug !== null ? $this->hostUrl($site) . '/s/' . $slug : null;
     }
 
     private function ttl(): int

@@ -159,39 +159,83 @@ class SitemapGenerator
         return $acc;
     }
 
-    public function buildItemSets(string $siteUrl, int $siteId, int $ttl): string
-    {
-        return $this->cached('item-sets', $ttl, function () use ($siteUrl, $siteId) {
+    /**
+     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
+     */
+    public function buildItemSets(
+        string $siteUrl,
+        int $siteId,
+        int $ttl,
+        array $altBases = [],
+        ?string $xDefaultBase = null
+    ): string {
+        return $this->cached('item-sets', $ttl, function () use ($siteUrl, $siteId, $altBases, $xDefaultBase) {
             $urls = [];
             foreach ($this->fetchItemSets($siteId) as $row) {
+                $path = '/item-set/' . (int) $row['id'];
                 $urls[] = [
-                    'loc'        => $siteUrl . '/item-set/' . (int) $row['id'],
+                    'loc'        => $siteUrl . $path,
                     'lastmod'    => $this->w3c($row['modified'] ?? null),
                     'changefreq' => $this->changefreq('browse'),
                     'priority'   => $this->priority('section'),
+                    'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
                 ];
             }
             return $this->renderUrlset($urls);
         });
     }
 
-    public function buildItems(string $siteUrl, int $siteId, int $chunk, int $ttl): string
-    {
+    /**
+     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
+     */
+    public function buildItems(
+        string $siteUrl,
+        int $siteId,
+        int $chunk,
+        int $ttl,
+        array $altBases = [],
+        ?string $xDefaultBase = null
+    ): string {
         $chunk = max(1, $chunk);
-        return $this->cached('items-' . $chunk, $ttl, function () use ($siteUrl, $siteId, $chunk) {
+        return $this->cached('items-' . $chunk, $ttl, function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase) {
             $size = $this->chunkSize();
             $offset = ($chunk - 1) * $size;
             $urls = [];
             foreach ($this->fetchItems($siteId, $offset, $size) as $row) {
+                $path = '/item/' . (int) $row['id'];
                 $urls[] = [
-                    'loc'        => $siteUrl . '/item/' . (int) $row['id'],
+                    'loc'        => $siteUrl . $path,
                     'lastmod'    => $this->w3c($row['modified'] ?? null),
                     'changefreq' => $this->changefreq('item'),
                     'priority'   => $this->priority('item'),
+                    'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
                 ];
             }
             return $this->renderUrlset($urls);
         });
+    }
+
+    /**
+     * Build the per-URL hreflang alternate set for a resource path. Each shared
+     * resource lives at the same path under every site slug, so the alternates
+     * are just that path appended to each language base (+ x-default).
+     *
+     * @param array<int,array{lang:string,base:string}> $altBases
+     * @return array<int,array{hreflang:string,href:string}>
+     */
+    private function altLinks(array $altBases, ?string $xDefaultBase, string $path): array
+    {
+        if (count($altBases) < 2) {
+            return [];
+        }
+        $links = [];
+        foreach ($altBases as $alt) {
+            $links[] = ['hreflang' => $alt['lang'], 'href' => $alt['base'] . $path];
+        }
+        if ($xDefaultBase !== null) {
+            $links[] = ['hreflang' => 'x-default', 'href' => $xDefaultBase . $path];
+        }
+        return $links;
     }
 
     public function itemChunkCount(int $siteId): int
@@ -287,11 +331,21 @@ class SitemapGenerator
 
     // ─── XML rendering ──────────────────────────────────────────────────────
 
-    /** @param array<array<string,?string>> $urls */
+    /** @param array<array<string,mixed>> $urls */
     private function renderUrlset(array $urls): string
     {
+        // Declare the xhtml namespace only when hreflang alternates are present.
+        $hasAlternates = false;
+        foreach ($urls as $u) {
+            if (!empty($u['alternates'])) {
+                $hasAlternates = true;
+                break;
+            }
+        }
+        $xhtmlNs = $hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '';
+
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
+            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $xhtmlNs . '>' . "\n";
         foreach ($urls as $u) {
             $xml .= '  <url><loc>' . $this->esc((string) $u['loc']) . '</loc>';
             if (!empty($u['lastmod'])) {
@@ -302,6 +356,10 @@ class SitemapGenerator
             }
             if (!empty($u['priority'])) {
                 $xml .= '<priority>' . $u['priority'] . '</priority>';
+            }
+            foreach ($u['alternates'] ?? [] as $alt) {
+                $xml .= '<xhtml:link rel="alternate" hreflang="' . $this->esc((string) $alt['hreflang'])
+                    . '" href="' . $this->esc((string) $alt['href']) . '"/>';
             }
             $xml .= '</url>' . "\n";
         }

@@ -15,8 +15,9 @@ database tables, no theme edits.
 > **IWAC is bilingual.** The same collection is published as two Omeka sites —
 > `afrique_ouest` (French, the default the host root redirects to) and `westafrica`
 > (English). The module resolves the current site at request time, so every signal
-> (site title, locale, canonical, breadcrumbs) is emitted in the right language with no
-> extra configuration.
+> (site title, locale, **self-referential** canonical, breadcrumbs) is emitted in the
+> right language, and each page advertises its other-language counterpart via
+> `rel="alternate" hreflang`. See [Bilingual SEO](#bilingual-seo-hreflang).
 
 ---
 
@@ -209,6 +210,30 @@ precisely on their own.
 
 ---
 
+## Bilingual SEO (hreflang)
+
+IWAC is the same collection under two Omeka sites — `afrique_ouest` (fr) and `westafrica`
+(en). The module ties them together the way Google expects:
+
+- **Canonicals are self-referential per language.** The French page canonicals to its own
+  `…/afrique_ouest/…` URL, the English page to `…/westafrica/…`. It never points one
+  language at the other (that would drop a language from the index).
+- **`rel="alternate" hreflang`** links every page to its counterpart — with a self link and
+  an `x-default` (the French site, matching the host-root redirect) — so Google serves the
+  right language and treats the pair as one set instead of duplicate content.
+  - **Resources** (items, item sets, media) are shared across both sites under the same
+    `o:id`, so the alternate is just the same path under the other site slug — fully automatic.
+  - **Static pages** have different slugs per language (`accueil`/`home`, `a-propos`/`about` …);
+    they are mapped by the `iwac_seo.hreflang.page_pairs` table in `config/module.config.php`.
+    A page with no entry simply gets no alternate (never a broken one). Update the table when
+    pages are added or renamed.
+- **`og:locale` + `og:locale:alternate`** advertise both languages to social platforms.
+- The **item / item-set sitemaps** carry `<xhtml:link rel="alternate" hreflang>` for each
+  language, so both versions are discoverable from the single (default-site) `<loc>` entries.
+
+Configure the language map, `x_default` and page pairs under `iwac_seo.hreflang` (override via
+`config/local.config.php`); set `enabled => false` to turn it all off.
+
 ## Sitemap
 
 * `/sitemap.xml` — sitemap **index** listing the children below.
@@ -291,7 +316,8 @@ IwacSeo/
 * **COinS** (`<span class="Z3988">`) as a complementary reference-embedding signal, and to
   expose references on list pages.
 * unAPI + per-item **BibTeX / RIS** export links ("Cite / Export").
-* `hreflang` linking the French (`afrique_ouest`) and English (`westafrica`) variants of each page.
+* Per-URL hreflang in the *pages* sitemap too (static-page alternates are already emitted
+  on-page; only the item / item-set sitemaps carry `<xhtml:link>` so far).
 * Image sitemap extension for the IIIF page scans; optional nginx-level caching of `/sitemap*.xml`.
 
 ---

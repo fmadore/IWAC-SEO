@@ -43,6 +43,7 @@ class HeadMetadata
         private readonly Settings $settings,
         private readonly StructuredData $structuredData,
         private readonly CitationMeta $citationMeta,
+        private readonly Hreflang $hreflang,
     ) {
     }
 
@@ -92,6 +93,10 @@ class HeadMetadata
             $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
             $this->citationMeta->apply($view, $resource, $classId, $canonical);
         }
+
+        // Bilingual: link this item to its counterpart on the other-language
+        // site (the same o:id, different site slug).
+        $this->emitAlternates($view, $this->hreflang->forResource($resource));
     }
 
     // ─── Phase 1: static site pages ─────────────────────────────────────────
@@ -150,6 +155,10 @@ class HeadMetadata
         if ($isHomepage && $this->jsonLdEnabled()) {
             $this->addJsonLd($view, $this->structuredData->webSite($view, $site));
         }
+
+        // Bilingual: link this static page to its translated counterpart on the
+        // other-language site (resolved from the configured page-slug map).
+        $this->emitAlternates($view, $this->hreflang->forPage($view, $page, $site));
     }
 
     // ─── Phase 1: browse / search listing pages ─────────────────────────────
@@ -197,6 +206,15 @@ class HeadMetadata
         if ($site !== null) {
             $headMeta->setProperty('og:site_name', $site->title());
             $headMeta->setProperty('og:locale', $this->locale($view));
+            // Advertise the other-language site(s) as og:locale:alternate.
+            if ($this->hreflang->isEnabled()) {
+                $currentSlug = $site->slug();
+                foreach ($this->hreflang->sites() as $slug => $lang) {
+                    if ($slug !== $currentSlug) {
+                        $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
+                    }
+                }
+            }
         }
         $headMeta->appendName('twitter:card', 'summary_large_image');
         $twitter = trim($this->stringSetting('iwac_seo_twitter_site'));
@@ -440,6 +458,42 @@ class HeadMetadata
         $lang = method_exists($view, 'lang') ? (string) $view->lang() : 'en';
         // BCP-47 (en-US) → Open Graph locale (en_US).
         return str_replace('-', '_', $lang) ?: 'en_US';
+    }
+
+    /**
+     * Emit reciprocal hreflang alternate <link>s (plus x-default). A self link
+     * is included so each language version references the whole set, as Google
+     * requires. Skipped when there is fewer than two versions, keeping
+     * single-language pages clean.
+     *
+     * @param array<int,array{lang:string,href:string,slug:string}> $alternates
+     */
+    private function emitAlternates(PhpRenderer $view, array $alternates): void
+    {
+        if (count($alternates) < 2) {
+            return;
+        }
+        $xDefaultSlug = $this->hreflang->xDefaultSlug();
+        $xDefaultHref = null;
+        foreach ($alternates as $alt) {
+            $view->headLink(['rel' => 'alternate', 'hreflang' => $alt['lang'], 'href' => $alt['href']]);
+            if ($xDefaultSlug !== null && $alt['slug'] === $xDefaultSlug) {
+                $xDefaultHref = $alt['href'];
+            }
+        }
+        if ($xDefaultHref !== null) {
+            $view->headLink(['rel' => 'alternate', 'hreflang' => 'x-default', 'href' => $xDefaultHref]);
+        }
+    }
+
+    /** Map a bare hreflang code to an Open Graph locale (language_TERRITORY). */
+    private function ogLocale(string $lang): string
+    {
+        $map = ['fr' => 'fr_FR', 'en' => 'en_US'];
+        if (isset($map[$lang])) {
+            return $map[$lang];
+        }
+        return str_contains($lang, '-') ? str_replace('-', '_', $lang) : $lang;
     }
 
     private function jsonLdEnabled(): bool
