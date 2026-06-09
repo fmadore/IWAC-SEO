@@ -2,6 +2,7 @@
 /**
  * @var \Laminas\View\Renderer\PhpRenderer $this
  * @var \Omeka\Api\Representation\SiteRepresentation $site
+ * @var \Omeka\Api\Representation\SiteRepresentation[] $sites
  * @var \Omeka\Api\Representation\SitePageRepresentation[] $pages
  * @var array<int,array<string,mixed>> $overrides
  * @var \Laminas\Form\Form $form
@@ -26,8 +27,23 @@ $form->prepare();
         <?php echo $this->translate('Override the title, description, share image and indexing for individual static pages. Leave a field blank to fall back to the page’s own content and the site-wide defaults set in Configure. Resource (item) pages derive their SEO automatically and are not listed here.'); ?>
     </p>
 
+    <?php if (count($sites) > 1): ?>
+    <form method="get" action="<?php echo $this->escapeHtmlAttr($this->url('admin/iwac-seo/pages')); ?>" class="iwac-seo-site-switch">
+        <label for="iwac-seo-site"><?php echo $this->translate('Site'); ?></label>
+        <select id="iwac-seo-site" name="site_id" onchange="this.form.submit()">
+            <?php foreach ($sites as $s): ?>
+                <option value="<?php echo (int) $s->id(); ?>" <?php echo $s->id() === $site->id() ? 'selected' : ''; ?>>
+                    <?php echo $this->escapeHtml($s->title()); ?> (<?php echo $this->escapeHtml($s->slug()); ?>)
+                </option>
+            <?php endforeach; ?>
+        </select>
+        <button type="submit" class="button"><?php echo $this->translate('Switch'); ?></button>
+    </form>
+    <?php endif; ?>
+
     <?php echo $this->form()->openTag($form); ?>
     <?php echo $this->formElement($form->get('csrf')); ?>
+    <input type="hidden" name="site_id" value="<?php echo (int) $site->id(); ?>">
 
     <table class="tablesaw" data-tablesaw-mode="stack">
         <thead>

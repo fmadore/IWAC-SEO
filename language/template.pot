@@ -57,6 +57,12 @@ msgstr ""
 msgid "Configure defaults & verification"
 msgstr ""
 
+msgid "Site"
+msgstr ""
+
+msgid "Switch"
+msgstr ""
+
 msgid "Page"
 msgstr ""
 

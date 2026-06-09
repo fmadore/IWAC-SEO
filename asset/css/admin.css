@@ -10,6 +10,17 @@
     font-weight: 600;
 }
 
+.iwac-seo-site-switch {
+    display: flex;
+    align-items: center;
+    gap: 0.5rem;
+    margin: 0 0 1rem;
+}
+
+.iwac-seo-site-switch label {
+    font-weight: 600;
+}
+
 .iwac-seo-links {
     list-style: none;
     margin: 0 0 1rem;

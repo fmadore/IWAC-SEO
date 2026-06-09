@@ -66,11 +66,19 @@ class SeoController extends AbstractActionController
 
     public function pagesAction()
     {
-        $site = $this->resolveSite();
-        if (!$site) {
+        // IWAC is bilingual: the same collection is two Omeka sites
+        // (afrique_ouest/fr, westafrica/en), each with its own static pages and
+        // its own per-site overrides. Let the editor pick which site to edit —
+        // POST (the save) carries the site, then ?site_id=, then the default.
+        $sites = $this->api->search('sites')->getContent();
+        if (!$sites) {
             $this->messenger()->addError('No site found.'); // @translate
             return $this->redirect()->toRoute('admin/iwac-seo');
         }
+        $requestedId = (int) ($this->params()->fromPost('site_id')
+            ?: $this->params()->fromQuery('site_id', 0));
+        $site = $this->siteById($sites, $requestedId) ?? $this->resolveSite() ?? $sites[0];
+
         $this->pageSeoStore->setSite($site->id());
         $form = $this->getForm(PageSeoForm::class);
 
@@ -92,7 +100,7 @@ class SeoController extends AbstractActionController
                 }
                 $this->pageSeoStore->replaceAll($map);
                 $this->messenger()->addSuccess('Static-page SEO saved.'); // @translate
-                return $this->redirect()->toRoute('admin/iwac-seo/pages');
+                return $this->redirect()->toRoute('admin/iwac-seo/pages', [], ['query' => ['site_id' => $site->id()]]);
             }
             $this->messenger()->addError('Invalid form submission.'); // @translate
         }
@@ -101,6 +109,7 @@ class SeoController extends AbstractActionController
 
         $view = new ViewModel([
             'site'      => $site,
+            'sites'     => $sites,
             'pages'     => $pages,
             'overrides' => $this->pageSeoStore->all(),
             'form'      => $form,
@@ -109,6 +118,24 @@ class SeoController extends AbstractActionController
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /**
+     * The site with the given id from an already-loaded list, or null.
+     *
+     * @param SiteRepresentation[] $sites
+     */
+    private function siteById(array $sites, int $id): ?SiteRepresentation
+    {
+        if (!$id) {
+            return null;
+        }
+        foreach ($sites as $site) {
+            if ($site->id() === $id) {
+                return $site;
+            }
+        }
+        return null;
+    }
 
     private function resolveSite(): ?SiteRepresentation
     {

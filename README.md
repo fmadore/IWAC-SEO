@@ -105,6 +105,12 @@ description**, **share image** (asset ID) and **indexing** (default / index / no
 fields fall back to the page's own title and the site-wide defaults. Resource pages are not
 listed — their SEO is automatic.
 
+Because IWAC publishes the collection as two Omeka sites (`afrique_ouest`/fr and
+`westafrica`/en), the screen opens on the default site and a **Site** selector at the top
+switches between them — overrides are stored per site, so the English pages
+(`home`, `about`, …) are edited on the `westafrica` site and the French ones on
+`afrique_ouest`.
+
 ### Admin dashboard
 
 **Admin → SEO** shows what is configured, the sitemap/robots URLs with public-resource counts,
