@@ -191,7 +191,7 @@ return [
                 60  => 'PublicationIssue',// bibo:Issue           — Islamic publication issue
                 38  => 'VideoObject',     // bibo:AudioVisualDocument
                 49  => 'DigitalDocument', // bibo:Document
-                58  => 'ImageObject',     // bibo:Image           — photographs (not published)
+                58  => 'ImageObject',     // bibo:Image           — photographs (public since IwacSearch 3.3.0)
                 // Bibliographic references
                 35  => 'ScholarlyArticle',// bibo:AcademicArticle — Article de revue
                 178 => 'Review',          // fabio:BookReview     — Compte rendu
@@ -224,6 +224,7 @@ return [
                 60  => 'magazine',    // Islamic-publication issue (periodical)
                 38  => 'av',          // audiovisual document
                 49  => 'document',
+                58  => 'photo',       // fieldwork photograph → Zotero artwork
                 // Bibliographic references
                 35  => 'article',     // journal article (container in dcterms:publisher)
                 178 => 'review',      // book review (container in dcterms:publisher)

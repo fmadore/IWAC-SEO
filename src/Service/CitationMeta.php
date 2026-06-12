@@ -54,6 +54,9 @@ class CitationMeta
         'post'          => 'blogPost',
         'av'            => 'videoRecording',
         'communication' => 'presentation',
+        // Fieldwork photographs (class 58) — publicly discoverable since
+        // IwacSearch 3.3.0; without this they captured as a generic document.
+        'photo'         => 'artwork',
     ];
 
     /**
