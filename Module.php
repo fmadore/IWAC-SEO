@@ -51,6 +51,7 @@ class Module extends AbstractModule
         'iwac_seo_noindex_browse',
         'iwac_seo_jsonld_enabled',
         'iwac_seo_citation_meta',
+        'iwac_seo_unapi',
         'iwac_seo_sitemap_enabled',
         'iwac_seo_sitemap_ttl',
         'iwac_seo_ping_enabled',
@@ -64,6 +65,7 @@ class Module extends AbstractModule
         'iwac_seo_sitemap_enabled' => '1',
         'iwac_seo_jsonld_enabled'  => '1',
         'iwac_seo_citation_meta'   => '1',
+        'iwac_seo_unapi'           => '1',
         'iwac_seo_noindex_browse'  => '1',
         'iwac_seo_sitemap_ttl'     => '86400',
     ];
@@ -120,7 +122,7 @@ class Module extends AbstractModule
 
         /** @var Acl $acl */
         $acl = $event->getApplication()->getServiceManager()->get('Omeka\Acl');
-        $acl->allow(null, [Controller\SitemapController::class]);
+        $acl->allow(null, [Controller\SitemapController::class, Controller\UnapiController::class]);
         $acl->allow(
             [Acl::ROLE_EDITOR, Acl::ROLE_SITE_ADMIN, Acl::ROLE_GLOBAL_ADMIN],
             [Controller\Admin\SeoController::class]
@@ -168,7 +170,14 @@ class Module extends AbstractModule
         if (!$site || !$resource instanceof AbstractResourceEntityRepresentation) {
             return;
         }
-        $this->headMetadata()->applyResource($view, $resource, $site);
+        // applyResource sets the <head> signals and returns optional body markup
+        // (the unAPI <abbr class="unapi-id"> element). Omeka's view.show.after
+        // trigger discards listener return values, so echo it here — this runs
+        // inside the show template's output buffer, placing it in the page body.
+        $bodyMarkup = $this->headMetadata()->applyResource($view, $resource, $site);
+        if ($bodyMarkup !== null && $bodyMarkup !== '') {
+            echo $bodyMarkup;
+        }
     }
 
     public function handleBrowse(EventInterface $event): void

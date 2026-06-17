@@ -120,6 +120,16 @@ class ConfigForm extends Form
             'attributes' => ['id' => 'iwac_seo_citation_meta'],
         ]);
 
+        $this->add([
+            'name'    => 'iwac_seo_unapi',
+            'type'    => Element\Checkbox::class,
+            'options' => [
+                'label' => 'Serve unAPI (Zotero RDF) for primary sources', // @translate
+                'info'  => 'Adds a /unapi endpoint and discovery tags to newspaper articles, periodical issues, documents, audiovisual items and photographs. Zotero prefers unAPI over the meta tags, so it imports a richer record — the call number (Cote) from the iwac- identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. Needs “Emit citation meta tags” for the fallback. Recommended.', // @translate
+            ],
+            'attributes' => ['id' => 'iwac_seo_unapi'],
+        ]);
+
         // ── Sitemap ─────────────────────────────────────────────────────────
         $this->add([
             'name'    => 'iwac_seo_sitemap_enabled',
@@ -174,6 +184,7 @@ class ConfigForm extends Form
             'iwac_seo_noindex_browse',
             'iwac_seo_jsonld_enabled',
             'iwac_seo_citation_meta',
+            'iwac_seo_unapi',
             'iwac_seo_sitemap_enabled',
             'iwac_seo_sitemap_ttl',
             'iwac_seo_ping_enabled',

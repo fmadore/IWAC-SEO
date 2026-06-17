@@ -44,16 +44,22 @@ class HeadMetadata
         private readonly StructuredData $structuredData,
         private readonly CitationMeta $citationMeta,
         private readonly Hreflang $hreflang,
+        private readonly ZoteroRdf $zoteroRdf,
     ) {
     }
 
     // ─── Phase 1: resource pages ────────────────────────────────────────────
 
+    /**
+     * @return string|null Optional body markup to echo after the resource view:
+     *   the unAPI <abbr class="unapi-id"> element for items served as Zotero RDF,
+     *   or null. Everything else here goes into the <head> placeholder helpers.
+     */
     public function applyResource(
         PhpRenderer $view,
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site
-    ): void {
+    ): ?string {
         $title = (string) $resource->displayTitle();
         $description = $this->resourceDescription($resource, $site);
         $canonical = $this->absoluteResourceUrl($resource, $site);
@@ -97,6 +103,29 @@ class HeadMetadata
         // Bilingual: link this item to its counterpart on the other-language
         // site (the same o:id, different site slug).
         $this->emitAlternates($view, $this->hreflang->forResource($resource));
+
+        // unAPI discovery for primary-source items. Advertise a Zotero-RDF
+        // endpoint so the Zotero Connector imports the rich record (call number,
+        // single-field institutional creators, tags) — unAPI outranks Embedded
+        // Metadata, so for these kinds it supersedes the meta tags emitted above.
+        // Returns the <abbr class="unapi-id"> element to echo in the page body.
+        if ($canonical !== null
+            && $resource instanceof ItemRepresentation
+            && $this->boolSetting('iwac_seo_unapi', true)
+            && $this->zoteroRdf->isEligible($resource->resourceClass() ? $resource->resourceClass()->id() : null)
+        ) {
+            $view->headLink([
+                'rel'   => 'unapi-server',
+                'type'  => 'application/xml',
+                'title' => 'unAPI',
+                'href'  => $view->serverUrl('/unapi'),
+            ]);
+            return sprintf(
+                '<abbr class="unapi-id" title="%s"></abbr>',
+                $view->escapeHtmlAttr($canonical)
+            );
+        }
+        return null;
     }
 
     // ─── Phase 1: static site pages ─────────────────────────────────────────

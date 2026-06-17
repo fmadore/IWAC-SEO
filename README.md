@@ -29,6 +29,7 @@ database tables, no theme edits.
 | **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. |
 | **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` + `SearchAction` on the home page and `BreadcrumbList` on resource pages. |
 | **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
+| **unAPI (Zotero RDF)** | Primary-source items also advertise a `/unapi` endpoint serving **Zotero RDF**. Zotero prefers unAPI over the meta tags, so it imports a fuller record — the call number (*Cote*) from the `iwac-` identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (chunked at 50k). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
 | **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. A staging switch can `Disallow: /` the whole site. |
@@ -93,6 +94,7 @@ on install.
 | **Noindex filtered/paginated browse** | Keeps facet/pagination URLs out of the index while still following links to resources. On by default. |
 | **Emit schema.org JSON-LD** | Toggle structured data. On by default. |
 | **Emit citation meta tags** | Toggle Zotero / Scholar tags. On by default. |
+| **Serve unAPI (Zotero RDF)** | Toggle the `/unapi` endpoint + discovery tags for primary sources. On by default; needs the meta tags on for the fallback. |
 | **Serve /sitemap.xml & /robots.txt** | Toggle the sitemap/robots endpoints. On by default. |
 | **Sitemap cache lifetime** | Seconds before the cached sitemap is rebuilt. Default 86400 (24h). |
 | **Ping IndexNow when content changes** | Off by default. See the caveat below. |
@@ -192,7 +194,12 @@ IWAC's field conventions are baked into the per-kind tags (see `src/Service/Cita
   linked item set), not `dcterms:isPartOf`;
 - a **book chapter's book title** lives in `dcterms:alternative`;
 - **DOIs** live in `bibo:doi` (a URI value); **ISBN/ISSN are not recorded** in IWAC, so
-  those tags are not emitted.
+  those tags are not emitted;
+- **Zotero tags** are built from both `dcterms:subject` (*Sujet*) and `dcterms:spatial`
+  (*Couverture spatiale*). Both sets are emitted as repeated `DC.subject` — the channel
+  Zotero's *Embedded Metadata* translator turns into tags via its RDF backend (it pre-empts
+  `citation_keywords`) — and also folded into `citation_keywords` for Google Scholar and as
+  a fallback.
 
 The citation kind per class lives in `iwac_seo.citation.class_kinds` and is overridable.
 `citation_pdf_url` is emitted only for a **public** PDF media, so restricted bitstreams are
@@ -213,6 +220,39 @@ The same DC.type technique types blog posts (`blogPost`), audiovisual (`videoRec
 scientific communications (`presentation`). The scholarly references (journal article, book,
 chapter, thesis, report, review) use the standard Highwire container tags, which type them
 precisely on their own.
+
+### unAPI — full-fidelity Zotero import for primary sources
+
+Two things the archive needs simply **cannot** be expressed through the flat `<meta>` tags
+that Zotero's *Embedded Metadata* translator reads (verified against `translators/RDF.js`):
+
+- a **call number** (French Zotero: *Cote*) — Zotero only fills `callNumber` from a *typed*
+  RDF node (`dcterms:LCC`), never from a meta tag; a bare `dc:identifier` that is not an
+  ISBN/ISSN/DOI is dropped; and
+- a **single-field institutional creator** — a literal author is always run through Zotero's
+  `cleanAuthor()` and split, so `Association Islamique d'Al Mawadda Burkina Faso` becomes
+  `… Burkina / Faso`.
+
+So the **primary-source** kinds (newspaper article, periodical issue, document, audiovisual,
+photograph) additionally expose [**unAPI**](https://www.zotero.org/support/dev/exposing_metadata):
+each page carries `<link rel="unapi-server" href="/unapi">` and `<abbr class="unapi-id">`, and
+`/unapi?id={url}&format=rdf_zotero` serves the item as **Zotero RDF**. Zotero ranks the unAPI
+translator (priority 300) **above** Embedded Metadata (400), so the Connector imports the RDF
+instead of scraping the meta tags — which lets the module set every field exactly:
+
+- `z:itemType` → the precise item type; `dc:identifier → dcterms:URI` → the item URL;
+- **Cote** ← the `iwac-` identifier, as a `dc:subject → dcterms:LCC → rdf:value` node → `callNumber`;
+- **institutional creators** ← a `foaf:Person` node with only `foaf:surname` → a single-field
+  creator; **persons** stay literal `dcterms:creator` values that Zotero splits into first/last;
+- **tags** ← `dcterms:subject` (Sujet) + `dcterms:spatial` (Couverture spatiale) as `dc:subject`;
+- `prism:publicationName`, `prism:number`/`prism:volume`, `bib:pages`, `dc:date`, `dc:language`,
+  `dcterms:abstract`, `dc:rights`, and the public PDF as an `eprints:document_url` attachment.
+
+The Highwire / DC `<meta>` tags stay on every page — they still feed Google Scholar and are the
+fallback if unAPI is unreachable, and they remain the sole path for the bibliographic-reference
+kinds (which Highwire already types precisely). `ZoteroRdf` reuses the same
+`iwac_seo.citation.class_kinds` map as `CitationMeta`; toggle the endpoint with **Serve unAPI**
+in Configure (the `iwac_seo_unapi` setting).
 
 ---
 

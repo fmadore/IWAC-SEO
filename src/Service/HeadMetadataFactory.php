@@ -15,6 +15,7 @@ final class HeadMetadataFactory implements FactoryInterface
             $container->get(StructuredData::class),
             $container->get(CitationMeta::class),
             $container->get(Hreflang::class),
+            $container->get(ZoteroRdf::class),
         );
     }
 }

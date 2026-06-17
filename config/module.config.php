@@ -21,6 +21,7 @@ return [
             Service\HeadMetadata::class     => Service\HeadMetadataFactory::class,
             Service\StructuredData::class   => Service\StructuredDataFactory::class,
             Service\CitationMeta::class     => Service\CitationMetaFactory::class,
+            Service\ZoteroRdf::class        => Service\ZoteroRdfFactory::class,
             Service\SitemapGenerator::class => Service\SitemapGeneratorFactory::class,
             Service\PageSeoStore::class     => Service\PageSeoStoreFactory::class,
             Service\Pinger::class           => Service\PingerFactory::class,
@@ -31,6 +32,7 @@ return [
     'controllers' => [
         'factories' => [
             Controller\SitemapController::class    => Service\Controller\SitemapControllerFactory::class,
+            Controller\UnapiController::class      => Service\Controller\UnapiControllerFactory::class,
             Controller\Admin\SeoController::class  => Service\Controller\SeoControllerFactory::class,
         ],
     ],
@@ -82,6 +84,16 @@ return [
                 'options' => [
                     'route'    => '/robots.txt',
                     'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'robots'],
+                ],
+            ],
+            // unAPI resolver. Item pages advertise it via <link rel="unapi-server">
+            // + <abbr class="unapi-id">; Zotero fetches ?id=…&format=rdf_zotero and
+            // imports the Zotero RDF (CitationMeta meta tags remain the fallback).
+            'iwac-seo-unapi' => [
+                'type'    => Literal::class,
+                'options' => [
+                    'route'    => '/unapi',
+                    'defaults' => ['controller' => Controller\UnapiController::class, 'action' => 'index'],
                 ],
             ],
             // IndexNow ownership key at /{key}.txt. Constrained to a hex key so

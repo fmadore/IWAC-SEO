@@ -27,7 +27,9 @@ use Omeka\Api\Representation\ValueRepresentation;
  *   • the journal / newspaper / publication title lives in **dcterms:publisher**
  *     (often a linked item set), not dcterms:isPartOf;
  *   • a book chapter's **book title** lives in **dcterms:alternative**;
- *   • DOIs live in **bibo:doi** (a URI value); ISBN/ISSN are not recorded.
+ *   • DOIs live in **bibo:doi** (a URI value); ISBN/ISSN are not recorded;
+ *   • Zotero **tags** come from both **dcterms:subject** (Sujet) and
+ *     **dcterms:spatial** (Couverture spatiale) — see {@see keywords()}.
  *
  * Newspaper articles and Islamic-publication issues are the bulk of the archive.
  * Highwire has no container tag for a newspaper/magazine, and any citation_*
@@ -110,7 +112,7 @@ class CitationMeta
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
-        $keywords = $this->labels($resource, 'dcterms:subject');
+        $keywords = $this->keywords($resource);
         if ($keywords) {
             $this->single($headMeta, 'citation_keywords', implode('; ', $keywords));
         }
@@ -202,7 +204,11 @@ class CitationMeta
         // here as well makes Zotero copy it into the Extra field redundantly.
         $this->single($headMeta, 'DC.identifier', $canonical);
 
-        foreach ($this->labels($resource, 'dcterms:subject') as $subject) {
+        // Sujet (dcterms:subject) + Couverture spatiale (dcterms:spatial). Zotero's
+        // Embedded Metadata translator turns dc:subject into the item's tags (via
+        // its RDF backend), so both descriptive subjects and spatial coverage are
+        // captured as tags. See keywords().
+        foreach ($this->keywords($resource) as $subject) {
             $headMeta->appendName('DC.subject', $subject);
         }
         $description = $this->firstString($resource, ['dcterms:abstract', 'bibo:shortDescription', 'dcterms:description']);
@@ -250,6 +256,30 @@ class CitationMeta
             $linked = $value->valueResource();
             $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
             if ($label !== '') {
+                $out[$label] = $label;
+            }
+        }
+        return array_values($out);
+    }
+
+    /**
+     * Zotero tag labels: descriptive subjects (dcterms:subject — "Sujet")
+     * followed by spatial coverage (dcterms:spatial — "Couverture spatiale"),
+     * de-duplicated with subjects first.
+     *
+     * Zotero's Embedded Metadata translator builds tags from dc:subject through
+     * its RDF backend, which pre-empts the citation_keywords fallback (that only
+     * fires when no tag was found). So the combined set is emitted on BOTH
+     * channels — DC.subject (Dublin Core) and citation_keywords (Highwire) — and
+     * whichever the translator consumes, subjects and places both land as tags.
+     *
+     * @return string[]
+     */
+    private function keywords(AbstractResourceEntityRepresentation $resource): array
+    {
+        $out = [];
+        foreach (['dcterms:subject', 'dcterms:spatial'] as $term) {
+            foreach ($this->labels($resource, $term) as $label) {
                 $out[$label] = $label;
             }
         }
