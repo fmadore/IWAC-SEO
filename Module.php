@@ -122,7 +122,11 @@ class Module extends AbstractModule
 
         /** @var Acl $acl */
         $acl = $event->getApplication()->getServiceManager()->get('Omeka\Acl');
-        $acl->allow(null, [Controller\SitemapController::class, Controller\UnapiController::class]);
+        $acl->allow(null, [
+            Controller\SitemapController::class,
+            Controller\UnapiController::class,
+            Controller\CitationController::class,
+        ]);
         $acl->allow(
             [Acl::ROLE_EDITOR, Acl::ROLE_SITE_ADMIN, Acl::ROLE_GLOBAL_ADMIN],
             [Controller\Admin\SeoController::class]

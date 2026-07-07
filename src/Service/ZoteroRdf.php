@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Concern\ResourceValueReader;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -44,6 +45,8 @@ use Omeka\Api\Representation\ValueRepresentation;
  */
 class ZoteroRdf
 {
+    use ResourceValueReader;
+
     /** Namespaces, exactly as RDF.js expects them. */
     private const NS = [
         'rdf'     => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
@@ -232,18 +235,6 @@ class ZoteroRdf
 
     // ─── Field readers ───────────────────────────────────────────────────────
 
-    /** Sujet (dcterms:subject) + Couverture spatiale (dcterms:spatial), de-duplicated. */
-    private function keywords(ItemRepresentation $item): array
-    {
-        $out = [];
-        foreach (['dcterms:subject', 'dcterms:spatial'] as $term) {
-            foreach ($this->labels($item, $term) as $label) {
-                $out[$label] = $label;
-            }
-        }
-        return array_values($out);
-    }
-
     /** The archive accession number: a dcterms:identifier value starting "iwac-". */
     private function cote(ItemRepresentation $item): ?string
     {
@@ -286,49 +277,6 @@ class ZoteroRdf
             }
         }
         return null;
-    }
-
-    /** @param string[] $terms */
-    private function firstString(AbstractResourceEntityRepresentation $resource, array $terms): ?string
-    {
-        foreach ($terms as $term) {
-            $value = $resource->value($term);
-            if ($value instanceof ValueRepresentation) {
-                $text = trim(strip_tags((string) $value));
-                if ($text !== '') {
-                    return $text;
-                }
-            }
-        }
-        return null;
-    }
-
-    private function firstLabel(AbstractResourceEntityRepresentation $resource, string $term): ?string
-    {
-        $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        $linked = $value->valueResource();
-        $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-        return $label !== '' ? $label : null;
-    }
-
-    /** @return string[] */
-    private function labels(AbstractResourceEntityRepresentation $resource, string $term): array
-    {
-        $out = [];
-        foreach ($resource->value($term, ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $linked = $value->valueResource();
-            $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-            if ($label !== '') {
-                $out[$label] = $label;
-            }
-        }
-        return array_values($out);
     }
 
     // ─── XML helpers ─────────────────────────────────────────────────────────

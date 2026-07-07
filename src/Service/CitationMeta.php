@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Concern\ResourceValueReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
@@ -41,6 +42,8 @@ use Omeka\Api\Representation\ValueRepresentation;
  */
 class CitationMeta
 {
+    use ResourceValueReader;
+
     private const ABSTRACT_MAX = 5000;
 
     /** Kinds that are descriptive authority records, not citable works → Dublin Core only. */
@@ -218,73 +221,12 @@ class CitationMeta
     }
 
     // ─── Value readers ──────────────────────────────────────────────────────
-
-    /** @param string[] $terms */
-    private function firstString(AbstractResourceEntityRepresentation $resource, array $terms): ?string
-    {
-        foreach ($terms as $term) {
-            $value = $resource->value($term);
-            if ($value instanceof ValueRepresentation) {
-                $text = trim(strip_tags((string) $value));
-                if ($text !== '') {
-                    return $text;
-                }
-            }
-        }
-        return null;
-    }
-
-    private function firstLabel(AbstractResourceEntityRepresentation $resource, string $term): ?string
-    {
-        $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        $linked = $value->valueResource();
-        $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-        return $label !== '' ? $label : null;
-    }
-
-    /** @return string[] */
-    private function labels(AbstractResourceEntityRepresentation $resource, string $term): array
-    {
-        $out = [];
-        foreach ($resource->value($term, ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $linked = $value->valueResource();
-            $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-            if ($label !== '') {
-                $out[$label] = $label;
-            }
-        }
-        return array_values($out);
-    }
-
-    /**
-     * Zotero tag labels: descriptive subjects (dcterms:subject — "Sujet")
-     * followed by spatial coverage (dcterms:spatial — "Couverture spatiale"),
-     * de-duplicated with subjects first.
-     *
-     * Zotero's Embedded Metadata translator builds tags from dc:subject through
-     * its RDF backend, which pre-empts the citation_keywords fallback (that only
-     * fires when no tag was found). So the combined set is emitted on BOTH
-     * channels — DC.subject (Dublin Core) and citation_keywords (Highwire) — and
-     * whichever the translator consumes, subjects and places both land as tags.
-     *
-     * @return string[]
-     */
-    private function keywords(AbstractResourceEntityRepresentation $resource): array
-    {
-        $out = [];
-        foreach (['dcterms:subject', 'dcterms:spatial'] as $term) {
-            foreach ($this->labels($resource, $term) as $label) {
-                $out[$label] = $label;
-            }
-        }
-        return array_values($out);
-    }
+    // firstString(), firstLabel(), labels() and keywords() live in the shared
+    // ResourceValueReader trait (used above). Zotero's Embedded Metadata
+    // translator builds tags from dc:subject via its RDF backend (pre-empting the
+    // citation_keywords fallback), so keywords() — Sujet + Couverture spatiale —
+    // is emitted on BOTH DC.subject and citation_keywords; whichever the
+    // translator consumes, subjects and places both land as tags.
 
     /**
      * Person names from the first populated role property, in document order.

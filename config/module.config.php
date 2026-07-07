@@ -21,11 +21,17 @@ return [
             Service\HeadMetadata::class     => Service\HeadMetadataFactory::class,
             Service\StructuredData::class   => Service\StructuredDataFactory::class,
             Service\CitationMeta::class     => Service\CitationMetaFactory::class,
+            Service\CitationData::class     => Service\CitationDataFactory::class,
             Service\ZoteroRdf::class        => Service\ZoteroRdfFactory::class,
             Service\SitemapGenerator::class => Service\SitemapGeneratorFactory::class,
             Service\PageSeoStore::class     => Service\PageSeoStoreFactory::class,
             Service\Pinger::class           => Service\PingerFactory::class,
             Service\Hreflang::class         => Service\HreflangFactory::class,
+        ],
+        // Dependency-free (no bundled vendor/): plain instantiation.
+        'invokables' => [
+            Service\CitationFormatter::class => Service\CitationFormatter::class,
+            Service\CitationExport::class    => Service\CitationExport::class,
         ],
     ],
 
@@ -33,7 +39,14 @@ return [
         'factories' => [
             Controller\SitemapController::class    => Service\Controller\SitemapControllerFactory::class,
             Controller\UnapiController::class      => Service\Controller\UnapiControllerFactory::class,
+            Controller\CitationController::class   => Service\Controller\CitationControllerFactory::class,
             Controller\Admin\SeoController::class  => Service\Controller\SeoControllerFactory::class,
+        ],
+    ],
+
+    'view_helpers' => [
+        'factories' => [
+            'iwacCitation' => Service\ViewHelper\CitationFactory::class,
         ],
     ],
 
@@ -94,6 +107,18 @@ return [
                 'options' => [
                     'route'    => '/unapi',
                     'defaults' => ['controller' => Controller\UnapiController::class, 'action' => 'index'],
+                ],
+            ],
+            // Single-item citation downloads: /cite/{item-id}/{format}. Host-root
+            // like /unapi, so nginx's try_files falls it through to Omeka. The
+            // item page's "How to cite" panel links here; format is bibtex|ris|
+            // csljson (validated against CitationExport::FORMATS in the controller).
+            'iwac-seo-cite' => [
+                'type'    => Segment::class,
+                'options' => [
+                    'route'       => '/cite/:id/:format',
+                    'constraints' => ['id' => '\d+', 'format' => '[a-z]+'],
+                    'defaults'    => ['controller' => Controller\CitationController::class, 'action' => 'index'],
                 ],
             ],
             // IndexNow ownership key at /{key}.txt. Constrained to a hex key so
@@ -248,6 +273,13 @@ return [
                 77  => 'communication',
                 305 => 'post',        // blog post
             ],
+            // Item-page "How to cite" panel — the theme renders the UI via the
+            // `iwacCitation` view helper; downloads are served by CitationController.
+            // Chicago (notes–bibliography) leads for the history / area-studies
+            // audience; APA + MLA are switchable. Formats mirror CitationExport.
+            'default_style' => 'chicago',
+            'styles'        => ['chicago' => 'Chicago', 'apa' => 'APA', 'mla' => 'MLA'],
+            'formats'       => ['bibtex', 'ris', 'csljson'],
         ],
         'hreflang' => [
             // Bilingual cross-language alternates. IWAC publishes the same
