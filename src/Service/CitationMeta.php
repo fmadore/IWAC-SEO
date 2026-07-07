@@ -62,6 +62,11 @@ class CitationMeta
         // Fieldwork photographs (class 58) — publicly discoverable since
         // IwacSearch 3.3.0; without this they captured as a generic document.
         'photo'         => 'artwork',
+        // Books (authored + edited volumes) carry no Highwire container tag, so
+        // the Embedded Metadata translator would default them to journalArticle.
+        // citation_publisher is not a container tag, so this DC.type override
+        // wins — Zotero captures a "book" (with editors, for an edited volume).
+        'book'          => 'book',
     ];
 
     /**

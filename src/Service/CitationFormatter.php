@@ -77,9 +77,14 @@ final class CitationFormatter
         $kind = (string) $record['kind'];
         $parts = [];
 
-        $authors = $this->authors($record, $locale, 'chicago');
-        if ($authors !== '') {
-            $parts[] = $this->terminate($authors);
+        // Creator slot: chapter → its own author only (the book's editors go in
+        // the container as "edited by …"); everything else → authors, or the
+        // editors as editors for an edited volume.
+        $creator = $kind === 'chapter'
+            ? $this->nameList($record['authors'] ?? [], $locale, 'chicago')
+            : $this->creators($record, $locale, 'chicago');
+        if ($creator !== '') {
+            $parts[] = $this->terminate($creator);
         }
 
         $parts[] = $this->titleSegment($record, $locale, 'chicago');
@@ -106,6 +111,10 @@ final class CitationFormatter
 
             case 'chapter':
                 $seg = $this->str($locale, 'in') . ' ' . $this->italic($record['bookTitle'] ?: $record['title']);
+                $eds = $this->nameList($record['editors'] ?? [], $locale, 'chicago', false);
+                if ($eds !== '') {
+                    $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
+                }
                 $pages = CitationData::pageRange($record);
                 if ($pages !== null) {
                     $seg .= ', ' . $this->esc($pages);
@@ -173,12 +182,15 @@ final class CitationFormatter
             : ($this->year($record) !== null ? $this->esc((string) $this->year($record)) : '');
         $dateSeg = '(' . ($date !== '' ? $date : 'n.d.') . ').';
 
-        // "Author. (Date). Title." — but with no author the title takes the
-        // author slot and the date follows it ("Title. (Date)."), per APA.
-        $authors = $this->authors($record, $locale, 'apa');
+        // "Creator. (Date). Title." — with no creator the title takes the slot
+        // and the date follows it ("Title. (Date)."), per APA. Chapter → its own
+        // author; other kinds → authors, or the editors for an edited volume.
+        $creator = $kind === 'chapter'
+            ? $this->nameList($record['authors'] ?? [], $locale, 'apa')
+            : $this->creators($record, $locale, 'apa');
         $title = $this->titleSegment($record, $locale, 'apa');
-        if ($authors !== '') {
-            $parts[] = $this->terminate($authors);
+        if ($creator !== '') {
+            $parts[] = $this->terminate($creator);
             $parts[] = $dateSeg;
             $parts[] = $title;
         } else {
@@ -205,7 +217,13 @@ final class CitationFormatter
                 break;
 
             case 'chapter':
-                $seg = $this->str($locale, 'in') . ' ' . $this->italic($record['bookTitle'] ?: $record['title']);
+                // In {editors} (Eds.), *Book Title* (pp. x–y). Publisher.
+                $seg = $this->str($locale, 'in') . ' ';
+                $eds = $this->nameList($record['editors'] ?? [], $locale, 'apa', false);
+                if ($eds !== '') {
+                    $seg .= $eds . ' ' . $this->editorRole(count($record['editors'] ?? []), 'apa', $locale) . ', ';
+                }
+                $seg .= $this->italic($record['bookTitle'] ?: $record['title']);
                 $pages = CitationData::pageRange($record);
                 if ($pages !== null) {
                     $seg .= ' (' . $this->str($locale, 'pp') . ' ' . $this->esc($pages) . ')';
@@ -247,9 +265,11 @@ final class CitationFormatter
         $kind = (string) $record['kind'];
         $parts = [];
 
-        $authors = $this->authors($record, $locale, 'mla');
-        if ($authors !== '') {
-            $parts[] = $this->terminate($authors);
+        $creator = $kind === 'chapter'
+            ? $this->nameList($record['authors'] ?? [], $locale, 'mla')
+            : $this->creators($record, $locale, 'mla');
+        if ($creator !== '') {
+            $parts[] = $this->terminate($creator);
         }
 
         $parts[] = $this->titleSegment($record, $locale, 'mla');
@@ -277,6 +297,10 @@ final class CitationFormatter
 
             case 'chapter':
                 $seg = $this->italic($record['bookTitle'] ?: $record['title']);
+                $eds = $this->nameList($record['editors'] ?? [], $locale, 'mla', false);
+                if ($eds !== '') {
+                    $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
+                }
                 $py = $this->publisherYear($record, $locale); // publisher, year
                 if ($py !== '') {
                     $seg .= ', ' . $py;
@@ -334,22 +358,45 @@ final class CitationFormatter
         return $this->terminate($this->italic($title));
     }
 
-    // ─── Authors ─────────────────────────────────────────────────────────────
+    // ─── Creators (authors / editors) ────────────────────────────────────────
 
     /**
+     * The creator slot: the authors, or — for an edited work with no authors
+     * (an edited volume) — the editors followed by an "ed(s)." role label.
+     *
      * @param array<string,mixed> $record
      */
-    private function authors(array $record, string $locale, string $style): string
+    private function creators(array $record, string $locale, string $style): string
     {
-        $people = $record['authors'] ?? [];
+        $authors = $this->nameList($record['authors'] ?? [], $locale, $style);
+        if ($authors !== '') {
+            return $authors;
+        }
+        $editors = $record['editors'] ?? [];
+        $names = $this->nameList($editors, $locale, $style);
+        if ($names === '') {
+            return '';
+        }
+        // Chicago/MLA: "Names, eds." · APA: "Names (Eds.)".
+        return $names . ($style === 'apa' ? ' ' : ', ') . $this->editorRole(count($editors), $style, $locale);
+    }
+
+    /**
+     * Format a list of people. The first name is inverted (Family, Given /
+     * Family, I.) unless $invertFirst is false (e.g. a chapter's "edited by …");
+     * subsequent names are natural order for Chicago/MLA. APA inverts to initials
+     * for the reference-list slot ($invertFirst true) and puts the initials first
+     * for a non-inverted list ("In J.-L. Triaud & D. Robinson (Eds.)").
+     *
+     * @param array<int,array{family:?string,given:?string,literal:string,isInstitution:bool}> $people
+     */
+    private function nameList(array $people, string $locale, string $style, bool $invertFirst = true): string
+    {
         if (!$people) {
             return '';
         }
         $n = count($people);
-
-        // Rendered forms: the first author is inverted (Family, Given / Family, I.),
-        // the rest are natural order — except APA, which inverts every name.
-        $first = $this->name($people[0], $style, true);
+        $first = $this->name($people[0], $style, $invertFirst);
         if ($n === 1) {
             return $first;
         }
@@ -358,19 +405,40 @@ final class CitationFormatter
             return $first . ', ' . $this->str($locale, 'et_al');
         }
 
+        // Subsequent names: natural order for Chicago/MLA; APA follows the list's
+        // inversion (inverted for creator lists, initials-first for "edited by").
+        $restInverted = $style === 'apa' ? $invertFirst : false;
         $rest = [];
         for ($i = 1; $i < $n; $i++) {
-            $rest[] = $this->name($people[$i], $style, $style === 'apa');
+            $rest[] = $this->name($people[$i], $style, $restInverted);
         }
 
         $sep = $style === 'apa' ? '&' : $this->str($locale, 'and');
         if ($n === 2) {
-            $glue = $style === 'apa' ? ', ' . $sep . ' ' : ', ' . $sep . ' ';
+            // A comma precedes the conjunction only when the first name is
+            // inverted ("Triaud, Jean-Louis, and …"); a natural-order pair
+            // ("edited by A and B") takes none.
+            $glue = $invertFirst ? ', ' . $sep . ' ' : ' ' . $sep . ' ';
             return $first . $glue . $rest[0];
         }
         // 3+ (Chicago/APA list all): "A, B, and/& C"
         $last = array_pop($rest);
         return $first . ', ' . implode(', ', $rest) . ', ' . $sep . ' ' . $last;
+    }
+
+    /** Role label after editor names in the creator slot ("eds." / "(Eds.)" / "editors"). */
+    private function editorRole(int $count, string $style, string $locale): string
+    {
+        if ($locale === 'fr') {
+            // French uses "dir." (sous la direction de), invariant in number.
+            return $style === 'apa' ? '(dir.)' : 'dir.';
+        }
+        $plural = $count > 1;
+        return match ($style) {
+            'apa' => $plural ? '(Eds.)' : '(Ed.)',
+            'mla' => $plural ? 'editors' : 'editor',
+            default => $plural ? 'eds.' : 'ed.', // chicago
+        };
     }
 
     /**
@@ -386,7 +454,14 @@ final class CitationFormatter
 
         if ($style === 'apa') {
             $initials = $this->initials($given);
-            return $this->esc($family) . ($initials !== '' ? ', ' . $this->esc($initials) : '');
+            if ($initials === '') {
+                return $this->esc($family);
+            }
+            // "Family, Initials" for the reference-list creator slot; initials
+            // first ("J.-L. Triaud") for a non-inverted list (chapter editors).
+            return $inverted
+                ? $this->esc($family) . ', ' . $this->esc($initials)
+                : $this->esc($initials) . ' ' . $this->esc($family);
         }
         if ($given === '') {
             return $this->esc($family);
