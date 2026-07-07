@@ -484,7 +484,20 @@ class HeadMetadata
 
     private function locale(PhpRenderer $view): string
     {
-        $lang = method_exists($view, 'lang') ? (string) $view->lang() : 'en';
+        // `lang` is a view helper invoked via __call, so method_exists($view,
+        // 'lang') is always false — this used to pin og:locale to en_US even on
+        // the French site. Resolve it through the plugin manager.
+        $lang = 'en';
+        try {
+            $helpers = $view->getHelperPluginManager();
+            if ($helpers->has('lang')) {
+                $resolved = (string) $view->lang();
+                if ($resolved !== '') {
+                    $lang = $resolved;
+                }
+            }
+        } catch (\Throwable $e) {
+        }
         // BCP-47 (en-US) → Open Graph locale (en_US).
         return str_replace('-', '_', $lang) ?: 'en_US';
     }

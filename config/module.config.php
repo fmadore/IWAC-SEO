@@ -50,6 +50,15 @@ return [
         ],
     ],
 
+    // "How to cite" resource page block — appears in the theme's resource-page
+    // configuration (Admin → Themes → Configure resource pages) so its placement
+    // is admin-controlled. Renders via the iwacCitation helper + theme partial.
+    'resource_page_block_layouts' => [
+        'invokables' => [
+            'iwacCitation' => Site\ResourcePageBlockLayout\Citation::class,
+        ],
+    ],
+
     'form_elements' => [
         'invokables' => [
             Form\ConfigForm::class  => Form\ConfigForm::class,

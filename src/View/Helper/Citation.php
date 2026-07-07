@@ -125,10 +125,22 @@ class Citation extends AbstractHelper
 
     private function locale($view): string
     {
+        // `lang` and `siteSetting` are view helpers invoked via __call, so they
+        // must be resolved through the plugin manager — method_exists($view,
+        // 'lang') is ALWAYS false and silently forced English dates on the French
+        // site (the citation text stayed "May 13, 2025" while the chrome was
+        // French). Prefer the active translator locale (matches the translated
+        // chrome), fall back to the site's configured locale.
+        $lang = '';
         try {
-            $lang = method_exists($view, 'lang') ? (string) $view->lang() : 'en';
+            $helpers = $view->getHelperPluginManager();
+            if ($helpers->has('lang')) {
+                $lang = (string) $view->lang();
+            }
+            if ($lang === '' && $helpers->has('siteSetting')) {
+                $lang = (string) ($view->siteSetting('locale') ?? '');
+            }
         } catch (\Throwable $e) {
-            $lang = 'en';
         }
         return str_starts_with(strtolower($lang), 'fr') ? 'fr' : 'en';
     }
