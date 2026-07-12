@@ -40,7 +40,6 @@ class StructuredData
 
     /** @return array<mixed>|null */
     public function forResource(
-        PhpRenderer $view,
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site,
         ?string $canonical,

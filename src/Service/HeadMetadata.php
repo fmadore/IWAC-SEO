@@ -83,7 +83,7 @@ class HeadMetadata
         $this->markApplied('og:title');
 
         if ($this->jsonLdEnabled()) {
-            $data = $this->structuredData->forResource($view, $resource, $site, $canonical, $image);
+            $data = $this->structuredData->forResource($resource, $site, $canonical, $image);
             if ($data !== null) {
                 $this->addJsonLd($view, $data);
             }
@@ -131,7 +131,7 @@ class HeadMetadata
     // ─── Phase 1: static site pages ─────────────────────────────────────────
 
     /**
-     * @param array{title?:string,description?:string,image?:int|string,robots?:string,jsonld?:bool} $overrides
+     * @param array{title?:string,description?:string,image?:int|string,robots?:string} $overrides
      */
     public function applyPage(
         PhpRenderer $view,

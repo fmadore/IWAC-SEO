@@ -60,6 +60,12 @@ class Module extends AbstractModule
         'iwac_seo_ping_last',
     ];
 
+    /** Internal bookkeeping settings — never surfaced in the config form. */
+    private const INTERNAL_SETTINGS = [
+        'iwac_seo_ping_pending',
+        'iwac_seo_ping_last',
+    ];
+
     /** Sensible defaults applied on install. */
     private const DEFAULTS = [
         'iwac_seo_sitemap_enabled' => '1',
@@ -290,8 +296,8 @@ class Module extends AbstractModule
 
         $data = [];
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
-                continue; // internal bookkeeping, not user-facing
+            if (in_array($key, self::INTERNAL_SETTINGS, true)) {
+                continue;
             }
             $data[$key] = $settings->get($key, self::DEFAULTS[$key] ?? '');
         }
@@ -314,7 +320,7 @@ class Module extends AbstractModule
 
         $data = $form->getData();
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
+            if (in_array($key, self::INTERNAL_SETTINGS, true)) {
                 continue;
             }
             if (array_key_exists($key, $data)) {
