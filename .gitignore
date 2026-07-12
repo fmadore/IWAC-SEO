@@ -8,3 +8,6 @@ Thumbs.db
 *.swp
 .idea/
 .vscode/
+
+# PHPUnit
+/.phpunit.cache/

@@ -104,7 +104,8 @@ on install.
 ### Per-page SEO
 
 **Admin → SEO → Static pages** lists every site page with editable **meta title**, **meta
-description**, **share image** (asset ID) and **indexing** (default / index / noindex). Blank
+description**, **share image** (picked with Omeka's asset selector) and **indexing**
+(default / index / noindex). Blank
 fields fall back to the page's own title and the site-wide defaults. Resource pages are not
 listed — their SEO is automatic.
 
@@ -117,7 +118,10 @@ switches between them — overrides are stored per site, so the English pages
 ### Admin dashboard
 
 **Admin → SEO** shows what is configured, the sitemap/robots URLs with public-resource counts,
-and a **Regenerate** button that clears the sitemap cache so it rebuilds on the next request.
+a **bilingual (hreflang) coverage** report listing public pages that are missing from the
+`page_pairs` map, and a **Regenerate** button that clears the sitemap cache so it rebuilds on
+the next request. It also warns when the stored IndexNow key cannot match the `/{key}.txt`
+route (non-hex) and would fail verification.
 
 ---
 
@@ -320,16 +324,23 @@ Configure the language map, `x_default` and page pairs under `iwac_seo.hreflang`
 * `/sitemap-items-{n}.xml` — public items, chunked at 50,000 URLs per file (IWAC's ~22,600
   public items fit in a single chunk).
 
+Each item entry also carries an **`<image:image>`** element (the primary media's large
+thumbnail — the page scan or cover) so Google Images can index the scans; disable via
+`iwac_seo.sitemap.include_images` in a local config override.
+
 Resource ids + modified timestamps are read with one lean DBAL query per type (public
 resources scoped to the site), so the whole sitemap renders in well under a second. Output is
-cached under `files/iwac-seo-cache/`; any cache failure falls back to live generation.
+cached under `files/iwac-seo-cache/` and served with `Cache-Control` / `Last-Modified`
+headers; the cache is invalidated when an item or page changes, and any cache failure falls
+back to live generation.
 
 ---
 
 ## IndexNow ping — and the bulk-import caveat
 
 When **Ping IndexNow** is on, public item/page **create** and **update** events queue the
-changed URL; a background job submits the queue to IndexNow at most once every 15 minutes.
+changed URL — and **delete** events too, so engines recrawl and drop the URL; a background
+job submits the queue to IndexNow at most once every 15 minutes.
 
 > **IWAC content arrives mainly through bulk imports that write thousands of items at once.**
 > The queue is therefore capped (200) and the job *skips* pinging when it looks like a bulk
@@ -404,14 +415,32 @@ IwacSeo/
 * unAPI + per-item **BibTeX / RIS** export links ("Cite / Export").
 * Per-URL hreflang in the *pages* sitemap too (static-page alternates are already emitted
   on-page; only the item / item-set sitemaps carry `<xhtml:link>` so far).
-* Image sitemap extension for the IIIF page scans; optional nginx-level caching of `/sitemap*.xml`.
+* Optional nginx-level caching of `/sitemap*.xml` (the module already emits
+  `Cache-Control`/`Last-Modified`; the image-sitemap entries shipped in 0.6.0).
 
 ---
 
 ## Uninstalling
 
-Removes every `iwac_seo_*` global setting and the per-site `iwac_seo_pages` overrides. The
-sitemap cache directory (`files/iwac-seo-cache/`) can be deleted manually if desired.
+Removes every `iwac_seo_*` global setting, the per-site `iwac_seo_pages` overrides and the
+sitemap cache directory (`files/iwac-seo-cache/`).
+
+---
+
+## Development
+
+No production dependencies; `composer install` pulls PHPUnit only. Run the test suite with:
+
+```sh
+composer install
+vendor/bin/phpunit
+```
+
+The suite covers the pure logic that regresses most silently — the Chicago/APA/MLA
+formatter, the BibTeX/RIS/CSL-JSON serialisers, hreflang resolution and the text
+utilities. GitHub Actions (`.github/workflows/ci.yml`) runs a syntax check plus the suite
+on PHP 8.2–8.4 for every push and pull request. `ROADMAP.md` documents the refactoring
+plan behind 0.6.0 and what remains deliberately out of scope.
 
 ---
 

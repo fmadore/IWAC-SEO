@@ -225,11 +225,11 @@ class HeadMetadata
         }
 
         // Verification tags — site-wide, on every public page.
-        $gsc = $this->extractToken($this->stringSetting('iwac_seo_gsc_verification'), 'google-site-verification');
+        $gsc = Text::extractToken($this->stringSetting('iwac_seo_gsc_verification'));
         if ($gsc !== '') {
             $headMeta->appendName('google-site-verification', $gsc);
         }
-        $bing = $this->extractToken($this->stringSetting('iwac_seo_bing_verification'), 'msvalidate.01');
+        $bing = Text::extractToken($this->stringSetting('iwac_seo_bing_verification'));
         if ($bing !== '') {
             $headMeta->appendName('msvalidate.01', $bing);
         }
@@ -458,37 +458,9 @@ class HeadMetadata
         }
     }
 
-    /**
-     * Accept either a full <meta …> snippet pasted from the search console or a
-     * bare token, and return just the token.
-     */
-    private function extractToken(string $raw, string $metaName): string
-    {
-        $raw = trim($raw);
-        if ($raw === '') {
-            return '';
-        }
-        if (stripos($raw, '<meta') !== false
-            && preg_match('/content\s*=\s*"([^"]+)"/i', $raw, $m)
-        ) {
-            return trim($m[1]);
-        }
-        // Strip accidental surrounding quotes/markup.
-        return trim(strip_tags($raw), " \t\n\r\0\x0B\"'");
-    }
-
     private function truncate(string $text): string
     {
-        $text = trim(preg_replace('/\s+/', ' ', $text) ?? '');
-        if (mb_strlen($text) <= self::DESCRIPTION_MAX) {
-            return $text;
-        }
-        $cut = mb_substr($text, 0, self::DESCRIPTION_MAX - 1);
-        $lastSpace = mb_strrpos($cut, ' ');
-        if ($lastSpace !== false && $lastSpace > 0) {
-            $cut = mb_substr($cut, 0, $lastSpace);
-        }
-        return rtrim($cut, " ,.;:") . '…';
+        return Text::truncate($text, self::DESCRIPTION_MAX);
     }
 
     private function locale(PhpRenderer $view): string
