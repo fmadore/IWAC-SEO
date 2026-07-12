@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Service\Controller;
 
 use IwacSeo\Controller\Admin\SeoController;
+use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
@@ -20,6 +21,7 @@ final class SeoControllerFactory implements FactoryInterface
             $container->get('Omeka\ApiManager'),
             $container->get('Omeka\Settings'),
             $container->get(SiteResolver::class),
+            $container->get(Hreflang::class),
         );
     }
 }

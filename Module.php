@@ -108,6 +108,12 @@ class Module extends AbstractModule
         foreach (self::SETTINGS as $key) {
             $settings->delete($key);
         }
+        // Remove the cached sitemap files (files/iwac-seo-cache).
+        try {
+            $services->get(SitemapGenerator::class)->destroyCache();
+        } catch (\Throwable $e) {
+            // best-effort
+        }
         // Drop the per-site static-page overrides too.
         try {
             $siteSettings = $services->get('Omeka\Settings\Site');
@@ -164,10 +170,13 @@ class Module extends AbstractModule
         // Every public page — site-wide constants + verification + gap-fill.
         $sharedEventManager->attach('*', 'view.layout', [$this, 'handleLayout']);
 
-        // Auto-ping on public content changes (no-op unless ping is enabled).
+        // Sitemap invalidation + auto-ping on content changes. Deletes are
+        // included: the URL leaves the sitemap, and IndexNow is also the
+        // fastest way to tell engines a URL vanished (they recrawl → 404).
         foreach (['Omeka\Api\Adapter\ItemAdapter', 'Omeka\Api\Adapter\SitePageAdapter'] as $adapter) {
             $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleContentChange']);
+            $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleContentChange']);
         }
     }
 
@@ -273,7 +282,12 @@ class Module extends AbstractModule
         if (trim((string) $settings->get('iwac_seo_indexnow_key', '')) === '') {
             return;
         }
-        if (method_exists($resource, 'isPublic') && !$resource->isPublic()) {
+        // Creates/updates announce a public URL; a delete is pinged regardless
+        // of visibility so engines recrawl and drop it. (A public→private
+        // *update* is not pinged — the previous state isn't in the event — but
+        // the sitemap invalidation above already stops advertising it.)
+        $isDelete = (string) $event->getName() === 'api.delete.post';
+        if (!$isDelete && method_exists($resource, 'isPublic') && !$resource->isPublic()) {
             return;
         }
 

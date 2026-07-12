@@ -32,11 +32,15 @@ class SitemapGenerator
 
     /**
      * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
+     * @param string|null $fileBaseUri the file store's public base URI
+     *   (config file_store.local.base_uri), or null to derive it from the
+     *   site URL at build time ({site base}/files)
      */
     public function __construct(
         private readonly Connection $connection,
         private readonly array $config,
         private readonly ?string $cacheDir,
+        private readonly ?string $fileBaseUri = null,
     ) {
     }
 
@@ -208,19 +212,40 @@ class SitemapGenerator
         return $this->cached('items-' . $chunk, $ttl, function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase) {
             $size = $this->chunkSize();
             $offset = ($chunk - 1) * $size;
+            $withImages = (bool) ($this->config['include_images'] ?? true);
+            $imageBase = $withImages ? $this->imageBase($siteUrl) : null;
             $urls = [];
-            foreach ($this->fetchItems($siteId, $offset, $size) as $row) {
+            foreach ($this->fetchItems($siteId, $offset, $size, $withImages) as $row) {
                 $path = '/item/' . (int) $row['id'];
-                $urls[] = [
+                $url = [
                     'loc'        => $siteUrl . $path,
                     'lastmod'    => $this->w3c($row['modified'] ?? null),
                     'changefreq' => $this->changefreq('item'),
                     'priority'   => $this->priority('item'),
                     'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
                 ];
+                // Google Images: the item's primary-media large thumbnail
+                // (the page scan / cover) as an <image:image> entry.
+                if ($imageBase !== null && !empty($row['storage_id'])) {
+                    $url['image'] = $imageBase . '/large/' . $row['storage_id'] . '.jpg';
+                }
+                $urls[] = $url;
             }
             return $this->renderUrlset($urls);
         });
+    }
+
+    /**
+     * The public base URI of stored files: the configured file_store base_uri,
+     * else "{site base}/files" derived from the site URL (works for root and
+     * sub-directory installs alike, since the /s/{slug} suffix is stripped).
+     */
+    private function imageBase(string $siteUrl): string
+    {
+        if ($this->fileBaseUri !== null && $this->fileBaseUri !== '') {
+            return rtrim($this->fileBaseUri, '/');
+        }
+        return preg_replace('#/s/[^/]+$#', '', $siteUrl) . '/files';
     }
 
     /**
@@ -258,6 +283,15 @@ class SitemapGenerator
         }
         foreach (glob($this->cacheDir . '/*.xml') ?: [] as $file) {
             @unlink($file);
+        }
+    }
+
+    /** Clear the cache and remove the cache directory itself (uninstall). */
+    public function destroyCache(): void
+    {
+        $this->clearCache();
+        if ($this->cacheDir !== null && is_dir($this->cacheDir)) {
+            @rmdir($this->cacheDir);
         }
     }
 
@@ -312,23 +346,40 @@ class SitemapGenerator
         }
     }
 
-    /** @return array<array{id:int,modified:?string}> */
-    private function fetchItems(int $siteId, int $offset, int $limit): array
+    /** @return array<array{id:int,modified:?string,storage_id?:?string}> */
+    private function fetchItems(int $siteId, int $offset, int $limit, bool $withImages = false): array
     {
         // LIMIT/OFFSET are inlined as already-cast integers: PDO refuses bound
         // parameters there under emulated prepares, and casting makes it safe.
         $limit = max(0, $limit);
         $offset = max(0, $offset);
+
+        // With images: the storage id of the item's representative thumbnail —
+        // the primary media when set (and public, with thumbnails), else the
+        // first public media with thumbnails, in position order. Mirrors how
+        // primaryMedia() picks the og:image source.
+        $imageColumn = $withImages
+            ? ', (SELECT m.storage_id FROM media m
+                  JOIN resource rm ON rm.id = m.id
+                  WHERE m.item_id = r.id AND m.has_thumbnails = 1 AND rm.is_public = 1
+                  ORDER BY COALESCE(m.id = i.primary_media_id, 0) DESC, m.position ASC, m.id ASC
+                  LIMIT 1) AS storage_id'
+            : '';
+        $itemJoin = $withImages ? ' JOIN item i ON i.id = r.id' : '';
+
         try {
             return $this->connection->fetchAllAssociative(
-                'SELECT r.id, r.modified FROM resource r
-                 JOIN item_site isi ON isi.item_id = r.id
+                'SELECT r.id, r.modified' . $imageColumn . ' FROM resource r'
+                . $itemJoin
+                . ' JOIN item_site isi ON isi.item_id = r.id
                  WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s
                  ORDER BY r.id LIMIT ' . $limit . ' OFFSET ' . $offset,
                 ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
             );
         } catch (\Throwable $e) {
-            return [];
+            // A failing image subquery (schema drift) must not empty the
+            // sitemap — retry lean before giving up.
+            return $withImages ? $this->fetchItems($siteId, $offset, $limit, false) : [];
         }
     }
 
@@ -367,18 +418,21 @@ class SitemapGenerator
     /** @param array<array<string,mixed>> $urls */
     private function renderUrlset(array $urls): string
     {
-        // Declare the xhtml namespace only when hreflang alternates are present.
+        // Declare the xhtml/image namespaces only when actually used.
         $hasAlternates = false;
+        $hasImages = false;
         foreach ($urls as $u) {
-            if (!empty($u['alternates'])) {
-                $hasAlternates = true;
+            $hasAlternates = $hasAlternates || !empty($u['alternates']);
+            $hasImages = $hasImages || !empty($u['image']);
+            if ($hasAlternates && $hasImages) {
                 break;
             }
         }
-        $xhtmlNs = $hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '';
+        $ns = ($hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '')
+            . ($hasImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '');
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $xhtmlNs . '>' . "\n";
+            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $ns . '>' . "\n";
         foreach ($urls as $u) {
             $xml .= '  <url><loc>' . $this->esc((string) $u['loc']) . '</loc>';
             if (!empty($u['lastmod'])) {
@@ -393,6 +447,9 @@ class SitemapGenerator
             foreach ($u['alternates'] ?? [] as $alt) {
                 $xml .= '<xhtml:link rel="alternate" hreflang="' . $this->esc((string) $alt['hreflang'])
                     . '" href="' . $this->esc((string) $alt['href']) . '"/>';
+            }
+            if (!empty($u['image'])) {
+                $xml .= '<image:image><image:loc>' . $this->esc((string) $u['image']) . '</image:loc></image:image>';
             }
             $xml .= '</url>' . "\n";
         }

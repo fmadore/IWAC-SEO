@@ -5,6 +5,7 @@ namespace IwacSeo\Controller\Admin;
 
 use IwacSeo\Form\PageSeoForm;
 use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
@@ -28,6 +29,7 @@ class SeoController extends AbstractActionController
         private readonly ApiManager $api,
         private readonly Settings $settings,
         private readonly SiteResolver $siteResolver,
+        private readonly Hreflang $hreflang,
     ) {
     }
 
@@ -53,10 +55,53 @@ class SeoController extends AbstractActionController
             'sitemapUrl'     => $hostUrl ? $hostUrl . '/sitemap.xml' : '',
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],
+            'hreflangEnabled' => $this->hreflang->isEnabled(),
+            'hreflangGaps'   => $this->hreflangGaps(),
             'confirmForm'    => $this->getForm(\Omeka\Form\ConfirmForm::class)
                 ->setAttribute('action', $this->url()->fromRoute('admin/iwac-seo/regenerate')),
         ]);
         return $view->setTemplate('iwac-seo/admin/seo/dashboard');
+    }
+
+    /**
+     * Public pages with no entry in the hreflang page map — they emit no
+     * cross-language alternate links until config page_pairs is updated.
+     * Surfacing them here catches drift as soon as a page is added/renamed.
+     *
+     * @return array<int,array{site:SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}>
+     */
+    private function hreflangGaps(): array
+    {
+        if (!$this->hreflang->isEnabled()) {
+            return [];
+        }
+        $gaps = [];
+        foreach ($this->hreflang->sites() as $slug => $lang) {
+            try {
+                $sites = $this->api->search('sites', ['slug' => $slug])->getContent();
+                $site = $sites[0] ?? null;
+                if (!$site instanceof SiteRepresentation) {
+                    continue;
+                }
+                $pages = $this->api->search('site_pages', ['site_id' => $site->id()])->getContent();
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $covered = $this->hreflang->coveredSlugs((string) $slug);
+            $missing = [];
+            foreach ($pages as $page) {
+                if (method_exists($page, 'isPublic') && !$page->isPublic()) {
+                    continue;
+                }
+                if (!in_array($page->slug(), $covered, true)) {
+                    $missing[] = $page;
+                }
+            }
+            if ($missing) {
+                $gaps[] = ['site' => $site, 'lang' => (string) $lang, 'pages' => $missing];
+            }
+        }
+        return $gaps;
     }
 
     public function regenerateAction()

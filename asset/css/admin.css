@@ -40,8 +40,14 @@
     box-sizing: border-box;
 }
 
-#content table.tablesaw td input.iwac-seo-asset {
-    width: 6rem;
+/* Keep Omeka's asset picker compact inside the table. */
+#content table.tablesaw td.iwac-seo-asset .asset-form-element {
+    min-width: 10rem;
+}
+
+#content table.tablesaw td.iwac-seo-asset img.selected-asset-image {
+    max-width: 6rem;
+    max-height: 4rem;
 }
 
 #content table.tablesaw td code {
