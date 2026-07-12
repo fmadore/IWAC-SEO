@@ -16,6 +16,11 @@ use Doctrine\DBAL\Connection;
  * URL construction is intentionally string-based (the caller passes the
  * already-canonical host and site roots) rather than invoking the URL helper
  * thousands of times.
+ *
+ * Cache keys are per-type only, not per-host: the generated XML embeds the
+ * request-derived canonical host, so the first request's host is baked into
+ * the cache for the TTL. Fine for IWAC's single-host deployment; include the
+ * host in the key if the instance ever answers under several hostnames.
  */
 class SitemapGenerator
 {

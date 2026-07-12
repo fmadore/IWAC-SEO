@@ -9,6 +9,7 @@
  * @var bool $noindexSite
  * @var bool $pingEnabled
  * @var string $indexNowKey
+ * @var bool $indexNowKeyValid
  * @var string $sitemapUrl
  * @var string $robotsUrl
  * @var array{items:int,itemSets:int,pages:int} $counts
@@ -65,6 +66,8 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
                     <?php echo $pingEnabled ? $on : $off; ?>
                     <?php if ($pingEnabled && $indexNowKey === ''): ?>
                         — <span class="iwac-seo-off"><?php echo $this->translate('no key set'); ?></span>
+                    <?php elseif ($indexNowKey !== '' && !$indexNowKeyValid): ?>
+                        — <span class="iwac-seo-off"><?php echo $this->translate('key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail'); ?></span>
                     <?php endif; ?>
                 </td>
             </tr>

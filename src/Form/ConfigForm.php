@@ -179,5 +179,24 @@ class ConfigForm extends Form
         foreach ($this->getElements() as $element) {
             $inputFilter->add(['name' => $element->getName(), 'required' => false]);
         }
+
+        // The IndexNow key must match the /{key}.txt route constraint — a
+        // non-hex key would save fine but the key file would 404 and IndexNow
+        // verification would fail silently.
+        $inputFilter->add([
+            'name'       => 'iwac_seo_indexnow_key',
+            'required'   => false,
+            'validators' => [
+                [
+                    'name'    => 'Regex',
+                    'options' => [
+                        'pattern'  => '/^[A-Fa-f0-9]{8,128}$/',
+                        'messages' => [
+                            \Laminas\Validator\Regex::NOT_MATCH => 'The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16.', // @translate
+                        ],
+                    ],
+                ],
+            ],
+        ]);
     }
 }

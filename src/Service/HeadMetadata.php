@@ -237,7 +237,10 @@ class HeadMetadata
         // Open Graph / Twitter constants.
         if ($site !== null) {
             $headMeta->setProperty('og:site_name', $site->title());
-            $headMeta->setProperty('og:locale', $this->locale($view));
+            // Through ogLocale() so a bare site locale ("fr") still emits the
+            // language_TERRITORY form Open Graph expects, matching the
+            // og:locale:alternate values below.
+            $headMeta->setProperty('og:locale', $this->ogLocale($this->locale($view)));
             // Advertise the other-language site(s) as og:locale:alternate.
             if ($this->hreflang->isEnabled()) {
                 $currentSlug = $site->slug();
@@ -364,7 +367,10 @@ class HeadMetadata
         // Newspaper articles carry their summary in bibo:shortDescription (the
         // AI summary); references and publication issues use dcterms:abstract;
         // authority records (persons, organisations, events) use
-        // dcterms:description. Try them in that order.
+        // dcterms:description. Try them in that order. NOTE: this order is
+        // deliberately different from ResourceValueReader::ABSTRACT_TERMS —
+        // a meta description wants the punchy summary, a citation wants the
+        // formal abstract. Do not unify the two.
         foreach (['bibo:shortDescription', 'dcterms:abstract', 'dcterms:description', 'bibo:abstract'] as $term) {
             $value = $resource->value($term);
             if ($value !== null) {
@@ -531,7 +537,11 @@ class HeadMetadata
         }
     }
 
-    /** Map a bare hreflang code to an Open Graph locale (language_TERRITORY). */
+    /**
+     * Map a bare language code to an Open Graph locale (language_TERRITORY).
+     * Codes that already carry a territory ("en_US", "en-GB") pass through
+     * with the separator normalised.
+     */
     private function ogLocale(string $lang): string
     {
         $map = ['fr' => 'fr_FR', 'en' => 'en_US'];

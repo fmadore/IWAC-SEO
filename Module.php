@@ -277,12 +277,14 @@ class Module extends AbstractModule
         }
 
         // Dispatch at most once per interval; the job batches the whole queue.
+        // The throttle is stamped only after a successful dispatch so a failed
+        // dispatch does not burn the window.
         $last = (int) $settings->get('iwac_seo_ping_last', 0);
         $now = time();
         if ($now - $last >= self::PING_INTERVAL) {
-            $settings->set('iwac_seo_ping_last', $now);
             try {
                 $services->get('Omeka\Job\Dispatcher')->dispatch(PingSearchEngines::class);
+                $settings->set('iwac_seo_ping_last', $now);
             } catch (\Throwable $e) {
                 // never let SEO bookkeeping break a save
             }

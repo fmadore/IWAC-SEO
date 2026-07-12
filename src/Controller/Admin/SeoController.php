@@ -35,6 +35,7 @@ class SeoController extends AbstractActionController
     {
         $site = $this->resolveSite();
         $hostUrl = $site ? $this->hostUrl($site) : '';
+        $indexNowKey = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
 
         $view = new ViewModel([
             'site'           => $site,
@@ -44,7 +45,11 @@ class SeoController extends AbstractActionController
             'sitemapEnabled' => $this->boolSetting('iwac_seo_sitemap_enabled', true),
             'noindexSite'    => $this->boolSetting('iwac_seo_noindex_site'),
             'pingEnabled'    => $this->boolSetting('iwac_seo_ping_enabled'),
-            'indexNowKey'    => trim((string) $this->settings->get('iwac_seo_indexnow_key', '')),
+            'indexNowKey'    => $indexNowKey,
+            // The /{key}.txt route only matches a hex key; a non-hex key can
+            // never be served, so IndexNow verification would fail silently.
+            'indexNowKeyValid' => $indexNowKey === ''
+                || (bool) preg_match('/^[A-Fa-f0-9]{8,128}$/', $indexNowKey),
             'sitemapUrl'     => $hostUrl ? $hostUrl . '/sitemap.xml' : '',
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],
