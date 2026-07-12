@@ -27,6 +27,7 @@ return [
             Service\PageSeoStore::class     => Service\PageSeoStoreFactory::class,
             Service\Pinger::class           => Service\PingerFactory::class,
             Service\Hreflang::class         => Service\HreflangFactory::class,
+            Service\SiteResolver::class     => Service\SiteResolverFactory::class,
         ],
         // Dependency-free (no bundled vendor/): plain instantiation.
         'invokables' => [

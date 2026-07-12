@@ -18,8 +18,10 @@ final class CitationFactory implements FactoryInterface
         $config = $container->get('Config')['iwac_seo']['citation'] ?? [];
         $settings = $container->get('Omeka\Settings');
 
-        // The panel shares the citation kill-switch with the Highwire/DC meta tags.
-        $enabled = in_array((string) $settings->get('iwac_seo_citation_meta', '1'), ['1'], true);
+        // The panel shares the citation kill-switch with the Highwire/DC meta
+        // tags. Same truthiness contract as SettingsReader::boolSetting().
+        $value = $settings->get('iwac_seo_citation_meta', '1');
+        $enabled = $value === '1' || $value === 1 || $value === true;
 
         return new Citation(
             $container->get(CitationData::class),

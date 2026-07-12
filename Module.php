@@ -26,6 +26,7 @@ namespace IwacSeo;
 use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\Mvc\Controller\AbstractController;
@@ -76,12 +77,14 @@ class Module extends AbstractModule
         'iwac_seo_sitemap_ttl'     => '86400',
     ];
 
-    /** How often (seconds) a ping job may be dispatched, and the queue cap. */
+    /** How often (seconds) a ping job may be dispatched. */
     private const PING_INTERVAL = 900;
-    private const PING_QUEUE_CAP = 200;
 
-    private ?string $cachedSiteSlug = null;
-    private bool $siteSlugResolved = false;
+    /**
+     * Pending-URL queue cap. Public because {@see PingSearchEngines} treats a
+     * full queue as a bulk sync and skips the ping — the two must agree.
+     */
+    public const PING_QUEUE_CAP = 200;
 
     public function getConfig(): array
     {
@@ -363,7 +366,7 @@ class Module extends AbstractModule
 
     private function resourcePublicUrl(object $resource): ?string
     {
-        $slug = $this->defaultSiteSlug();
+        $slug = $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug();
         if ($slug === null) {
             return null;
         }
@@ -375,28 +378,5 @@ class Module extends AbstractModule
             // ignore
         }
         return null;
-    }
-
-    private function defaultSiteSlug(): ?string
-    {
-        if ($this->siteSlugResolved) {
-            return $this->cachedSiteSlug;
-        }
-        $this->siteSlugResolved = true;
-        $services = $this->getServiceLocator();
-        try {
-            $settings = $services->get('Omeka\Settings');
-            $api = $services->get('Omeka\ApiManager');
-            $defaultSiteId = (int) $settings->get('default_site');
-            if ($defaultSiteId) {
-                $this->cachedSiteSlug = $api->read('sites', $defaultSiteId)->getContent()->slug();
-            } else {
-                $sites = $api->search('sites', ['limit' => 1])->getContent();
-                $this->cachedSiteSlug = $sites ? $sites[0]->slug() : null;
-            }
-        } catch (\Throwable $e) {
-            $this->cachedSiteSlug = null;
-        }
-        return $this->cachedSiteSlug;
     }
 }

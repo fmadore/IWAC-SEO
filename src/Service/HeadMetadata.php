@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Concern\SettingsReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
@@ -30,6 +31,8 @@ use Omeka\Settings\Settings;
  */
 class HeadMetadata
 {
+    use SettingsReader;
+
     private const DESCRIPTION_MAX = 160;
 
     /** @var array<string,bool> Signals already emitted this request. */
@@ -541,17 +544,6 @@ class HeadMetadata
     private function jsonLdEnabled(): bool
     {
         return $this->boolSetting('iwac_seo_jsonld_enabled', true);
-    }
-
-    private function boolSetting(string $key, bool $default = false): bool
-    {
-        $value = $this->settings->get($key, $default ? '1' : '0');
-        return $value === '1' || $value === 1 || $value === true;
-    }
-
-    private function stringSetting(string $key): string
-    {
-        return (string) ($this->settings->get($key, '') ?? '');
     }
 
     private function markApplied(string $key): void

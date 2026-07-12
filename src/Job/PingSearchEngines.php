@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Job;
 
+use IwacSeo\Module;
 use IwacSeo\Service\Pinger;
 use Omeka\Job\AbstractJob;
 
@@ -17,7 +18,6 @@ use Omeka\Job\AbstractJob;
  */
 class PingSearchEngines extends AbstractJob
 {
-    private const FLOOD_CAP = 200;
 
     public function perform(): void
     {
@@ -41,7 +41,7 @@ class PingSearchEngines extends AbstractJob
         }
 
         $urls = array_values(array_unique(array_filter($pending)));
-        if (count($urls) >= self::FLOOD_CAP) {
+        if (count($urls) >= Module::PING_QUEUE_CAP) {
             $logger->info(sprintf(
                 'IwacSeo: skipped IndexNow ping for a bulk change (%d URLs); the sitemap covers discovery.',
                 count($urls)

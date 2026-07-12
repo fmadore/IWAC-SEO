@@ -6,8 +6,6 @@ namespace IwacSeo\Service;
 use IwacSeo\Service\Concern\ResourceValueReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
-use Omeka\Api\Representation\ItemRepresentation;
-use Omeka\Api\Representation\ValueRepresentation;
 
 /**
  * Emits bibliographic <meta> tags so the Zotero Connector (and Google Scholar,
@@ -43,8 +41,6 @@ use Omeka\Api\Representation\ValueRepresentation;
 class CitationMeta
 {
     use ResourceValueReader;
-
-    private const ABSTRACT_MAX = 5000;
 
     /** Kinds that are descriptive authority records, not citable works → Dublin Core only. */
     private const ENTITY_KINDS = ['person', 'place', 'organization', 'event', 'subject'];
@@ -116,7 +112,7 @@ class CitationMeta
         }
 
         $this->single($headMeta, 'citation_publication_date',
-            $this->firstString($resource, ['dcterms:date', 'dcterms:issued', 'dcterms:created']));
+            $this->firstString($resource, self::DATE_TERMS));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
@@ -125,7 +121,7 @@ class CitationMeta
             $this->single($headMeta, 'citation_keywords', implode('; ', $keywords));
         }
 
-        $abstract = $this->firstString($resource, ['dcterms:abstract', 'bibo:abstract', 'bibo:shortDescription', 'dcterms:description']);
+        $abstract = $this->firstString($resource, self::ABSTRACT_TERMS);
         if ($abstract !== null) {
             $this->single($headMeta, 'citation_abstract', $this->clip($abstract));
         }
@@ -200,8 +196,7 @@ class CitationMeta
         foreach ($this->people($resource, ['dcterms:creator', 'bibo:authorList']) as $creator) {
             $headMeta->appendName('DC.creator', $creator);
         }
-        $this->single($headMeta, 'DC.date',
-            $this->firstString($resource, ['dcterms:date', 'dcterms:issued', 'dcterms:created']));
+        $this->single($headMeta, 'DC.date', $this->firstString($resource, self::DATE_TERMS));
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
         $this->single($headMeta, 'DC.type',
             $resource->resourceClass() ? $resource->resourceClass()->label() : null);
@@ -219,7 +214,7 @@ class CitationMeta
         foreach ($this->keywords($resource) as $subject) {
             $headMeta->appendName('DC.subject', $subject);
         }
-        $description = $this->firstString($resource, ['dcterms:abstract', 'bibo:shortDescription', 'dcterms:description']);
+        $description = $this->firstString($resource, self::ABSTRACT_TERMS);
         if ($description !== null) {
             $this->single($headMeta, 'DC.description', $this->clip($description));
         }
@@ -250,46 +245,7 @@ class CitationMeta
         return [];
     }
 
-    private function doi(AbstractResourceEntityRepresentation $resource): ?string
-    {
-        $value = $resource->value('bibo:doi');
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        // bibo:doi is stored as a URI value; prefer the URI, fall back to text.
-        $doi = $value->uri() ?: trim(strip_tags((string) $value));
-        if ($doi === '') {
-            return null;
-        }
-        // Normalise a DOI URL or "doi:" prefix down to the bare identifier.
-        $doi = preg_replace('#^(https?://(dx\.)?doi\.org/|doi:)#i', '', $doi);
-        return $doi !== '' ? $doi : null;
-    }
-
-    private function pdfUrl(AbstractResourceEntityRepresentation $resource): ?string
-    {
-        if (!$resource instanceof ItemRepresentation) {
-            return null;
-        }
-        foreach ($resource->media() as $media) {
-            if (method_exists($media, 'isPublic') && !$media->isPublic()) {
-                continue;
-            }
-            if ($media->mediaType() === 'application/pdf') {
-                $url = $media->originalUrl();
-                if ($url) {
-                    return $url;
-                }
-            }
-        }
-        return null;
-    }
-
-    private function clip(string $text): string
-    {
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($text)) ?? '');
-        return mb_substr($text, 0, self::ABSTRACT_MAX);
-    }
+    // doi(), pdfUrl() and clip() live in the shared ResourceValueReader trait.
 
     private function single(\Laminas\View\Helper\HeadMeta $headMeta, string $name, ?string $content): void
     {

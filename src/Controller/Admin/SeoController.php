@@ -4,8 +4,10 @@ declare(strict_types=1);
 namespace IwacSeo\Controller\Admin;
 
 use IwacSeo\Form\PageSeoForm;
+use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SitemapGenerator;
+use IwacSeo\Service\SiteResolver;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
@@ -18,11 +20,14 @@ use Omeka\Settings\Settings;
  */
 class SeoController extends AbstractActionController
 {
+    use SettingsReader;
+
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly PageSeoStore $pageSeoStore,
         private readonly ApiManager $api,
         private readonly Settings $settings,
+        private readonly SiteResolver $siteResolver,
     ) {
     }
 
@@ -139,36 +144,12 @@ class SeoController extends AbstractActionController
 
     private function resolveSite(): ?SiteRepresentation
     {
-        $defaultSiteId = (int) $this->settings->get('default_site');
-        if ($defaultSiteId) {
-            try {
-                return $this->api->read('sites', $defaultSiteId)->getContent();
-            } catch (\Throwable $e) {
-                // fall through
-            }
-        }
-        try {
-            $sites = $this->api->search('sites', ['limit' => 1])->getContent();
-            return $sites[0] ?? null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return $this->siteResolver->defaultSite();
     }
 
     private function hostUrl(SiteRepresentation $site): string
     {
         $siteUrl = $this->url()->fromRoute('site', ['site-slug' => $site->slug()], ['force_canonical' => true]);
-        $parts = parse_url($siteUrl);
-        $host = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
-        if (!empty($parts['port'])) {
-            $host .= ':' . $parts['port'];
-        }
-        return $host;
-    }
-
-    private function boolSetting(string $key, bool $default = false): bool
-    {
-        $value = $this->settings->get($key, $default ? '1' : '0');
-        return $value === '1' || $value === 1 || $value === true;
+        return SiteResolver::hostFromUrl($siteUrl);
     }
 }

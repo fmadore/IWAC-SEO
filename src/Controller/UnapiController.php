@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller;
 
+use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
@@ -27,6 +28,8 @@ use Omeka\Settings\Settings;
  */
 class UnapiController extends AbstractActionController
 {
+    use SettingsReader;
+
     /** The only format we serve; rdf_zotero is Zotero's most-preferred unAPI format. */
     private const FORMAT = 'rdf_zotero';
 
@@ -115,8 +118,7 @@ class UnapiController extends AbstractActionController
 
     private function enabled(): bool
     {
-        $value = $this->settings->get('iwac_seo_unapi', '1');
-        return $value === '1' || $value === 1 || $value === true;
+        return $this->boolSetting('iwac_seo_unapi', true);
     }
 
     private function body(string $content, string $contentType, int $status = 200): Response
