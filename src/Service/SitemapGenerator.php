@@ -27,6 +27,9 @@ class SitemapGenerator
     /** Sitemaps protocol hard cap is 50,000 URLs / 50 MB per file. */
     private const MAX_URLS_PER_FILE = 50000;
 
+    /** When the most recently served document was generated (see lastModified()). */
+    private ?int $lastModified = null;
+
     /**
      * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
      */
@@ -263,22 +266,47 @@ class SitemapGenerator
     {
         return [
             'items'    => $this->countItems($siteId),
-            'itemSets' => count($this->fetchItemSets($siteId)),
-            'pages'    => count($this->fetchPages($siteId)), // home is one of these
+            'itemSets' => $this->countScalar(
+                'SELECT COUNT(*) FROM resource r
+                 JOIN site_item_set sis ON sis.item_set_id = r.id
+                 WHERE r.resource_type = :t AND r.is_public = 1 AND sis.site_id = :s',
+                ['t' => 'Omeka\\Entity\\ItemSet', 's' => $siteId]
+            ),
+            // Home is one of these.
+            'pages'    => $this->countScalar(
+                'SELECT COUNT(*) FROM site_page WHERE site_id = :s AND is_public = 1',
+                ['s' => $siteId]
+            ),
         ];
+    }
+
+    /**
+     * When the most recently served document was generated: the cache file's
+     * mtime on a hit, the build moment on a live build, null before any call.
+     * Lets the controller emit an honest Last-Modified header.
+     */
+    public function lastModified(): ?int
+    {
+        return $this->lastModified;
     }
 
     // ─── Data (lean DBAL) ───────────────────────────────────────────────────
 
     private function countItems(int $siteId): int
     {
+        return $this->countScalar(
+            'SELECT COUNT(*) FROM resource r
+             JOIN item_site isi ON isi.item_id = r.id
+             WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s',
+            ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
+        );
+    }
+
+    /** @param array<string,mixed> $params */
+    private function countScalar(string $sql, array $params): int
+    {
         try {
-            return (int) $this->connection->fetchOne(
-                'SELECT COUNT(*) FROM resource r
-                 JOIN item_site isi ON isi.item_id = r.id
-                 WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s',
-                ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
-            );
+            return (int) $this->connection->fetchOne($sql, $params);
         } catch (\Throwable $e) {
             return 0;
         }
@@ -404,14 +432,17 @@ class SitemapGenerator
     /** @param callable():string $build */
     private function cached(string $key, int $ttl, callable $build): string
     {
+        $this->lastModified = time();
         if ($this->cacheDir === null || $ttl <= 0) {
             return $build();
         }
         $file = $this->cacheDir . '/' . $key . '.xml';
         try {
-            if (is_file($file) && (time() - filemtime($file)) < $ttl) {
+            $mtime = is_file($file) ? filemtime($file) : false;
+            if ($mtime !== false && (time() - $mtime) < $ttl) {
                 $cached = file_get_contents($file);
                 if ($cached !== false) {
+                    $this->lastModified = $mtime;
                     return $cached;
                 }
             }

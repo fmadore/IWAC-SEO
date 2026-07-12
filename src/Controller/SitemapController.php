@@ -108,7 +108,13 @@ class SitemapController extends AbstractActionController
             return $this->notFound();
         }
         $chunk = (int) $this->params()->fromRoute('chunk', 1);
-        if ($chunk < 1 || $chunk > $this->generator->itemChunkCount($site->id())) {
+        if ($chunk < 1) {
+            return $this->notFound();
+        }
+        // Chunk 1 always exists (an empty urlset is still valid), so only the
+        // higher chunks pay for the bound-checking COUNT query — at IWAC's
+        // scale chunk 1 is the only chunk, so cached requests stay query-free.
+        if ($chunk > 1 && $chunk > $this->generator->itemChunkCount($site->id())) {
             return $this->notFound();
         }
         return $this->xml($this->generator->buildItems(
@@ -218,6 +224,17 @@ class SitemapController extends AbstractActionController
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'application/xml; charset=utf-8');
         $headers->addHeaderLine('X-Robots-Tag', 'noindex'); // don't index the sitemap file itself
+
+        // The XML is already file-cached server-side; let crawlers and any
+        // CDN revalidate instead of refetching for the same window.
+        $ttl = $this->ttl();
+        if ($ttl > 0) {
+            $headers->addHeaderLine('Cache-Control', 'public, max-age=' . $ttl);
+        }
+        $lastModified = $this->generator->lastModified();
+        if ($lastModified !== null) {
+            $headers->addHeaderLine('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
+        }
         return $response;
     }
 

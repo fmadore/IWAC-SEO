@@ -26,6 +26,7 @@ namespace IwacSeo;
 use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
 use Laminas\EventManager\SharedEventManagerInterface;
@@ -248,16 +249,31 @@ class Module extends AbstractModule
         $services = $this->getServiceLocator();
         $settings = $services->get('Omeka\Settings');
 
+        $response = $event->getParam('response');
+        $resource = $response ? $response->getContent() : null;
+        if (!$resource) {
+            return;
+        }
+
+        // Invalidate the sitemap cache so the change shows up on the next
+        // crawl instead of after the TTL. Any create/update can affect the
+        // URL set or a <lastmod> (including a public→private edit), and
+        // clearing is just a few unlinks, so no public check here.
+        if ((string) $settings->get('iwac_seo_sitemap_enabled', '1') === '1') {
+            try {
+                $services->get(SitemapGenerator::class)->clearCache();
+            } catch (\Throwable $e) {
+                // never let SEO bookkeeping break a save
+            }
+        }
+
         if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
             return;
         }
         if (trim((string) $settings->get('iwac_seo_indexnow_key', '')) === '') {
             return;
         }
-
-        $response = $event->getParam('response');
-        $resource = $response ? $response->getContent() : null;
-        if (!$resource || (method_exists($resource, 'isPublic') && !$resource->isPublic())) {
+        if (method_exists($resource, 'isPublic') && !$resource->isPublic()) {
             return;
         }
 
