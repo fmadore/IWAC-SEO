@@ -17,10 +17,15 @@ final class SitemapGeneratorFactory implements FactoryInterface
             ?? (defined('OMEKA_PATH') ? OMEKA_PATH . '/files' : sys_get_temp_dir());
         $cacheDir = rtrim((string) $basePath, '/\\') . '/iwac-seo-cache';
 
+        // Public base URI of stored files, when configured; the generator
+        // falls back to deriving "{site base}/files" from the site URL.
+        $fileBaseUri = $config['file_store']['local']['base_uri'] ?? null;
+
         return new SitemapGenerator(
             $container->get('Omeka\Connection'),
             $sitemapConfig,
             $cacheDir,
+            is_string($fileBaseUri) && $fileBaseUri !== '' ? $fileBaseUri : null,
         );
     }
 }

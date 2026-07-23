@@ -51,7 +51,7 @@ $form->prepare();
                 <th><?php echo $this->translate('Page'); ?></th>
                 <th><?php echo $this->translate('Meta title'); ?></th>
                 <th><?php echo $this->translate('Meta description'); ?></th>
-                <th><?php echo $this->translate('Share image (asset ID)'); ?></th>
+                <th><?php echo $this->translate('Share image'); ?></th>
                 <th><?php echo $this->translate('Indexing'); ?></th>
             </tr>
         </thead>
@@ -76,10 +76,15 @@ $form->prepare();
                         <textarea name="<?php echo $this->escapeHtmlAttr($base . '[description]'); ?>" rows="2"
                             placeholder="<?php echo $this->escapeHtmlAttr($this->translate('150–160 characters')); ?>"><?php echo $this->escapeHtml($o['description'] ?? ''); ?></textarea>
                     </td>
-                    <td>
-                        <input type="number" min="0" step="1" class="iwac-seo-asset"
-                            name="<?php echo $this->escapeHtmlAttr($base . '[image]'); ?>"
-                            value="<?php echo $this->escapeHtmlAttr((string) ($o['image'] ?? '')); ?>">
+                    <td class="iwac-seo-asset">
+                        <?php
+                        // Omeka's own asset picker (common/asset-form): it
+                        // enqueues its CSS/JS itself and builds its selection
+                        // sidebar dynamically, so it works on this page as-is.
+                        $assetElement = new \Omeka\Form\Element\Asset($base . '[image]');
+                        $assetElement->setValue((string) ($o['image'] ?? ''));
+                        echo $this->formAsset($assetElement);
+                        ?>
                     </td>
                     <td>
                         <select name="<?php echo $this->escapeHtmlAttr($base . '[robots]'); ?>">

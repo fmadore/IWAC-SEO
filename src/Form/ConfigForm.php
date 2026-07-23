@@ -173,24 +173,30 @@ class ConfigForm extends Form
         ]);
 
         // Everything is optional — the module degrades to sensible defaults.
+        // Derived from the elements themselves so a new field cannot be
+        // forgotten here.
         $inputFilter = $this->getInputFilter();
-        foreach ([
-            'iwac_seo_gsc_verification',
-            'iwac_seo_bing_verification',
-            'iwac_seo_default_description',
-            'iwac_seo_default_share_image',
-            'iwac_seo_twitter_site',
-            'iwac_seo_noindex_site',
-            'iwac_seo_noindex_browse',
-            'iwac_seo_jsonld_enabled',
-            'iwac_seo_citation_meta',
-            'iwac_seo_unapi',
-            'iwac_seo_sitemap_enabled',
-            'iwac_seo_sitemap_ttl',
-            'iwac_seo_ping_enabled',
-            'iwac_seo_indexnow_key',
-        ] as $name) {
-            $inputFilter->add(['name' => $name, 'required' => false]);
+        foreach ($this->getElements() as $element) {
+            $inputFilter->add(['name' => $element->getName(), 'required' => false]);
         }
+
+        // The IndexNow key must match the /{key}.txt route constraint — a
+        // non-hex key would save fine but the key file would 404 and IndexNow
+        // verification would fail silently.
+        $inputFilter->add([
+            'name'       => 'iwac_seo_indexnow_key',
+            'required'   => false,
+            'validators' => [
+                [
+                    'name'    => 'Regex',
+                    'options' => [
+                        'pattern'  => '/^[A-Fa-f0-9]{8,128}$/',
+                        'messages' => [
+                            \Laminas\Validator\Regex::NOT_MATCH => 'The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16.', // @translate
+                        ],
+                    ],
+                ],
+            ],
+        ]);
     }
 }

@@ -502,12 +502,12 @@ final class CitationFormatter
         return $out;
     }
 
-    /** "Publisher, Year" (Chicago/MLA book-like). $trailingYear=false drops the year. */
-    private function publisherYear(array $record, string $locale, bool $trailingYear = true): string
+    /** "Publisher, Year" (Chicago/MLA book-like). */
+    private function publisherYear(array $record, string $locale): string
     {
         $seg = $this->esc($record['publisher'] ?? ($record['container'] ?? null));
         $year = $this->year($record);
-        if ($trailingYear && $year !== null) {
+        if ($year !== null) {
             $seg = $seg !== '' ? $seg . ', ' . $this->esc($year) : $this->esc($year);
         }
         return $seg;

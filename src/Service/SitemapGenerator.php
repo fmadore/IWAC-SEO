@@ -16,19 +16,31 @@ use Doctrine\DBAL\Connection;
  * URL construction is intentionally string-based (the caller passes the
  * already-canonical host and site roots) rather than invoking the URL helper
  * thousands of times.
+ *
+ * Cache keys are per-type only, not per-host: the generated XML embeds the
+ * request-derived canonical host, so the first request's host is baked into
+ * the cache for the TTL. Fine for IWAC's single-host deployment; include the
+ * host in the key if the instance ever answers under several hostnames.
  */
 class SitemapGenerator
 {
     /** Sitemaps protocol hard cap is 50,000 URLs / 50 MB per file. */
     private const MAX_URLS_PER_FILE = 50000;
 
+    /** When the most recently served document was generated (see lastModified()). */
+    private ?int $lastModified = null;
+
     /**
      * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
+     * @param string|null $fileBaseUri the file store's public base URI
+     *   (config file_store.local.base_uri), or null to derive it from the
+     *   site URL at build time ({site base}/files)
      */
     public function __construct(
         private readonly Connection $connection,
         private readonly array $config,
         private readonly ?string $cacheDir,
+        private readonly ?string $fileBaseUri = null,
     ) {
     }
 
@@ -200,19 +212,40 @@ class SitemapGenerator
         return $this->cached('items-' . $chunk, $ttl, function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase) {
             $size = $this->chunkSize();
             $offset = ($chunk - 1) * $size;
+            $withImages = (bool) ($this->config['include_images'] ?? true);
+            $imageBase = $withImages ? $this->imageBase($siteUrl) : null;
             $urls = [];
-            foreach ($this->fetchItems($siteId, $offset, $size) as $row) {
+            foreach ($this->fetchItems($siteId, $offset, $size, $withImages) as $row) {
                 $path = '/item/' . (int) $row['id'];
-                $urls[] = [
+                $url = [
                     'loc'        => $siteUrl . $path,
                     'lastmod'    => $this->w3c($row['modified'] ?? null),
                     'changefreq' => $this->changefreq('item'),
                     'priority'   => $this->priority('item'),
                     'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
                 ];
+                // Google Images: the item's primary-media large thumbnail
+                // (the page scan / cover) as an <image:image> entry.
+                if ($imageBase !== null && !empty($row['storage_id'])) {
+                    $url['image'] = $imageBase . '/large/' . $row['storage_id'] . '.jpg';
+                }
+                $urls[] = $url;
             }
             return $this->renderUrlset($urls);
         });
+    }
+
+    /**
+     * The public base URI of stored files: the configured file_store base_uri,
+     * else "{site base}/files" derived from the site URL (works for root and
+     * sub-directory installs alike, since the /s/{slug} suffix is stripped).
+     */
+    private function imageBase(string $siteUrl): string
+    {
+        if ($this->fileBaseUri !== null && $this->fileBaseUri !== '') {
+            return rtrim($this->fileBaseUri, '/');
+        }
+        return preg_replace('#/s/[^/]+$#', '', $siteUrl) . '/files';
     }
 
     /**
@@ -253,49 +286,100 @@ class SitemapGenerator
         }
     }
 
+    /** Clear the cache and remove the cache directory itself (uninstall). */
+    public function destroyCache(): void
+    {
+        $this->clearCache();
+        if ($this->cacheDir !== null && is_dir($this->cacheDir)) {
+            @rmdir($this->cacheDir);
+        }
+    }
+
     /** @return array{items:int,itemSets:int,pages:int} */
     public function counts(int $siteId): array
     {
         return [
             'items'    => $this->countItems($siteId),
-            'itemSets' => count($this->fetchItemSets($siteId)),
-            'pages'    => count($this->fetchPages($siteId)), // home is one of these
+            'itemSets' => $this->countScalar(
+                'SELECT COUNT(*) FROM resource r
+                 JOIN site_item_set sis ON sis.item_set_id = r.id
+                 WHERE r.resource_type = :t AND r.is_public = 1 AND sis.site_id = :s',
+                ['t' => 'Omeka\\Entity\\ItemSet', 's' => $siteId]
+            ),
+            // Home is one of these.
+            'pages'    => $this->countScalar(
+                'SELECT COUNT(*) FROM site_page WHERE site_id = :s AND is_public = 1',
+                ['s' => $siteId]
+            ),
         ];
+    }
+
+    /**
+     * When the most recently served document was generated: the cache file's
+     * mtime on a hit, the build moment on a live build, null before any call.
+     * Lets the controller emit an honest Last-Modified header.
+     */
+    public function lastModified(): ?int
+    {
+        return $this->lastModified;
     }
 
     // ─── Data (lean DBAL) ───────────────────────────────────────────────────
 
     private function countItems(int $siteId): int
     {
+        return $this->countScalar(
+            'SELECT COUNT(*) FROM resource r
+             JOIN item_site isi ON isi.item_id = r.id
+             WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s',
+            ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
+        );
+    }
+
+    /** @param array<string,mixed> $params */
+    private function countScalar(string $sql, array $params): int
+    {
         try {
-            return (int) $this->connection->fetchOne(
-                'SELECT COUNT(*) FROM resource r
-                 JOIN item_site isi ON isi.item_id = r.id
-                 WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s',
-                ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
-            );
+            return (int) $this->connection->fetchOne($sql, $params);
         } catch (\Throwable $e) {
             return 0;
         }
     }
 
-    /** @return array<array{id:int,modified:?string}> */
-    private function fetchItems(int $siteId, int $offset, int $limit): array
+    /** @return array<array{id:int,modified:?string,storage_id?:?string}> */
+    private function fetchItems(int $siteId, int $offset, int $limit, bool $withImages = false): array
     {
         // LIMIT/OFFSET are inlined as already-cast integers: PDO refuses bound
         // parameters there under emulated prepares, and casting makes it safe.
         $limit = max(0, $limit);
         $offset = max(0, $offset);
+
+        // With images: the storage id of the item's representative thumbnail —
+        // the primary media when set (and public, with thumbnails), else the
+        // first public media with thumbnails, in position order. Mirrors how
+        // primaryMedia() picks the og:image source.
+        $imageColumn = $withImages
+            ? ', (SELECT m.storage_id FROM media m
+                  JOIN resource rm ON rm.id = m.id
+                  WHERE m.item_id = r.id AND m.has_thumbnails = 1 AND rm.is_public = 1
+                  ORDER BY COALESCE(m.id = i.primary_media_id, 0) DESC, m.position ASC, m.id ASC
+                  LIMIT 1) AS storage_id'
+            : '';
+        $itemJoin = $withImages ? ' JOIN item i ON i.id = r.id' : '';
+
         try {
             return $this->connection->fetchAllAssociative(
-                'SELECT r.id, r.modified FROM resource r
-                 JOIN item_site isi ON isi.item_id = r.id
+                'SELECT r.id, r.modified' . $imageColumn . ' FROM resource r'
+                . $itemJoin
+                . ' JOIN item_site isi ON isi.item_id = r.id
                  WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s
                  ORDER BY r.id LIMIT ' . $limit . ' OFFSET ' . $offset,
                 ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
             );
         } catch (\Throwable $e) {
-            return [];
+            // A failing image subquery (schema drift) must not empty the
+            // sitemap — retry lean before giving up.
+            return $withImages ? $this->fetchItems($siteId, $offset, $limit, false) : [];
         }
     }
 
@@ -334,18 +418,21 @@ class SitemapGenerator
     /** @param array<array<string,mixed>> $urls */
     private function renderUrlset(array $urls): string
     {
-        // Declare the xhtml namespace only when hreflang alternates are present.
+        // Declare the xhtml/image namespaces only when actually used.
         $hasAlternates = false;
+        $hasImages = false;
         foreach ($urls as $u) {
-            if (!empty($u['alternates'])) {
-                $hasAlternates = true;
+            $hasAlternates = $hasAlternates || !empty($u['alternates']);
+            $hasImages = $hasImages || !empty($u['image']);
+            if ($hasAlternates && $hasImages) {
                 break;
             }
         }
-        $xhtmlNs = $hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '';
+        $ns = ($hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '')
+            . ($hasImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '');
 
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $xhtmlNs . '>' . "\n";
+            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $ns . '>' . "\n";
         foreach ($urls as $u) {
             $xml .= '  <url><loc>' . $this->esc((string) $u['loc']) . '</loc>';
             if (!empty($u['lastmod'])) {
@@ -360,6 +447,9 @@ class SitemapGenerator
             foreach ($u['alternates'] ?? [] as $alt) {
                 $xml .= '<xhtml:link rel="alternate" hreflang="' . $this->esc((string) $alt['hreflang'])
                     . '" href="' . $this->esc((string) $alt['href']) . '"/>';
+            }
+            if (!empty($u['image'])) {
+                $xml .= '<image:image><image:loc>' . $this->esc((string) $u['image']) . '</image:loc></image:image>';
             }
             $xml .= '</url>' . "\n";
         }
@@ -399,14 +489,17 @@ class SitemapGenerator
     /** @param callable():string $build */
     private function cached(string $key, int $ttl, callable $build): string
     {
+        $this->lastModified = time();
         if ($this->cacheDir === null || $ttl <= 0) {
             return $build();
         }
         $file = $this->cacheDir . '/' . $key . '.xml';
         try {
-            if (is_file($file) && (time() - filemtime($file)) < $ttl) {
+            $mtime = is_file($file) ? filemtime($file) : false;
+            if ($mtime !== false && (time() - $mtime) < $ttl) {
                 $cached = file_get_contents($file);
                 if ($cached !== false) {
+                    $this->lastModified = $mtime;
                     return $cached;
                 }
             }

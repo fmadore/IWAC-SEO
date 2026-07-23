@@ -26,6 +26,8 @@ namespace IwacSeo;
 use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SitemapGenerator;
+use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
 use Laminas\EventManager\SharedEventManagerInterface;
 use Laminas\Mvc\Controller\AbstractController;
@@ -60,6 +62,12 @@ class Module extends AbstractModule
         'iwac_seo_ping_last',
     ];
 
+    /** Internal bookkeeping settings — never surfaced in the config form. */
+    private const INTERNAL_SETTINGS = [
+        'iwac_seo_ping_pending',
+        'iwac_seo_ping_last',
+    ];
+
     /** Sensible defaults applied on install. */
     private const DEFAULTS = [
         'iwac_seo_sitemap_enabled' => '1',
@@ -70,12 +78,14 @@ class Module extends AbstractModule
         'iwac_seo_sitemap_ttl'     => '86400',
     ];
 
-    /** How often (seconds) a ping job may be dispatched, and the queue cap. */
+    /** How often (seconds) a ping job may be dispatched. */
     private const PING_INTERVAL = 900;
-    private const PING_QUEUE_CAP = 200;
 
-    private ?string $cachedSiteSlug = null;
-    private bool $siteSlugResolved = false;
+    /**
+     * Pending-URL queue cap. Public because {@see PingSearchEngines} treats a
+     * full queue as a bulk sync and skips the ping — the two must agree.
+     */
+    public const PING_QUEUE_CAP = 200;
 
     public function getConfig(): array
     {
@@ -97,6 +107,12 @@ class Module extends AbstractModule
         $settings = $services->get('Omeka\Settings');
         foreach (self::SETTINGS as $key) {
             $settings->delete($key);
+        }
+        // Remove the cached sitemap files (files/iwac-seo-cache).
+        try {
+            $services->get(SitemapGenerator::class)->destroyCache();
+        } catch (\Throwable $e) {
+            // best-effort
         }
         // Drop the per-site static-page overrides too.
         try {
@@ -154,10 +170,13 @@ class Module extends AbstractModule
         // Every public page — site-wide constants + verification + gap-fill.
         $sharedEventManager->attach('*', 'view.layout', [$this, 'handleLayout']);
 
-        // Auto-ping on public content changes (no-op unless ping is enabled).
+        // Sitemap invalidation + auto-ping on content changes. Deletes are
+        // included: the URL leaves the sitemap, and IndexNow is also the
+        // fastest way to tell engines a URL vanished (they recrawl → 404).
         foreach (['Omeka\Api\Adapter\ItemAdapter', 'Omeka\Api\Adapter\SitePageAdapter'] as $adapter) {
             $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleContentChange']);
+            $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleContentChange']);
         }
     }
 
@@ -239,16 +258,36 @@ class Module extends AbstractModule
         $services = $this->getServiceLocator();
         $settings = $services->get('Omeka\Settings');
 
+        $response = $event->getParam('response');
+        $resource = $response ? $response->getContent() : null;
+        if (!$resource) {
+            return;
+        }
+
+        // Invalidate the sitemap cache so the change shows up on the next
+        // crawl instead of after the TTL. Any create/update can affect the
+        // URL set or a <lastmod> (including a public→private edit), and
+        // clearing is just a few unlinks, so no public check here.
+        if ((string) $settings->get('iwac_seo_sitemap_enabled', '1') === '1') {
+            try {
+                $services->get(SitemapGenerator::class)->clearCache();
+            } catch (\Throwable $e) {
+                // never let SEO bookkeeping break a save
+            }
+        }
+
         if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
             return;
         }
         if (trim((string) $settings->get('iwac_seo_indexnow_key', '')) === '') {
             return;
         }
-
-        $response = $event->getParam('response');
-        $resource = $response ? $response->getContent() : null;
-        if (!$resource || (method_exists($resource, 'isPublic') && !$resource->isPublic())) {
+        // Creates/updates announce a public URL; a delete is pinged regardless
+        // of visibility so engines recrawl and drop it. (A public→private
+        // *update* is not pinged — the previous state isn't in the event — but
+        // the sitemap invalidation above already stops advertising it.)
+        $isDelete = (string) $event->getName() === 'api.delete.post';
+        if (!$isDelete && method_exists($resource, 'isPublic') && !$resource->isPublic()) {
             return;
         }
 
@@ -268,12 +307,14 @@ class Module extends AbstractModule
         }
 
         // Dispatch at most once per interval; the job batches the whole queue.
+        // The throttle is stamped only after a successful dispatch so a failed
+        // dispatch does not burn the window.
         $last = (int) $settings->get('iwac_seo_ping_last', 0);
         $now = time();
         if ($now - $last >= self::PING_INTERVAL) {
-            $settings->set('iwac_seo_ping_last', $now);
             try {
                 $services->get('Omeka\Job\Dispatcher')->dispatch(PingSearchEngines::class);
+                $settings->set('iwac_seo_ping_last', $now);
             } catch (\Throwable $e) {
                 // never let SEO bookkeeping break a save
             }
@@ -290,8 +331,8 @@ class Module extends AbstractModule
 
         $data = [];
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
-                continue; // internal bookkeeping, not user-facing
+            if (in_array($key, self::INTERNAL_SETTINGS, true)) {
+                continue;
             }
             $data[$key] = $settings->get($key, self::DEFAULTS[$key] ?? '');
         }
@@ -314,7 +355,7 @@ class Module extends AbstractModule
 
         $data = $form->getData();
         foreach (self::SETTINGS as $key) {
-            if (in_array($key, ['iwac_seo_ping_pending', 'iwac_seo_ping_last'], true)) {
+            if (in_array($key, self::INTERNAL_SETTINGS, true)) {
                 continue;
             }
             if (array_key_exists($key, $data)) {
@@ -357,7 +398,7 @@ class Module extends AbstractModule
 
     private function resourcePublicUrl(object $resource): ?string
     {
-        $slug = $this->defaultSiteSlug();
+        $slug = $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug();
         if ($slug === null) {
             return null;
         }
@@ -369,28 +410,5 @@ class Module extends AbstractModule
             // ignore
         }
         return null;
-    }
-
-    private function defaultSiteSlug(): ?string
-    {
-        if ($this->siteSlugResolved) {
-            return $this->cachedSiteSlug;
-        }
-        $this->siteSlugResolved = true;
-        $services = $this->getServiceLocator();
-        try {
-            $settings = $services->get('Omeka\Settings');
-            $api = $services->get('Omeka\ApiManager');
-            $defaultSiteId = (int) $settings->get('default_site');
-            if ($defaultSiteId) {
-                $this->cachedSiteSlug = $api->read('sites', $defaultSiteId)->getContent()->slug();
-            } else {
-                $sites = $api->search('sites', ['limit' => 1])->getContent();
-                $this->cachedSiteSlug = $sites ? $sites[0]->slug() : null;
-            }
-        } catch (\Throwable $e) {
-            $this->cachedSiteSlug = null;
-        }
-        return $this->cachedSiteSlug;
     }
 }

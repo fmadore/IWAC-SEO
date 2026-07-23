@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Concern\ResourceValueReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
@@ -26,6 +27,8 @@ use Omeka\Api\Representation\ValueRepresentation;
  */
 class StructuredData
 {
+    use ResourceValueReader;
+
     /** @type values that are descriptive authority records, not creative works. */
     private const ENTITY_TYPES = ['Person', 'Place', 'Organization', 'Event', 'DefinedTerm'];
 
@@ -40,7 +43,6 @@ class StructuredData
 
     /** @return array<mixed>|null */
     public function forResource(
-        PhpRenderer $view,
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site,
         ?string $canonical,
@@ -60,7 +62,7 @@ class StructuredData
         if ($image) {
             $data['image'] = $image;
         }
-        $description = $this->firstLiteral($resource, [
+        $description = $this->firstString($resource, [
             'dcterms:abstract', 'bibo:shortDescription', 'dcterms:description', 'bibo:abstract',
         ]);
         if ($description !== null) {
@@ -141,11 +143,11 @@ class StructuredData
         SiteRepresentation $site
     ): void {
         if ($type === 'Person') {
-            $given = $this->firstLiteral($resource, ['foaf:firstName']);
+            $given = $this->firstString($resource, ['foaf:firstName']);
             if ($given !== null) {
                 $data['givenName'] = $given;
             }
-            $family = $this->firstLiteral($resource, ['foaf:lastName']);
+            $family = $this->firstString($resource, ['foaf:lastName']);
             if ($family !== null) {
                 $data['familyName'] = $family;
             }
@@ -178,11 +180,11 @@ class StructuredData
                 $data['parentOrganization'] = $parents;
             }
         } elseif ($type === 'Event') {
-            $date = $this->firstLiteral($resource, ['dcterms:date']);
+            $date = $this->firstString($resource, ['dcterms:date']);
             if ($date !== null) {
                 $data['startDate'] = $date;
             }
-            $places = $this->valueLabels($resource, 'dcterms:spatial');
+            $places = $this->labels($resource, 'dcterms:spatial');
             if ($places) {
                 $data['location'] = array_map(
                     static fn (string $name) => ['@type' => 'Place', 'name' => $name],
@@ -214,22 +216,22 @@ class StructuredData
             $data['contributor'] = $contributors;
         }
 
-        $date = $this->firstLiteral($resource, ['dcterms:date', 'dcterms:issued']);
+        $date = $this->firstString($resource, ['dcterms:date', 'dcterms:issued']);
         if ($date !== null) {
             $data['datePublished'] = $date;
         }
 
-        $language = $this->firstValueLabel($resource, 'dcterms:language');
+        $language = $this->firstLabel($resource, 'dcterms:language');
         if ($language !== null) {
             $data['inLanguage'] = $language;
         }
 
-        $subjects = $this->valueLabels($resource, 'dcterms:subject');
+        $subjects = $this->labels($resource, 'dcterms:subject');
         if ($subjects) {
             $data['keywords'] = implode(', ', $subjects);
         }
 
-        $places = $this->valueLabels($resource, 'dcterms:spatial');
+        $places = $this->labels($resource, 'dcterms:spatial');
         if ($places) {
             $data['spatialCoverage'] = array_map(
                 static fn (string $name) => ['@type' => 'Place', 'name' => $name],
@@ -240,7 +242,7 @@ class StructuredData
         // Audiovisual: an ISO-8601 duration and an upload date round out the
         // VideoObject (which schema.org expects for video rich results).
         if ($type === 'VideoObject') {
-            $duration = $this->firstLiteral($resource, ['dcterms:extent']);
+            $duration = $this->firstString($resource, ['dcterms:extent']);
             if ($duration !== null && str_starts_with($duration, 'P')) {
                 $data['duration'] = $duration;
             }
@@ -284,7 +286,7 @@ class StructuredData
                 ]);
             }
             if ($type === 'PublicationIssue') {
-                $issue = $this->firstLiteral($resource, ['bibo:issue']);
+                $issue = $this->firstString($resource, ['bibo:issue']);
                 if ($issue !== null) {
                     $data['issueNumber'] = $issue;
                 }
@@ -292,7 +294,7 @@ class StructuredData
             return;
         }
         if ($type === 'Chapter') {
-            $book = $this->firstLiteral($resource, ['dcterms:alternative']);
+            $book = $this->firstString($resource, ['dcterms:alternative']);
             if ($book !== null) {
                 $data['isPartOf'] = ['@type' => 'Book', 'name' => $book];
             }
@@ -321,56 +323,12 @@ class StructuredData
         if (!in_array($type, $publisherTypes, true)) {
             return null;
         }
-        return $this->firstValueLabel($resource, 'dcterms:publisher');
+        return $this->firstLabel($resource, 'dcterms:publisher');
     }
 
     // ─── Value readers ──────────────────────────────────────────────────────
-
-    /** @param string[] $terms @return string|null */
-    private function firstLiteral(AbstractResourceEntityRepresentation $resource, array $terms): ?string
-    {
-        foreach ($terms as $term) {
-            $value = $resource->value($term);
-            if ($value instanceof ValueRepresentation) {
-                $text = trim(strip_tags((string) $value));
-                if ($text !== '') {
-                    return $text;
-                }
-            }
-        }
-        return null;
-    }
-
-    private function firstValueLabel(AbstractResourceEntityRepresentation $resource, string $term): ?string
-    {
-        $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        $linked = $value->valueResource();
-        if ($linked) {
-            return (string) $linked->displayTitle();
-        }
-        $text = trim(strip_tags((string) $value));
-        return $text !== '' ? $text : null;
-    }
-
-    /** @return string[] */
-    private function valueLabels(AbstractResourceEntityRepresentation $resource, string $term): array
-    {
-        $labels = [];
-        foreach ($resource->value($term, ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $linked = $value->valueResource();
-            $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-            if ($label !== '') {
-                $labels[$label] = $label;
-            }
-        }
-        return array_values($labels);
-    }
+    // firstString(), firstLabel() and labels() live in the shared
+    // ResourceValueReader trait; only the JSON-LD-specific readers remain here.
 
     /**
      * Linked (or literal) resources for the first of $terms that has values.
@@ -444,7 +402,7 @@ class StructuredData
      */
     private function coordinates(AbstractResourceEntityRepresentation $resource): ?array
     {
-        $raw = $this->firstLiteral($resource, ['curation:coordinates']);
+        $raw = $this->firstString($resource, ['curation:coordinates']);
         if ($raw === null) {
             return null;
         }

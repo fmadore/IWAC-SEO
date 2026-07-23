@@ -27,6 +27,7 @@ return [
             Service\PageSeoStore::class     => Service\PageSeoStoreFactory::class,
             Service\Pinger::class           => Service\PingerFactory::class,
             Service\Hreflang::class         => Service\HreflangFactory::class,
+            Service\SiteResolver::class     => Service\SiteResolverFactory::class,
         ],
         // Dependency-free (no bundled vendor/): plain instantiation.
         'invokables' => [
@@ -204,6 +205,9 @@ return [
     'iwac_seo' => [
         'sitemap' => [
             'item_chunk_size' => 50000,
+            // Emit an <image:image> entry (the item's primary-media large
+            // thumbnail) per item for Google Images.
+            'include_images'  => true,
             'priority' => [
                 'home'    => '1.0',
                 'section' => '0.8', // item sets (collections) + top-level menu pages

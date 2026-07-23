@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Concern\SettingsReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
@@ -30,6 +31,8 @@ use Omeka\Settings\Settings;
  */
 class HeadMetadata
 {
+    use SettingsReader;
+
     private const DESCRIPTION_MAX = 160;
 
     /** @var array<string,bool> Signals already emitted this request. */
@@ -83,7 +86,7 @@ class HeadMetadata
         $this->markApplied('og:title');
 
         if ($this->jsonLdEnabled()) {
-            $data = $this->structuredData->forResource($view, $resource, $site, $canonical, $image);
+            $data = $this->structuredData->forResource($resource, $site, $canonical, $image);
             if ($data !== null) {
                 $this->addJsonLd($view, $data);
             }
@@ -131,7 +134,7 @@ class HeadMetadata
     // ─── Phase 1: static site pages ─────────────────────────────────────────
 
     /**
-     * @param array{title?:string,description?:string,image?:int|string,robots?:string,jsonld?:bool} $overrides
+     * @param array{title?:string,description?:string,image?:int|string,robots?:string} $overrides
      */
     public function applyPage(
         PhpRenderer $view,
@@ -222,11 +225,11 @@ class HeadMetadata
         }
 
         // Verification tags — site-wide, on every public page.
-        $gsc = $this->extractToken($this->stringSetting('iwac_seo_gsc_verification'), 'google-site-verification');
+        $gsc = Text::extractToken($this->stringSetting('iwac_seo_gsc_verification'));
         if ($gsc !== '') {
             $headMeta->appendName('google-site-verification', $gsc);
         }
-        $bing = $this->extractToken($this->stringSetting('iwac_seo_bing_verification'), 'msvalidate.01');
+        $bing = Text::extractToken($this->stringSetting('iwac_seo_bing_verification'));
         if ($bing !== '') {
             $headMeta->appendName('msvalidate.01', $bing);
         }
@@ -234,7 +237,10 @@ class HeadMetadata
         // Open Graph / Twitter constants.
         if ($site !== null) {
             $headMeta->setProperty('og:site_name', $site->title());
-            $headMeta->setProperty('og:locale', $this->locale($view));
+            // Through ogLocale() so a bare site locale ("fr") still emits the
+            // language_TERRITORY form Open Graph expects, matching the
+            // og:locale:alternate values below.
+            $headMeta->setProperty('og:locale', $this->ogLocale($this->locale($view)));
             // Advertise the other-language site(s) as og:locale:alternate.
             if ($this->hreflang->isEnabled()) {
                 $currentSlug = $site->slug();
@@ -361,7 +367,10 @@ class HeadMetadata
         // Newspaper articles carry their summary in bibo:shortDescription (the
         // AI summary); references and publication issues use dcterms:abstract;
         // authority records (persons, organisations, events) use
-        // dcterms:description. Try them in that order.
+        // dcterms:description. Try them in that order. NOTE: this order is
+        // deliberately different from ResourceValueReader::ABSTRACT_TERMS —
+        // a meta description wants the punchy summary, a citation wants the
+        // formal abstract. Do not unify the two.
         foreach (['bibo:shortDescription', 'dcterms:abstract', 'dcterms:description', 'bibo:abstract'] as $term) {
             $value = $resource->value($term);
             if ($value !== null) {
@@ -449,37 +458,9 @@ class HeadMetadata
         }
     }
 
-    /**
-     * Accept either a full <meta …> snippet pasted from the search console or a
-     * bare token, and return just the token.
-     */
-    private function extractToken(string $raw, string $metaName): string
-    {
-        $raw = trim($raw);
-        if ($raw === '') {
-            return '';
-        }
-        if (stripos($raw, '<meta') !== false
-            && preg_match('/content\s*=\s*"([^"]+)"/i', $raw, $m)
-        ) {
-            return trim($m[1]);
-        }
-        // Strip accidental surrounding quotes/markup.
-        return trim(strip_tags($raw), " \t\n\r\0\x0B\"'");
-    }
-
     private function truncate(string $text): string
     {
-        $text = trim(preg_replace('/\s+/', ' ', $text) ?? '');
-        if (mb_strlen($text) <= self::DESCRIPTION_MAX) {
-            return $text;
-        }
-        $cut = mb_substr($text, 0, self::DESCRIPTION_MAX - 1);
-        $lastSpace = mb_strrpos($cut, ' ');
-        if ($lastSpace !== false && $lastSpace > 0) {
-            $cut = mb_substr($cut, 0, $lastSpace);
-        }
-        return rtrim($cut, " ,.;:") . '…';
+        return Text::truncate($text, self::DESCRIPTION_MAX);
     }
 
     private function locale(PhpRenderer $view): string
@@ -528,7 +509,11 @@ class HeadMetadata
         }
     }
 
-    /** Map a bare hreflang code to an Open Graph locale (language_TERRITORY). */
+    /**
+     * Map a bare language code to an Open Graph locale (language_TERRITORY).
+     * Codes that already carry a territory ("en_US", "en-GB") pass through
+     * with the separator normalised.
+     */
     private function ogLocale(string $lang): string
     {
         $map = ['fr' => 'fr_FR', 'en' => 'en_US'];
@@ -541,17 +526,6 @@ class HeadMetadata
     private function jsonLdEnabled(): bool
     {
         return $this->boolSetting('iwac_seo_jsonld_enabled', true);
-    }
-
-    private function boolSetting(string $key, bool $default = false): bool
-    {
-        $value = $this->settings->get($key, $default ? '1' : '0');
-        return $value === '1' || $value === 1 || $value === true;
-    }
-
-    private function stringSetting(string $key): string
-    {
-        return (string) ($this->settings->get($key, '') ?? '');
     }
 
     private function markApplied(string $key): void

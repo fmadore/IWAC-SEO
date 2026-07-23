@@ -6,6 +6,7 @@ namespace IwacSeo\Service\Controller;
 use IwacSeo\Controller\SitemapController;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\SitemapGenerator;
+use IwacSeo\Service\SiteResolver;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 
@@ -15,7 +16,7 @@ final class SitemapControllerFactory implements FactoryInterface
     {
         return new SitemapController(
             $container->get(SitemapGenerator::class),
-            $container->get('Omeka\ApiManager'),
+            $container->get(SiteResolver::class),
             $container->get('Omeka\Settings'),
             $container->get(Hreflang::class),
         );

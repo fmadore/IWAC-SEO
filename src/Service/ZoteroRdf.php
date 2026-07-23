@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace IwacSeo\Service;
 
 use IwacSeo\Service\Concern\ResourceValueReader;
-use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
 
@@ -58,8 +57,6 @@ class ZoteroRdf
         'prism'   => 'http://prismstandard.org/namespaces/1.2/basic/',
         'eprints' => 'http://purl.org/eprint/terms/',
     ];
-
-    private const ABSTRACT_MAX = 5000;
 
     /** Citation kinds (CitationMeta vocabulary) that get a unAPI / Zotero-RDF record. */
     private const ELIGIBLE_KINDS = ['newspaper', 'magazine', 'av', 'document', 'photo'];
@@ -118,8 +115,7 @@ class ZoteroRdf
             $props[] = $creator;
         }
 
-        $props[] = $this->el('dc:date',
-            $this->firstString($item, ['dcterms:date', 'dcterms:issued', 'dcterms:created']));
+        $props[] = $this->el('dc:date', $this->firstString($item, self::DATE_TERMS));
         $props[] = $this->el('dc:language', $this->firstLabel($item, 'dcterms:language'));
 
         // Only the periodical kinds carry a container (publication) + issue/pages.
@@ -130,8 +126,7 @@ class ZoteroRdf
             $props[] = $this->el('bib:pages', $this->pageRange($item));
         }
 
-        $abstract = $this->firstString($item,
-            ['dcterms:abstract', 'bibo:abstract', 'bibo:shortDescription', 'dcterms:description']);
+        $abstract = $this->firstString($item, self::ABSTRACT_TERMS);
         if ($abstract !== null) {
             $props[] = $this->el('dcterms:abstract', $this->clip($abstract));
         }
@@ -206,7 +201,7 @@ class ZoteroRdf
                 if ($label === '') {
                     continue;
                 }
-                if ($this->isOrganization($linked)) {
+                if ($this->isOrganizationClass($linked, $this->classKinds)) {
                     // foaf:Person with only a surname → fieldMode 1 (not split).
                     $out[] = sprintf(
                         '<dcterms:creator><foaf:Person><foaf:surname>%s</foaf:surname></foaf:Person></dcterms:creator>',
@@ -225,30 +220,8 @@ class ZoteroRdf
         return [];
     }
 
-    private function isOrganization(?AbstractResourceEntityRepresentation $linked): bool
-    {
-        if ($linked === null || !$linked->resourceClass()) {
-            return false;
-        }
-        return ($this->classKinds[$linked->resourceClass()->id()] ?? null) === 'organization';
-    }
-
     // ─── Field readers ───────────────────────────────────────────────────────
-
-    /** The archive accession number: a dcterms:identifier value starting "iwac-". */
-    private function cote(ItemRepresentation $item): ?string
-    {
-        foreach ($item->value('dcterms:identifier', ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $text = trim(strip_tags((string) $value));
-            if (stripos($text, 'iwac-') === 0) {
-                return $text;
-            }
-        }
-        return null;
-    }
+    // cote(), pdfUrl() and clip() live in the shared ResourceValueReader trait.
 
     private function pageRange(ItemRepresentation $item): ?string
     {
@@ -261,22 +234,6 @@ class ZoteroRdf
             return $first . '-' . $last;
         }
         return $first ?? $last;
-    }
-
-    private function pdfUrl(ItemRepresentation $item): ?string
-    {
-        foreach ($item->media() as $media) {
-            if (method_exists($media, 'isPublic') && !$media->isPublic()) {
-                continue;
-            }
-            if ($media->mediaType() === 'application/pdf') {
-                $url = $media->originalUrl();
-                if ($url) {
-                    return $url;
-                }
-            }
-        }
-        return null;
     }
 
     // ─── XML helpers ─────────────────────────────────────────────────────────
@@ -292,11 +249,5 @@ class ZoteroRdf
     private function esc(string $text): string
     {
         return htmlspecialchars($text, ENT_XML1 | ENT_QUOTES, 'UTF-8');
-    }
-
-    private function clip(string $text): string
-    {
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($text)) ?? '');
-        return mb_substr($text, 0, self::ABSTRACT_MAX);
     }
 }

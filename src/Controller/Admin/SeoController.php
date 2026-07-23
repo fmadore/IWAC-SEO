@@ -4,8 +4,11 @@ declare(strict_types=1);
 namespace IwacSeo\Controller\Admin;
 
 use IwacSeo\Form\PageSeoForm;
+use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SitemapGenerator;
+use IwacSeo\Service\SiteResolver;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
@@ -18,11 +21,15 @@ use Omeka\Settings\Settings;
  */
 class SeoController extends AbstractActionController
 {
+    use SettingsReader;
+
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly PageSeoStore $pageSeoStore,
         private readonly ApiManager $api,
         private readonly Settings $settings,
+        private readonly SiteResolver $siteResolver,
+        private readonly Hreflang $hreflang,
     ) {
     }
 
@@ -30,6 +37,7 @@ class SeoController extends AbstractActionController
     {
         $site = $this->resolveSite();
         $hostUrl = $site ? $this->hostUrl($site) : '';
+        $indexNowKey = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
 
         $view = new ViewModel([
             'site'           => $site,
@@ -39,14 +47,61 @@ class SeoController extends AbstractActionController
             'sitemapEnabled' => $this->boolSetting('iwac_seo_sitemap_enabled', true),
             'noindexSite'    => $this->boolSetting('iwac_seo_noindex_site'),
             'pingEnabled'    => $this->boolSetting('iwac_seo_ping_enabled'),
-            'indexNowKey'    => trim((string) $this->settings->get('iwac_seo_indexnow_key', '')),
+            'indexNowKey'    => $indexNowKey,
+            // The /{key}.txt route only matches a hex key; a non-hex key can
+            // never be served, so IndexNow verification would fail silently.
+            'indexNowKeyValid' => $indexNowKey === ''
+                || (bool) preg_match('/^[A-Fa-f0-9]{8,128}$/', $indexNowKey),
             'sitemapUrl'     => $hostUrl ? $hostUrl . '/sitemap.xml' : '',
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],
+            'hreflangEnabled' => $this->hreflang->isEnabled(),
+            'hreflangGaps'   => $this->hreflangGaps(),
             'confirmForm'    => $this->getForm(\Omeka\Form\ConfirmForm::class)
                 ->setAttribute('action', $this->url()->fromRoute('admin/iwac-seo/regenerate')),
         ]);
         return $view->setTemplate('iwac-seo/admin/seo/dashboard');
+    }
+
+    /**
+     * Public pages with no entry in the hreflang page map — they emit no
+     * cross-language alternate links until config page_pairs is updated.
+     * Surfacing them here catches drift as soon as a page is added/renamed.
+     *
+     * @return array<int,array{site:SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}>
+     */
+    private function hreflangGaps(): array
+    {
+        if (!$this->hreflang->isEnabled()) {
+            return [];
+        }
+        $gaps = [];
+        foreach ($this->hreflang->sites() as $slug => $lang) {
+            try {
+                $sites = $this->api->search('sites', ['slug' => $slug])->getContent();
+                $site = $sites[0] ?? null;
+                if (!$site instanceof SiteRepresentation) {
+                    continue;
+                }
+                $pages = $this->api->search('site_pages', ['site_id' => $site->id()])->getContent();
+            } catch (\Throwable $e) {
+                continue;
+            }
+            $covered = $this->hreflang->coveredSlugs((string) $slug);
+            $missing = [];
+            foreach ($pages as $page) {
+                if (method_exists($page, 'isPublic') && !$page->isPublic()) {
+                    continue;
+                }
+                if (!in_array($page->slug(), $covered, true)) {
+                    $missing[] = $page;
+                }
+            }
+            if ($missing) {
+                $gaps[] = ['site' => $site, 'lang' => (string) $lang, 'pages' => $missing];
+            }
+        }
+        return $gaps;
     }
 
     public function regenerateAction()
@@ -139,36 +194,12 @@ class SeoController extends AbstractActionController
 
     private function resolveSite(): ?SiteRepresentation
     {
-        $defaultSiteId = (int) $this->settings->get('default_site');
-        if ($defaultSiteId) {
-            try {
-                return $this->api->read('sites', $defaultSiteId)->getContent();
-            } catch (\Throwable $e) {
-                // fall through
-            }
-        }
-        try {
-            $sites = $this->api->search('sites', ['limit' => 1])->getContent();
-            return $sites[0] ?? null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return $this->siteResolver->defaultSite();
     }
 
     private function hostUrl(SiteRepresentation $site): string
     {
         $siteUrl = $this->url()->fromRoute('site', ['site-slug' => $site->slug()], ['force_canonical' => true]);
-        $parts = parse_url($siteUrl);
-        $host = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
-        if (!empty($parts['port'])) {
-            $host .= ':' . $parts['port'];
-        }
-        return $host;
-    }
-
-    private function boolSetting(string $key, bool $default = false): bool
-    {
-        $value = $this->settings->get($key, $default ? '1' : '0');
-        return $value === '1' || $value === 1 || $value === true;
+        return SiteResolver::hostFromUrl($siteUrl);
     }
 }

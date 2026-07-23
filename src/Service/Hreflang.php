@@ -132,6 +132,24 @@ class Hreflang
     }
 
     /**
+     * The page slugs of $siteSlug that have a page_pairs entry — i.e. the
+     * static pages that will emit cross-language alternates. Used by the admin
+     * dashboard to report pages missing from the map.
+     *
+     * @return string[]
+     */
+    public function coveredSlugs(string $siteSlug): array
+    {
+        $out = [];
+        foreach ($this->pagePairs as $pair) {
+            if (is_array($pair) && isset($pair[$siteSlug])) {
+                $out[(string) $pair[$siteSlug]] = true;
+            }
+        }
+        return array_keys($out);
+    }
+
+    /**
      * The page_pairs row that maps the current site's slug to $pageSlug, if any.
      *
      * @return array<string,string>|null

@@ -9,9 +9,12 @@
  * @var bool $noindexSite
  * @var bool $pingEnabled
  * @var string $indexNowKey
+ * @var bool $indexNowKeyValid
  * @var string $sitemapUrl
  * @var string $robotsUrl
  * @var array{items:int,itemSets:int,pages:int} $counts
+ * @var bool $hreflangEnabled
+ * @var array<int,array{site:\Omeka\Api\Representation\SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}> $hreflangGaps
  * @var \Laminas\Form\Form $confirmForm
  */
 
@@ -65,6 +68,8 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
                     <?php echo $pingEnabled ? $on : $off; ?>
                     <?php if ($pingEnabled && $indexNowKey === ''): ?>
                         — <span class="iwac-seo-off"><?php echo $this->translate('no key set'); ?></span>
+                    <?php elseif ($indexNowKey !== '' && !$indexNowKeyValid): ?>
+                        — <span class="iwac-seo-off"><?php echo $this->translate('key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail'); ?></span>
                     <?php endif; ?>
                 </td>
             </tr>
@@ -98,6 +103,25 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
     $confirmForm->setAttribute('action', $this->url('admin/iwac-seo/regenerate'));
     echo $this->form($confirmForm);
     ?>
+    <?php endif; ?>
+
+    <?php if ($hreflangEnabled): ?>
+    <h2><?php echo $this->translate('Bilingual (hreflang) coverage'); ?></h2>
+    <?php if (!count($hreflangGaps)): ?>
+    <p><?php echo $this->translate('Every public static page has a translated counterpart in the hreflang page map.'); ?></p>
+    <?php else: ?>
+    <p><?php echo $this->translate('These public pages have no entry in the hreflang page map (iwac_seo.hreflang.page_pairs), so they are published without cross-language alternate links. Add a pair when a translation exists.'); ?></p>
+    <ul class="iwac-seo-links">
+        <?php foreach ($hreflangGaps as $gap): ?>
+            <?php foreach ($gap['pages'] as $page): ?>
+                <li>
+                    <code><?php echo $this->escapeHtml($gap['site']->slug() . ' /' . $page->slug()); ?></code>
+                    — <?php echo $this->escapeHtml($page->title()); ?>
+                </li>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
+    </ul>
+    <?php endif; ?>
     <?php endif; ?>
 
     <h2><?php echo $this->translate('Static pages'); ?></h2>

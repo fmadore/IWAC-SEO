@@ -3,11 +3,12 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller;
 
+use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\SitemapGenerator;
+use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
-use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Settings\Settings;
 
@@ -24,9 +25,11 @@ use Omeka\Settings\Settings;
  */
 class SitemapController extends AbstractActionController
 {
+    use SettingsReader;
+
     public function __construct(
         private readonly SitemapGenerator $generator,
-        private readonly ApiManager $api,
+        private readonly SiteResolver $siteResolver,
         private readonly Settings $settings,
         private readonly Hreflang $hreflang,
     ) {
@@ -105,7 +108,13 @@ class SitemapController extends AbstractActionController
             return $this->notFound();
         }
         $chunk = (int) $this->params()->fromRoute('chunk', 1);
-        if ($chunk < 1 || $chunk > $this->generator->itemChunkCount($site->id())) {
+        if ($chunk < 1) {
+            return $this->notFound();
+        }
+        // Chunk 1 always exists (an empty urlset is still valid), so only the
+        // higher chunks pay for the bound-checking COUNT query — at IWAC's
+        // scale chunk 1 is the only chunk, so cached requests stay query-free.
+        if ($chunk > 1 && $chunk > $this->generator->itemChunkCount($site->id())) {
             return $this->notFound();
         }
         return $this->xml($this->generator->buildItems(
@@ -153,20 +162,7 @@ class SitemapController extends AbstractActionController
 
     private function resolveSite(): ?SiteRepresentation
     {
-        $defaultSiteId = (int) $this->settings->get('default_site');
-        if ($defaultSiteId) {
-            try {
-                return $this->api->read('sites', $defaultSiteId)->getContent();
-            } catch (\Throwable $e) {
-                // fall through to first site
-            }
-        }
-        try {
-            $sites = $this->api->search('sites', ['limit' => 1])->getContent();
-            return $sites[0] ?? null;
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return $this->siteResolver->defaultSite();
     }
 
     private function siteUrl(SiteRepresentation $site): string
@@ -179,12 +175,7 @@ class SitemapController extends AbstractActionController
 
     private function hostUrl(SiteRepresentation $site): string
     {
-        $parts = parse_url($this->siteUrl($site));
-        $host = ($parts['scheme'] ?? 'https') . '://' . ($parts['host'] ?? '');
-        if (!empty($parts['port'])) {
-            $host .= ':' . $parts['port'];
-        }
-        return $host;
+        return SiteResolver::hostFromUrl($this->siteUrl($site));
     }
 
     /**
@@ -226,12 +217,6 @@ class SitemapController extends AbstractActionController
         return $this->boolSetting('iwac_seo_sitemap_enabled', true);
     }
 
-    private function boolSetting(string $key, bool $default = false): bool
-    {
-        $value = $this->settings->get($key, $default ? '1' : '0');
-        return $value === '1' || $value === 1 || $value === true;
-    }
-
     private function xml(string $body): Response
     {
         $response = $this->getResponse();
@@ -239,6 +224,17 @@ class SitemapController extends AbstractActionController
         $headers = $response->getHeaders();
         $headers->addHeaderLine('Content-Type', 'application/xml; charset=utf-8');
         $headers->addHeaderLine('X-Robots-Tag', 'noindex'); // don't index the sitemap file itself
+
+        // The XML is already file-cached server-side; let crawlers and any
+        // CDN revalidate instead of refetching for the same window.
+        $ttl = $this->ttl();
+        if ($ttl > 0) {
+            $headers->addHeaderLine('Cache-Control', 'public, max-age=' . $ttl);
+        }
+        $lastModified = $this->generator->lastModified();
+        if ($lastModified !== null) {
+            $headers->addHeaderLine('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
+        }
         return $response;
     }
 

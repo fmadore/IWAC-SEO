@@ -13,12 +13,22 @@
   ],
   "require": {
     "php": ">=8.2",
-    "ext-json": "*",
-    "ext-dom": "*"
+    "ext-json": "*"
   },
   "autoload": {
     "psr-4": {
       "IwacSeo\\": "src/"
     }
+  },
+  "require-dev": {
+    "phpunit/phpunit": "^11"
+  },
+  "autoload-dev": {
+    "psr-4": {
+      "IwacSeo\\Test\\": "tests/"
+    }
+  },
+  "scripts": {
+    "test": "phpunit"
   }
 }

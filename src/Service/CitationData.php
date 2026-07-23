@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace IwacSeo\Service;
 
 use IwacSeo\Service\Concern\ResourceValueReader;
-use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
 
@@ -32,8 +31,6 @@ use Omeka\Api\Representation\ValueRepresentation;
 final class CitationData
 {
     use ResourceValueReader;
-
-    private const ABSTRACT_MAX = 5000;
 
     /** Descriptive authority records — not citable works. */
     private const ENTITY_KINDS = ['person', 'place', 'organization', 'event', 'subject'];
@@ -133,10 +130,7 @@ final class CitationData
                 break;
         }
 
-        $abstract = $this->firstString(
-            $item,
-            ['dcterms:abstract', 'bibo:abstract', 'bibo:shortDescription', 'dcterms:description']
-        );
+        $abstract = $this->firstString($item, self::ABSTRACT_TERMS);
         if ($abstract !== null) {
             $record['abstract'] = $this->clip($abstract);
         }
@@ -181,21 +175,13 @@ final class CitationData
                 if ($label === '') {
                     continue;
                 }
-                $out[] = $this->parseName($label, $this->isOrganization($linked));
+                $out[] = $this->parseName($label, $this->isOrganizationClass($linked, $this->classKinds));
             }
             if ($out) {
                 return $out;
             }
         }
         return [];
-    }
-
-    private function isOrganization(?AbstractResourceEntityRepresentation $linked): bool
-    {
-        if ($linked === null || !$linked->resourceClass()) {
-            return false;
-        }
-        return ($this->classKinds[$linked->resourceClass()->id()] ?? null) === 'organization';
     }
 
     /**
@@ -246,7 +232,7 @@ final class CitationData
      */
     private function dateParts(ItemRepresentation $item): array
     {
-        foreach (['dcterms:date', 'dcterms:issued', 'dcterms:created'] as $term) {
+        foreach (self::DATE_TERMS as $term) {
             $value = $item->value($term);
             if (!$value instanceof ValueRepresentation) {
                 continue;
@@ -271,38 +257,5 @@ final class CitationData
         return ['year' => null, 'month' => null, 'day' => null, 'literal' => null];
     }
 
-    private function doi(ItemRepresentation $item): ?string
-    {
-        $value = $item->value('bibo:doi');
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        $doi = $value->uri() ?: trim(strip_tags((string) $value));
-        if ($doi === '') {
-            return null;
-        }
-        $doi = preg_replace('#^(https?://(dx\.)?doi\.org/|doi:)#i', '', $doi);
-        return $doi !== '' ? $doi : null;
-    }
-
-    /** The archive accession number: a dcterms:identifier value starting "iwac-". */
-    private function cote(ItemRepresentation $item): ?string
-    {
-        foreach ($item->value('dcterms:identifier', ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $text = trim(strip_tags((string) $value));
-            if (stripos($text, 'iwac-') === 0) {
-                return $text;
-            }
-        }
-        return null;
-    }
-
-    private function clip(string $text): string
-    {
-        $text = trim(preg_replace('/\s+/', ' ', strip_tags($text)) ?? '');
-        return mb_substr($text, 0, self::ABSTRACT_MAX);
-    }
+    // doi(), cote() and clip() live in the shared ResourceValueReader trait.
 }
