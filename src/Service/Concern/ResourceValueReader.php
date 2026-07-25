@@ -157,18 +157,28 @@ trait ResourceValueReader
     }
 
     /**
-     * Whether a linked authority record is an Organisation, per the citation
-     * kind map (resource class id => kind). Institutional creators keep a
-     * single-field name and are never split/inverted.
-     *
-     * @param array<int,string> $classKinds
+     * Join a first/last page pair into a citation page range: "185-209", a
+     * single page when they match or only one is present, else null. The rule
+     * is shared by the record builder and the Zotero-RDF serialiser.
      */
-    private function isOrganizationClass(?AbstractResourceEntityRepresentation $linked, array $classKinds): bool
+    private static function joinPageRange(?string $first, ?string $last): ?string
     {
-        if ($linked === null || !$linked->resourceClass()) {
-            return false;
+        if ($first === null && $last === null) {
+            return null;
         }
-        return ($classKinds[$linked->resourceClass()->id()] ?? null) === 'organization';
+        if ($first !== null && $last !== null && $last !== $first) {
+            return $first . '-' . $last;
+        }
+        return $first ?? $last;
+    }
+
+    /** The resource's citation page range, read from bibo:pageStart/pageEnd. */
+    private function pageRange(AbstractResourceEntityRepresentation $resource): ?string
+    {
+        return self::joinPageRange(
+            $this->firstString($resource, ['bibo:pageStart']),
+            $this->firstString($resource, ['bibo:pageEnd'])
+        );
     }
 
     /** Whitespace-normalise, strip tags and clip to $max characters. */

@@ -22,22 +22,6 @@ final class CitationExport
         'csljson' => ['json', 'application/vnd.citationstyles.csl+json; charset=utf-8'],
     ];
 
-    /** Citation kind => BibTeX entry type. */
-    private const BIBTEX_TYPE = [
-        'article' => 'article', 'review' => 'article', 'newspaper' => 'article', 'magazine' => 'article',
-        'chapter' => 'incollection', 'book' => 'book', 'thesis' => 'phdthesis', 'report' => 'techreport',
-        'communication' => 'inproceedings', 'post' => 'online',
-        'av' => 'misc', 'photo' => 'misc', 'document' => 'misc', 'item' => 'misc',
-    ];
-
-    /** Citation kind => RIS reference type (TY). */
-    private const RIS_TYPE = [
-        'newspaper' => 'NEWS', 'magazine' => 'MGZN', 'article' => 'JOUR', 'review' => 'JOUR',
-        'chapter' => 'CHAP', 'book' => 'BOOK', 'thesis' => 'THES', 'report' => 'RPRT',
-        'communication' => 'CONF', 'post' => 'BLOG', 'av' => 'VIDEO', 'photo' => 'ART',
-        'document' => 'GEN', 'item' => 'GEN',
-    ];
-
     public function serialize(array $record, string $format): ?string
     {
         return match ($format) {
@@ -59,9 +43,16 @@ final class CitationExport
 
     // ─── BibTeX ──────────────────────────────────────────────────────────────
 
+    /** The record's kind; an unrecognised value degrades to the generic item. */
+    private function kind(array $record): CitationKind
+    {
+        return CitationKind::tryFrom((string) ($record['kind'] ?? '')) ?? CitationKind::Item;
+    }
+
     private function bibtex(array $record): string
     {
-        $type = self::BIBTEX_TYPE[$record['kind']] ?? 'misc';
+        $kind = $this->kind($record);
+        $type = $kind->bibtexType();
         $key = $this->citeKey($record);
 
         $fields = [];
@@ -79,24 +70,24 @@ final class CitationExport
         }
 
         // Container routes to journal / booktitle / publisher-adjacent fields.
-        switch ($record['kind']) {
-            case 'article':
-            case 'review':
-            case 'newspaper':
-            case 'magazine':
+        switch ($kind) {
+            case CitationKind::Article:
+            case CitationKind::Review:
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
                 $this->addField($fields, 'journal', $record['container']);
                 break;
-            case 'chapter':
+            case CitationKind::Chapter:
                 $this->addField($fields, 'booktitle', $record['bookTitle']);
                 $this->addField($fields, 'publisher', $record['publisher']);
                 break;
-            case 'thesis':
+            case CitationKind::Thesis:
                 $this->addField($fields, 'school', $record['publisher']);
                 break;
-            case 'report':
+            case CitationKind::Report:
                 $this->addField($fields, 'institution', $record['publisher']);
                 break;
-            case 'book':
+            case CitationKind::Book:
                 $this->addField($fields, 'publisher', $record['publisher']);
                 break;
             default:
@@ -180,7 +171,7 @@ final class CitationExport
     {
         $eol = "\r\n";
         $lines = [];
-        $lines[] = $this->risLine('TY', self::RIS_TYPE[$record['kind']] ?? 'GEN');
+        $lines[] = $this->risLine('TY', $this->kind($record)->risType());
 
         foreach ($record['authors'] ?? [] as $p) {
             $lines[] = $this->risLine('AU', $this->nameRis($p));

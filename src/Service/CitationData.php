@@ -32,44 +32,19 @@ final class CitationData
 {
     use ResourceValueReader;
 
-    /** Descriptive authority records — not citable works. */
-    private const ENTITY_KINDS = ['person', 'place', 'organization', 'event', 'subject'];
-
-    /** Citation kind → CSL item type (drives CSL-JSON export + downstream typing). */
-    private const CSL_TYPE = [
-        'newspaper'     => 'article-newspaper',
-        'magazine'      => 'article-magazine',
-        'article'       => 'article-journal',
-        'review'        => 'review',
-        'chapter'       => 'chapter',
-        'book'          => 'book',
-        'thesis'        => 'thesis',
-        'report'        => 'report',
-        'post'          => 'post-weblog',
-        'av'            => 'motion_picture',
-        'communication' => 'speech',
-        'document'      => 'document',
-        'photo'         => 'graphic',
-    ];
-
-    /**
-     * @param array<int,string> $classKinds resource class id => citation kind
-     */
-    public function __construct(
-        private readonly array $classKinds,
-        private readonly string $defaultKind = 'item',
-    ) {
+    public function __construct(private readonly CitationKindMap $kinds)
+    {
     }
 
-    public function kind(?int $classId): string
+    public function kind(?int $classId): CitationKind
     {
-        return $this->classKinds[$classId] ?? $this->defaultKind;
+        return $this->kinds->forClassId($classId);
     }
 
     /** Whether an item of this resource class is a citable work (not an authority record). */
     public function isCitable(?int $classId): bool
     {
-        return !in_array($this->kind($classId), self::ENTITY_KINDS, true);
+        return !$this->kind($classId)->isAuthorityRecord();
     }
 
     /**
@@ -80,8 +55,8 @@ final class CitationData
      */
     public function build(ItemRepresentation $item, ?string $url = null): ?array
     {
-        $kind = $this->kind(ResourceUrl::classId($item));
-        if (in_array($kind, self::ENTITY_KINDS, true)) {
+        $kind = $this->kinds->forResource($item);
+        if ($kind->isAuthorityRecord()) {
             return null;
         }
 
@@ -91,8 +66,8 @@ final class CitationData
 
         $record = [
             'id'        => $item->id(),
-            'kind'      => $kind,
-            'cslType'   => self::CSL_TYPE[$kind] ?? 'document',
+            'kind'      => $kind->value,
+            'cslType'   => $kind->cslType(),
             'title'     => $this->firstString($item, ['dcterms:title']),
             'authors'   => $this->people($item, ['bibo:authorList', 'dcterms:creator']),
             'editors'   => $this->people($item, ['bibo:editorList']),
@@ -113,13 +88,13 @@ final class CitationData
         ];
 
         switch ($kind) {
-            case 'chapter':
+            case CitationKind::Chapter:
                 $record['bookTitle'] = $this->firstString($item, ['dcterms:alternative']);
                 $record['publisher'] = $container;
                 break;
-            case 'book':
-            case 'thesis':
-            case 'report':
+            case CitationKind::Book:
+            case CitationKind::Thesis:
+            case CitationKind::Report:
                 $record['publisher'] = $container;
                 break;
             default:
@@ -137,18 +112,10 @@ final class CitationData
         return $record;
     }
 
-    /** The page range "185-209", or a single page, or null. */
+    /** The page range "185-209", or a single page, or null, for a built record. */
     public static function pageRange(array $record): ?string
     {
-        $first = $record['pageFirst'] ?? null;
-        $last = $record['pageLast'] ?? null;
-        if ($first === null && $last === null) {
-            return null;
-        }
-        if ($first !== null && $last !== null && $last !== $first) {
-            return $first . '-' . $last;
-        }
-        return $first ?? $last;
+        return self::joinPageRange($record['pageFirst'] ?? null, $record['pageLast'] ?? null);
     }
 
     // ─── Creators ────────────────────────────────────────────────────────────
@@ -174,7 +141,7 @@ final class CitationData
                 if ($label === '') {
                     continue;
                 }
-                $out[] = $this->parseName($label, $this->isOrganizationClass($linked, $this->classKinds));
+                $out[] = $this->parseName($label, $this->kinds->isOrganization($linked));
             }
             if ($out) {
                 return $out;

@@ -5,6 +5,7 @@ namespace IwacSeo\Controller;
 
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
+use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SiteResolver;
@@ -26,6 +27,7 @@ use Omeka\Settings\Settings;
  */
 class CitationController extends AbstractActionController
 {
+    use SendsResponses;
     use SettingsReader;
 
     public function __construct(
@@ -100,20 +102,14 @@ class CitationController extends AbstractActionController
 
     private function fileResponse(string $content, string $contentType, string $filename): Response
     {
-        $response = $this->getResponse();
-        $response->setContent($content);
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', $contentType);
         // filename() is sanitised to [A-Za-z0-9._-], safe inside the header.
-        $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . $filename . '"');
-        $headers->addHeaderLine('X-Robots-Tag', 'noindex');
-        return $response;
+        return $this->respond($content, $contentType, 200, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     private function status(int $code): Response
     {
-        $response = $this->getResponse();
-        $response->setStatusCode($code);
-        return $response;
+        return $this->respondWithStatus($code);
     }
 }

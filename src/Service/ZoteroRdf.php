@@ -58,39 +58,36 @@ class ZoteroRdf
         'eprints' => 'http://purl.org/eprint/terms/',
     ];
 
-    /** Citation kinds (CitationMeta vocabulary) that get a unAPI / Zotero-RDF record. */
-    private const ELIGIBLE_KINDS = ['newspaper', 'magazine', 'av', 'document', 'photo'];
-
-    /** kind => Zotero item-type id (z:itemType). */
-    private const ZOTERO_TYPE = [
-        'newspaper' => 'newspaperArticle',
-        'magazine'  => 'magazineArticle',
-        'av'        => 'videoRecording',
-        'document'  => 'document',
-        'photo'     => 'artwork',
+    /** Citation kinds that get a unAPI / Zotero-RDF record. */
+    private const ELIGIBLE_KINDS = [
+        CitationKind::Newspaper,
+        CitationKind::Magazine,
+        CitationKind::Av,
+        CitationKind::Document,
+        CitationKind::Photo,
     ];
 
-    /** kind => biblio-ontology class (rdf:type wrapper) — a sane fallback; z:itemType wins. */
-    private const BIB_TYPE = [
-        'newspaper' => 'Article',
-        'magazine'  => 'Article',
-        'av'        => 'Document',
-        'document'  => 'Document',
-        'photo'     => 'Image',
-    ];
-
-    /**
-     * @param array<int,string> $classKinds resource class id => citation kind
-     */
-    public function __construct(
-        private readonly array $classKinds,
-    ) {
+    public function __construct(private readonly CitationKindMap $kinds)
+    {
     }
 
     /** Whether an item of this resource class is served via unAPI. */
     public function isEligible(?int $classId): bool
     {
-        return in_array($this->classKinds[$classId] ?? null, self::ELIGIBLE_KINDS, true);
+        return in_array($this->kinds->forClassId($classId), self::ELIGIBLE_KINDS, true);
+    }
+
+    /**
+     * The biblio-ontology class wrapping the record (rdf:type). A sane fallback
+     * for readers that ignore z:itemType, which otherwise wins.
+     */
+    private function bibType(CitationKind $kind): string
+    {
+        return match ($kind) {
+            CitationKind::Newspaper, CitationKind::Magazine => 'Article',
+            CitationKind::Photo => 'Image',
+            default => 'Document',
+        };
     }
 
     /**
@@ -99,15 +96,15 @@ class ZoteroRdf
      */
     public function render(ItemRepresentation $item, string $canonical): ?string
     {
-        $kind = $this->classKinds[ResourceUrl::classId($item)] ?? null;
+        $kind = $this->kinds->forResource($item);
         if (!in_array($kind, self::ELIGIBLE_KINDS, true)) {
             return null;
         }
 
-        $bibType = self::BIB_TYPE[$kind] ?? 'Document';
+        $bibType = $this->bibType($kind);
         $props = [];
 
-        $props[] = $this->el('z:itemType', self::ZOTERO_TYPE[$kind]);
+        $props[] = $this->el('z:itemType', $kind->zoteroItemType());
         $props[] = $this->el('dc:title', $this->firstString($item, ['dcterms:title']));
 
         foreach ($this->creators($item) as $creator) {
@@ -118,7 +115,7 @@ class ZoteroRdf
         $props[] = $this->el('dc:language', $this->firstLabel($item, 'dcterms:language'));
 
         // Only the periodical kinds carry a container (publication) + issue/pages.
-        if ($kind === 'newspaper' || $kind === 'magazine') {
+        if ($kind === CitationKind::Newspaper || $kind === CitationKind::Magazine) {
             $props[] = $this->el('prism:publicationName', $this->firstLabel($item, 'dcterms:publisher'));
             $props[] = $this->el('prism:volume', $this->firstString($item, ['bibo:volume']));
             $props[] = $this->el('prism:number', $this->firstString($item, ['bibo:issue']));
@@ -200,7 +197,7 @@ class ZoteroRdf
                 if ($label === '') {
                     continue;
                 }
-                if ($this->isOrganizationClass($linked, $this->classKinds)) {
+                if ($this->kinds->isOrganization($linked)) {
                     // foaf:Person with only a surname → fieldMode 1 (not split).
                     $out[] = sprintf(
                         '<dcterms:creator><foaf:Person><foaf:surname>%s</foaf:surname></foaf:Person></dcterms:creator>',
@@ -220,20 +217,8 @@ class ZoteroRdf
     }
 
     // ─── Field readers ───────────────────────────────────────────────────────
-    // cote(), pdfUrl() and clip() live in the shared ResourceValueReader trait.
-
-    private function pageRange(ItemRepresentation $item): ?string
-    {
-        $first = $this->firstString($item, ['bibo:pageStart']);
-        $last = $this->firstString($item, ['bibo:pageEnd']);
-        if ($first === null && $last === null) {
-            return null;
-        }
-        if ($first !== null && $last !== null && $last !== $first) {
-            return $first . '-' . $last;
-        }
-        return $first ?? $last;
-    }
+    // cote(), pdfUrl(), pageRange() and clip() live in the shared
+    // ResourceValueReader trait.
 
     // ─── XML helpers ─────────────────────────────────────────────────────────
 

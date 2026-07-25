@@ -20,6 +20,7 @@ return [
         'factories' => [
             Service\HeadMetadata::class     => Service\HeadMetadataFactory::class,
             Service\StructuredData::class   => Service\StructuredDataFactory::class,
+            Service\CitationKindMap::class  => Service\CitationKindMapFactory::class,
             Service\CitationMeta::class     => Service\CitationMetaFactory::class,
             Service\CitationData::class     => Service\CitationDataFactory::class,
             Service\ZoteroRdf::class        => Service\ZoteroRdfFactory::class,

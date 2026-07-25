@@ -30,8 +30,8 @@ final class CitationFormatter
 {
     public const STYLES = ['chicago', 'apa', 'mla'];
 
-    /** Kinds whose title is set in quotes/plain with an italic container. */
-    private const PART_KINDS = ['newspaper', 'magazine', 'article', 'review', 'chapter', 'post', 'communication'];
+    /** Kinds whose citation carries a full publication date, not just a year. */
+    private const PERIODICAL_KINDS = [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::Post];
 
     /** @var array<string,array<string,string>> Connectives per locale. */
     private const STR = [
@@ -70,17 +70,23 @@ final class CitationFormatter
         };
     }
 
+    /** The record's kind; an unrecognised value degrades to the generic item. */
+    private function kind(array $record): CitationKind
+    {
+        return CitationKind::tryFrom((string) ($record['kind'] ?? '')) ?? CitationKind::Item;
+    }
+
     // ─── Chicago (notes–bibliography, bibliography entry) ────────────────────
 
     private function chicago(array $record, string $locale): string
     {
-        $kind = (string) $record['kind'];
+        $kind = $this->kind($record);
         $parts = [];
 
         // Creator slot: chapter → its own author only (the book's editors go in
         // the container as "edited by …"); everything else → authors, or the
         // editors as editors for an edited volume.
-        $creator = $kind === 'chapter'
+        $creator = $kind === CitationKind::Chapter
             ? $this->nameList($record['authors'] ?? [], $locale, 'chicago')
             : $this->creators($record, $locale, 'chicago');
         if ($creator !== '') {
@@ -91,8 +97,8 @@ final class CitationFormatter
 
         // Container / publication segment.
         switch ($kind) {
-            case 'article':
-            case 'review':
+            case CitationKind::Article:
+            case CitationKind::Review:
                 $seg = $this->italic($record['container']);
                 $vi = $this->volumeIssue($record, $locale);
                 if ($vi !== '') {
@@ -109,7 +115,7 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'chapter':
+            case CitationKind::Chapter:
                 $seg = $this->str($locale, 'in') . ' ' . $this->italic($record['bookTitle'] ?: $record['title']);
                 $eds = $this->nameList($record['editors'] ?? [], $locale, 'chicago', false);
                 if ($eds !== '') {
@@ -123,9 +129,9 @@ final class CitationFormatter
                 $parts[] = $this->terminate($this->publisherYear($record));
                 break;
 
-            case 'newspaper':
-            case 'magazine':
-            case 'post':
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+            case CitationKind::Post:
                 $seg = $this->italic($record['container']);
                 $date = $this->fullDate($record, $locale, 'chicago');
                 if ($date !== '') {
@@ -134,7 +140,7 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'thesis':
+            case CitationKind::Thesis:
                 $seg = $this->str($locale, 'phd');
                 $inst = $this->esc($record['publisher']);
                 if ($inst !== '') {
@@ -147,7 +153,7 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'communication':
+            case CitationKind::Communication:
                 $seg = $this->str($locale, 'presentation');
                 $seg = $this->ucfirst($seg);
                 $year = $this->year($record);
@@ -173,11 +179,11 @@ final class CitationFormatter
 
     private function apa(array $record, string $locale): string
     {
-        $kind = (string) $record['kind'];
+        $kind = $this->kind($record);
         $parts = [];
 
         // Date in parentheses; periodicals carry the full date.
-        $date = in_array($kind, ['newspaper', 'magazine', 'post'], true)
+        $date = in_array($kind, self::PERIODICAL_KINDS, true)
             ? $this->fullDate($record, $locale, 'apa')
             : ($this->year($record) !== null ? $this->esc((string) $this->year($record)) : '');
         $dateSeg = '(' . ($date !== '' ? $date : 'n.d.') . ').';
@@ -185,7 +191,7 @@ final class CitationFormatter
         // "Creator. (Date). Title." — with no creator the title takes the slot
         // and the date follows it ("Title. (Date)."), per APA. Chapter → its own
         // author; other kinds → authors, or the editors for an edited volume.
-        $creator = $kind === 'chapter'
+        $creator = $kind === CitationKind::Chapter
             ? $this->nameList($record['authors'] ?? [], $locale, 'apa')
             : $this->creators($record, $locale, 'apa');
         $title = $this->titleSegment($record, $locale, 'apa');
@@ -199,8 +205,8 @@ final class CitationFormatter
         }
 
         switch ($kind) {
-            case 'article':
-            case 'review':
+            case CitationKind::Article:
+            case CitationKind::Review:
                 $seg = $this->italic($record['container']);
                 $vol = $this->esc($record['volume']);
                 if ($vol !== '') {
@@ -216,7 +222,7 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'chapter':
+            case CitationKind::Chapter:
                 // In {editors} (Eds.), *Book Title* (pp. x–y). Publisher.
                 $seg = $this->str($locale, 'in') . ' ';
                 $eds = $this->nameList($record['editors'] ?? [], $locale, 'apa', false);
@@ -234,13 +240,13 @@ final class CitationFormatter
                 }
                 break;
 
-            case 'newspaper':
-            case 'magazine':
-            case 'post':
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+            case CitationKind::Post:
                 $parts[] = $this->terminate($this->italic($record['container']));
                 break;
 
-            case 'thesis':
+            case CitationKind::Thesis:
                 $inst = $this->esc($record['publisher']);
                 $label = $this->str($locale, 'phd');
                 $seg = '[' . $this->ucfirst($label) . ($inst !== '' ? ', ' . $inst : '') . ']';
@@ -262,10 +268,10 @@ final class CitationFormatter
 
     private function mla(array $record, string $locale): string
     {
-        $kind = (string) $record['kind'];
+        $kind = $this->kind($record);
         $parts = [];
 
-        $creator = $kind === 'chapter'
+        $creator = $kind === CitationKind::Chapter
             ? $this->nameList($record['authors'] ?? [], $locale, 'mla')
             : $this->creators($record, $locale, 'mla');
         if ($creator !== '') {
@@ -275,8 +281,8 @@ final class CitationFormatter
         $parts[] = $this->titleSegment($record, $locale, 'mla');
 
         switch ($kind) {
-            case 'article':
-            case 'review':
+            case CitationKind::Article:
+            case CitationKind::Review:
                 $seg = $this->italic($record['container']);
                 if (($record['volume'] ?? null)) {
                     $seg .= ', ' . $this->str($locale, 'vol') . ' ' . $this->esc($record['volume']);
@@ -295,7 +301,7 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'chapter':
+            case CitationKind::Chapter:
                 $seg = $this->italic($record['bookTitle'] ?: $record['title']);
                 $eds = $this->nameList($record['editors'] ?? [], $locale, 'mla', false);
                 if ($eds !== '') {
@@ -312,9 +318,9 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            case 'newspaper':
-            case 'magazine':
-            case 'post':
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+            case CitationKind::Post:
                 $seg = $this->italic($record['container']);
                 $date = $this->fullDate($record, $locale, 'mla');
                 if ($date !== '') {
@@ -340,18 +346,17 @@ final class CitationFormatter
     private function titleSegment(array $record, string $locale, string $style): string
     {
         $title = ($record['title'] ?? null) ?: $this->str($locale, 'untitled');
-        $kind = (string) $record['kind'];
+        $kind = $this->kind($record);
 
         if ($style === 'apa') {
             // APA: only standalone works are italic; parts stay plain. A thesis
             // is not a "part", so it italicises — correct for APA.
-            $italic = !in_array($kind, self::PART_KINDS, true);
-            return $this->terminate($italic ? $this->italic($title) : $this->esc($title));
+            return $this->terminate($kind->isPartOfWork() ? $this->esc($title) : $this->italic($title));
         }
 
         // Chicago / MLA: parts AND an unpublished thesis go in quotation marks
         // (period inside); other standalone works are italic.
-        $quoted = in_array($kind, self::PART_KINDS, true) || $kind === 'thesis';
+        $quoted = $kind->isPartOfWork() || $kind === CitationKind::Thesis;
         if ($quoted) {
             return '“' . $this->esc($title) . '.”';
         }

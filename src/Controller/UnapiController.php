@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller;
 
+use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\ZoteroRdf;
@@ -29,6 +30,7 @@ use Omeka\Settings\Settings;
  */
 class UnapiController extends AbstractActionController
 {
+    use SendsResponses;
     use SettingsReader;
 
     /** The only format we serve; rdf_zotero is Zotero's most-preferred unAPI format. */
@@ -123,19 +125,11 @@ class UnapiController extends AbstractActionController
 
     private function body(string $content, string $contentType, int $status = 200): Response
     {
-        $response = $this->getResponse();
-        $response->setStatusCode($status);
-        $response->setContent($content);
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', $contentType);
-        $headers->addHeaderLine('X-Robots-Tag', 'noindex');
-        return $response;
+        return $this->respond($content, $contentType, $status);
     }
 
     private function status(int $code): Response
     {
-        $response = $this->getResponse();
-        $response->setStatusCode($code);
-        return $response;
+        return $this->respondWithStatus($code);
     }
 }

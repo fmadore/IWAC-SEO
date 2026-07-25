@@ -4,6 +4,8 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Service;
 
 use IwacSeo\Service\CitationData;
+use IwacSeo\Service\CitationKind;
+use IwacSeo\Service\CitationKindMap;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -17,16 +19,15 @@ final class CitationDataTest extends TestCase
     protected function setUp(): void
     {
         $this->data = new CitationData(
-            [36 => 'newspaper', 94 => 'person', 40 => 'book'],
-            'item'
+            new CitationKindMap([36 => 'newspaper', 94 => 'person', 40 => 'book'], 'item')
         );
     }
 
     public function testKindDispatchAndDefault(): void
     {
-        $this->assertSame('newspaper', $this->data->kind(36));
-        $this->assertSame('item', $this->data->kind(999));
-        $this->assertSame('item', $this->data->kind(null));
+        $this->assertSame(CitationKind::Newspaper, $this->data->kind(36));
+        $this->assertSame(CitationKind::Item, $this->data->kind(999));
+        $this->assertSame(CitationKind::Item, $this->data->kind(null));
     }
 
     public function testAuthorityRecordsAreNotCitable(): void

@@ -10,9 +10,8 @@ final class ZoteroRdfFactory implements FactoryInterface
 {
     public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): ZoteroRdf
     {
-        // Shares the citation kind map (resource class id => kind) with
-        // CitationMeta, so both dispatch on the same IWAC class conventions.
-        $config = $container->get('Config')['iwac_seo']['citation'] ?? [];
-        return new ZoteroRdf($config['class_kinds'] ?? []);
+        // Shares the kind map with CitationData and CitationMeta, so all three
+        // dispatch on the same IWAC resource-class conventions.
+        return new ZoteroRdf($container->get(CitationKindMap::class));
     }
 }
