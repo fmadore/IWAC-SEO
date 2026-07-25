@@ -12,6 +12,7 @@ final class HeadMetadataFactory implements FactoryInterface
     {
         return new HeadMetadata(
             $container->get(SettingsGate::class),
+            $container->get(HeadWriter::class),
             $container->get(StructuredData::class),
             $container->get(CitationMeta::class),
             $container->get(Hreflang::class),

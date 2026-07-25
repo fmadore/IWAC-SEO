@@ -37,8 +37,12 @@ return $instance + [
             Service\SiteResolver::class     => Service\SiteResolverFactory::class,
             Service\SettingsGate::class    => Service\SettingsGateFactory::class,
         ],
-        // Dependency-free (no bundled vendor/): plain instantiation.
+        // Dependency-free (no bundled vendor/): plain instantiation. Shared,
+        // like every service-manager entry — HeadWriter relies on that: its
+        // applied-signal set has to span the action and layout render passes of
+        // one request.
         'invokables' => [
+            Service\HeadWriter::class        => Service\HeadWriter::class,
             Service\CitationFormatter::class => Service\CitationFormatter::class,
             Service\CitationExport::class    => Service\CitationExport::class,
         ],
