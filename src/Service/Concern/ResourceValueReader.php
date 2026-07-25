@@ -143,7 +143,7 @@ trait ResourceValueReader
             return null;
         }
         foreach ($resource->media() as $media) {
-            if (method_exists($media, 'isPublic') && !$media->isPublic()) {
+            if (!$media->isPublic()) {
                 continue;
             }
             if ($media->mediaType() === 'application/pdf') {

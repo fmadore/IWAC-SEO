@@ -78,12 +78,8 @@ class Hreflang
         }
         $out = [];
         foreach ($this->sites as $slug => $lang) {
-            try {
-                $href = $resource->siteUrl($slug, true);
-            } catch (\Throwable $e) {
-                continue;
-            }
-            if ($href) {
+            $href = ResourceUrl::forSite($resource, (string) $slug);
+            if ($href !== null) {
                 $out[] = ['lang' => (string) $lang, 'href' => $href, 'slug' => (string) $slug];
             }
         }

@@ -120,7 +120,7 @@ final class CitationFormatter
                     $seg .= ', ' . $this->esc($pages);
                 }
                 $parts[] = $this->terminate($seg);
-                $parts[] = $this->terminate($this->publisherYear($record, $locale));
+                $parts[] = $this->terminate($this->publisherYear($record));
                 break;
 
             case 'newspaper':
@@ -158,7 +158,7 @@ final class CitationFormatter
                 break;
 
             default: // book, report, av, photo, document, item
-                $py = $this->publisherYear($record, $locale);
+                $py = $this->publisherYear($record);
                 if ($py !== '') {
                     $parts[] = $this->terminate($py);
                 }
@@ -301,7 +301,7 @@ final class CitationFormatter
                 if ($eds !== '') {
                     $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
                 }
-                $py = $this->publisherYear($record, $locale); // publisher, year
+                $py = $this->publisherYear($record); // publisher, year
                 if ($py !== '') {
                     $seg .= ', ' . $py;
                 }
@@ -324,7 +324,7 @@ final class CitationFormatter
                 break;
 
             default: // book, thesis, report, av, photo, document, communication, item
-                $py = $this->publisherYear($record, $locale);
+                $py = $this->publisherYear($record);
                 if ($py !== '') {
                     $parts[] = $this->terminate($py);
                 }
@@ -503,7 +503,7 @@ final class CitationFormatter
     }
 
     /** "Publisher, Year" (Chicago/MLA book-like). */
-    private function publisherYear(array $record, string $locale): string
+    private function publisherYear(array $record): string
     {
         $seg = $this->esc($record['publisher'] ?? ($record['container'] ?? null));
         $year = $this->year($record);

@@ -99,8 +99,7 @@ class ZoteroRdf
      */
     public function render(ItemRepresentation $item, string $canonical): ?string
     {
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
-        $kind = $this->classKinds[$classId] ?? null;
+        $kind = $this->classKinds[ResourceUrl::classId($item)] ?? null;
         if (!in_array($kind, self::ELIGIBLE_KINDS, true)) {
             return null;
         }

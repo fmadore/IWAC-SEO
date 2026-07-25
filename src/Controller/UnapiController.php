@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Controller;
 
 use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
@@ -100,11 +101,10 @@ class UnapiController extends AbstractActionController
         if (!$item instanceof ItemRepresentation) {
             return null;
         }
-        if (method_exists($item, 'isPublic') && !$item->isPublic()) {
+        if (!$item->isPublic()) {
             return null;
         }
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
-        return $this->zoteroRdf->isEligible($classId) ? $item : null;
+        return $this->zoteroRdf->isEligible(ResourceUrl::classId($item)) ? $item : null;
     }
 
     private function formats(int $status): Response

@@ -65,7 +65,7 @@ class HeadMetadata
     ): ?string {
         $title = (string) $resource->displayTitle();
         $description = $this->resourceDescription($resource, $site);
-        $canonical = $this->absoluteResourceUrl($resource, $site);
+        $canonical = ResourceUrl::forSite($resource, $site->slug());
         $image = $this->resourceImage($view, $resource);
 
         $this->setOpenGraph($view, [
@@ -99,8 +99,7 @@ class HeadMetadata
         // Highwire Press + Dublin Core <meta> so Zotero / Google Scholar capture
         // the page as a reference.
         if ($this->boolSetting('iwac_seo_citation_meta', true)) {
-            $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
-            $this->citationMeta->apply($view, $resource, $classId, $canonical);
+            $this->citationMeta->apply($view, $resource, ResourceUrl::classId($resource), $canonical);
         }
 
         // Bilingual: link this item to its counterpart on the other-language
@@ -115,7 +114,7 @@ class HeadMetadata
         if ($canonical !== null
             && $resource instanceof ItemRepresentation
             && $this->boolSetting('iwac_seo_unapi', true)
-            && $this->zoteroRdf->isEligible($resource->resourceClass() ? $resource->resourceClass()->id() : null)
+            && $this->zoteroRdf->isEligible(ResourceUrl::classId($resource))
         ) {
             $view->headLink([
                 'rel'   => 'unapi-server',
@@ -143,7 +142,7 @@ class HeadMetadata
         array $overrides,
         bool $isHomepage
     ): void {
-        $canonical = $page->siteUrl($site->slug(), true);
+        $canonical = ResourceUrl::forSite($page, $site->slug());
         $this->setCanonical($view, $canonical);
 
         $title = isset($overrides['title']) && $overrides['title'] !== ''
@@ -215,7 +214,7 @@ class HeadMetadata
 
     // ─── Phase 2: site-wide constants + gap-fill (view.layout) ──────────────
 
-    public function applyGlobals(PhpRenderer $view, ?SiteRepresentation $site): void
+    public function applyGlobals(PhpRenderer $view, SiteRepresentation $site): void
     {
         $headMeta = $view->headMeta();
 
@@ -235,19 +234,17 @@ class HeadMetadata
         }
 
         // Open Graph / Twitter constants.
-        if ($site !== null) {
-            $headMeta->setProperty('og:site_name', $site->title());
-            // Through ogLocale() so a bare site locale ("fr") still emits the
-            // language_TERRITORY form Open Graph expects, matching the
-            // og:locale:alternate values below.
-            $headMeta->setProperty('og:locale', $this->ogLocale($this->locale($view)));
-            // Advertise the other-language site(s) as og:locale:alternate.
-            if ($this->hreflang->isEnabled()) {
-                $currentSlug = $site->slug();
-                foreach ($this->hreflang->sites() as $slug => $lang) {
-                    if ($slug !== $currentSlug) {
-                        $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
-                    }
+        $headMeta->setProperty('og:site_name', $site->title());
+        // Through ogLocale() so a bare site locale ("fr") still emits the
+        // language_TERRITORY form Open Graph expects, matching the
+        // og:locale:alternate values below.
+        $headMeta->setProperty('og:locale', $this->ogLocale(ViewLocale::resolve($view)));
+        // Advertise the other-language site(s) as og:locale:alternate.
+        if ($this->hreflang->isEnabled()) {
+            $currentSlug = $site->slug();
+            foreach ($this->hreflang->sites() as $slug => $lang) {
+                if ($slug !== $currentSlug) {
+                    $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
                 }
             }
         }
@@ -276,7 +273,7 @@ class HeadMetadata
         if (!$this->isApplied('og:title')) {
             // Mirror the rendered <title>'s leading segment as og/twitter title.
             $titleParts = $view->headTitle()->getContainer()->getArrayCopy();
-            $title = $titleParts[0] ?? ($site ? $site->title() : '');
+            $title = $titleParts[0] ?? $site->title();
             if ($title !== '') {
                 $this->setOpenGraph($view, ['og:title' => (string) $title, 'og:type' => 'website']);
             }
@@ -331,7 +328,7 @@ class HeadMetadata
     {
         $headMeta = $view->headMeta();
         foreach ($tags as $property => $content) {
-            if ($content === '' || $content === null) {
+            if ($content === '') {
                 continue;
             }
             $headMeta->setProperty($property, $content);
@@ -386,7 +383,7 @@ class HeadMetadata
         // sites without needing translation here.
         $title = (string) $resource->displayTitle();
         if ($title === '') {
-            $title = $resource->resourceClass() ? $resource->resourceClass()->label() : 'Record';
+            $title = ResourceUrl::classLabel($resource) ?? 'Record';
         }
         return $this->truncate(sprintf('%s — %s', $title, $site->title()));
     }
@@ -421,17 +418,6 @@ class HeadMetadata
         return $view->serverUrl($url);
     }
 
-    private function absoluteResourceUrl(
-        AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site
-    ): ?string {
-        try {
-            return $resource->siteUrl($site->slug(), true);
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
     private function resolveDefaultImage(PhpRenderer $view): ?string
     {
         if ($this->defaultImageResolved) {
@@ -461,26 +447,6 @@ class HeadMetadata
     private function truncate(string $text): string
     {
         return Text::truncate($text, self::DESCRIPTION_MAX);
-    }
-
-    private function locale(PhpRenderer $view): string
-    {
-        // `lang` is a view helper invoked via __call, so method_exists($view,
-        // 'lang') is always false — this used to pin og:locale to en_US even on
-        // the French site. Resolve it through the plugin manager.
-        $lang = 'en';
-        try {
-            $helpers = $view->getHelperPluginManager();
-            if ($helpers->has('lang')) {
-                $resolved = (string) $view->lang();
-                if ($resolved !== '') {
-                    $lang = $resolved;
-                }
-            }
-        } catch (\Throwable $e) {
-        }
-        // BCP-47 (en-US) → Open Graph locale (en_US).
-        return str_replace('-', '_', $lang) ?: 'en_US';
     }
 
     /**

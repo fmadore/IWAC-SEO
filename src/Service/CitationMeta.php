@@ -198,8 +198,7 @@ class CitationMeta
         }
         $this->single($headMeta, 'DC.date', $this->firstString($resource, self::DATE_TERMS));
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
-        $this->single($headMeta, 'DC.type',
-            $resource->resourceClass() ? $resource->resourceClass()->label() : null);
+        $this->single($headMeta, 'DC.type', ResourceUrl::classLabel($resource));
         $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));
 
         // DC.identifier is the resource's own (canonical) URL. The DOI is

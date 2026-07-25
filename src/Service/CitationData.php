@@ -80,8 +80,7 @@ final class CitationData
      */
     public function build(ItemRepresentation $item, ?string $url = null): ?array
     {
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
-        $kind = $this->kind($classId);
+        $kind = $this->kind(ResourceUrl::classId($item));
         if (in_array($kind, self::ENTITY_KINDS, true)) {
             return null;
         }

@@ -99,10 +99,7 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
         ); ?>
     </p>
     <p><?php echo $this->translate('The sitemap is cached. Clear the cache to rebuild it immediately after a large content change.'); ?></p>
-    <?php
-    $confirmForm->setAttribute('action', $this->url('admin/iwac-seo/regenerate'));
-    echo $this->form($confirmForm);
-    ?>
+    <?php echo $this->form($confirmForm); // action is set by the controller ?>
     <?php endif; ?>
 
     <?php if ($hreflangEnabled): ?>

@@ -90,7 +90,7 @@ class SeoController extends AbstractActionController
             $covered = $this->hreflang->coveredSlugs((string) $slug);
             $missing = [];
             foreach ($pages as $page) {
-                if (method_exists($page, 'isPublic') && !$page->isPublic()) {
+                if (!$page->isPublic()) {
                     continue;
                 }
                 if (!in_array($page->slug(), $covered, true)) {

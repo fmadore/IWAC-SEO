@@ -6,8 +6,11 @@ namespace IwacSeo\View\Helper;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationFormatter;
+use IwacSeo\Service\ResourceUrl;
+use IwacSeo\Service\ViewLocale;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\View\Helper\AbstractHelper;
+use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\ItemRepresentation;
 
 /**
@@ -59,11 +62,12 @@ class Citation extends AbstractHelper
         if (!$this->enabled) {
             return null;
         }
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
+        $classId = ResourceUrl::classId($item);
         if (!$this->citationData->isCitable($classId)) {
             return null;
         }
 
+        /** @var PhpRenderer $view */
         $view = $this->getView();
         $url = $this->itemUrl($view, $item);
 
@@ -72,7 +76,7 @@ class Citation extends AbstractHelper
             return null;
         }
 
-        $locale = $this->locale($view);
+        $locale = ViewLocale::forCitation($view);
 
         $styles = [];
         foreach ($this->styleLabels as $id => $label) {
@@ -111,37 +115,13 @@ class Citation extends AbstractHelper
         ];
     }
 
-    private function itemUrl($view, ItemRepresentation $item): ?string
+    private function itemUrl(PhpRenderer $view, ItemRepresentation $item): ?string
     {
         try {
             $site = $view->currentSite();
-            if ($site) {
-                return $item->siteUrl($site->slug(), true);
-            }
         } catch (\Throwable $e) {
+            return null;
         }
-        return null;
-    }
-
-    private function locale($view): string
-    {
-        // `lang` and `siteSetting` are view helpers invoked via __call, so they
-        // must be resolved through the plugin manager — method_exists($view,
-        // 'lang') is ALWAYS false and silently forced English dates on the French
-        // site (the citation text stayed "May 13, 2025" while the chrome was
-        // French). Prefer the active translator locale (matches the translated
-        // chrome), fall back to the site's configured locale.
-        $lang = '';
-        try {
-            $helpers = $view->getHelperPluginManager();
-            if ($helpers->has('lang')) {
-                $lang = (string) $view->lang();
-            }
-            if ($lang === '' && $helpers->has('siteSetting')) {
-                $lang = (string) ($view->siteSetting('locale') ?? '');
-            }
-        } catch (\Throwable $e) {
-        }
-        return str_starts_with(strtolower($lang), 'fr') ? 'fr' : 'en';
+        return $site ? ResourceUrl::forSite($item, $site->slug()) : null;
     }
 }

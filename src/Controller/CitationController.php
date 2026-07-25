@@ -6,6 +6,7 @@ namespace IwacSeo\Controller;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
@@ -79,25 +80,16 @@ class CitationController extends AbstractActionController
         if (!$item instanceof ItemRepresentation) {
             return null;
         }
-        if (method_exists($item, 'isPublic') && !$item->isPublic()) {
+        if (!$item->isPublic()) {
             return null;
         }
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
-        return $this->citationData->isCitable($classId) ? $item : null;
+        return $this->citationData->isCitable(ResourceUrl::classId($item)) ? $item : null;
     }
 
     /** The default site's public page URL — the citation's stable canonical. */
     private function itemUrl(ItemRepresentation $item): ?string
     {
-        $slug = $this->siteResolver->defaultSlug();
-        if ($slug === null) {
-            return null;
-        }
-        try {
-            return $item->siteUrl($slug, true);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return ResourceUrl::forSite($item, $this->siteResolver->defaultSlug());
     }
 
     private function enabled(): bool

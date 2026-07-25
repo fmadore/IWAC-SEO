@@ -26,6 +26,7 @@ namespace IwacSeo;
 use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
@@ -398,17 +399,9 @@ class Module extends AbstractModule
 
     private function resourcePublicUrl(object $resource): ?string
     {
-        $slug = $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug();
-        if ($slug === null) {
-            return null;
-        }
-        try {
-            if (method_exists($resource, 'siteUrl')) {
-                return $resource->siteUrl($slug, true);
-            }
-        } catch (\Throwable $e) {
-            // ignore
-        }
-        return null;
+        return ResourceUrl::forSite(
+            $resource,
+            $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug()
+        );
     }
 }
