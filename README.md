@@ -357,37 +357,48 @@ content via the robots.txt `Sitemap:` line and Search Console.
 
 ```
 IwacSeo/
-├── Module.php                       # listeners, ACL, install/uninstall, config form
+├── Module.php                       # listeners, ACL, install/upgrade/uninstall, config form
 ├── composer.json                    # type omeka-module; PSR-4 IwacSeo\ -> src/ (no runtime deps)
 ├── config/
 │   ├── module.ini
-│   └── module.config.php            # routes, services, navigation, iwac_seo defaults
+│   ├── module.config.php            # wiring: routes, services, navigation
+│   └── instance.config.php          # IWAC data: class maps + page translations
 ├── src/
 │   ├── Controller/
 │   │   ├── SitemapController.php     # /sitemap*.xml, /robots.txt, /{key}.txt
 │   │   ├── UnapiController.php       # /unapi -> Zotero RDF
 │   │   ├── CitationController.php    # /cite/{id}/{format} -> BibTeX/RIS/CSL-JSON
-│   │   └── Admin/SeoController.php   # dashboard + static-page table
+│   │   ├── Admin/SeoController.php   # dashboard + static-page table
+│   │   └── Concern/SendsResponses.php  # shared XML/text/file response plumbing
 │   ├── Form/{ConfigForm,PageSeoForm}.php
 │   ├── Job/PingSearchEngines.php
 │   ├── View/Helper/Citation.php      # iwacCitation() -> "How to cite" view-model
 │   ├── Site/ResourcePageBlockLayout/Citation.php  # "How to cite" resource page block
 │   └── Service/
-│       ├── HeadMetadata.php          # computes + injects all <head> SEO
+│       ├── HeadMetadata.php          # decides every <head> SEO signal
+│       ├── HeadWriter.php            # writes them; tracks what the request has set
 │       ├── StructuredData.php        # schema.org JSON-LD (by resource class)
+│       ├── CitationKind.php          # the kind vocabulary + export type tables
+│       ├── CitationKindMap.php       # resource class id -> kind (one shared map)
 │       ├── CitationMeta.php          # Highwire + Dublin Core citation tags
 │       ├── ZoteroRdf.php             # Zotero RDF (served via unAPI)
-│       ├── CitationData.php          # normalized citation record (shared source of truth)
+│       ├── CitationData.php          # builds a CitationRecord from an item
+│       ├── Citation/                 # CitationRecord, Creator, IssuedDate (the record)
 │       ├── CitationFormatter.php     # Chicago / APA / MLA text (hand-rolled, bilingual)
 │       ├── CitationExport.php        # BibTeX / RIS / CSL-JSON serialisers
 │       ├── Concern/ResourceValueReader.php  # shared value-readers (trait)
-│       ├── SitemapGenerator.php      # lean queries + XML + cache
+│       ├── SitemapGenerator.php      # which URLs go in which sitemap
+│       ├── Sitemap/                  # SitemapRepository, UrlsetWriter, XmlCache, SitemapDocument
 │       ├── PageSeoStore.php          # per-page overrides (site setting)
+│       ├── PingQueue.php             # IndexNow queue: dedupe, flood cap, throttle
 │       ├── Pinger.php                # IndexNow submit
+│       ├── SettingsGate.php          # typed reads over the iwac_seo_* settings
+│       ├── ResourceUrl.php, ViewLocale.php, Text.php  # small shared helpers
 │       └── *Factory.php
 ├── view/iwac-seo/admin/seo/{dashboard,pages}.phtml
 ├── asset/css/admin.css
-└── language/template.pot
+├── language/                        # template.pot + fr.po/fr.mo
+└── tests/                           # PHPUnit; `composer test`
 ```
 
 ---

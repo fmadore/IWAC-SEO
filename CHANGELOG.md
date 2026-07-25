@@ -3,6 +3,80 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 0.7.0 — 2026-07-25
+
+A structural refactoring release: no new features, no change to what any page,
+sitemap or export produces. It follows the second full-codebase review (see
+`ROADMAP.md`), which targeted implicit contracts, classes carrying several
+concerns, and the citation vocabulary spread across seven const tables.
+
+### Added
+- **French translation.** `language/fr.po`/`fr.mo`, plus a regenerated
+  `template.pot` — the previous template covered 30 of ~80 translatable
+  strings, and no catalogue shipped at all. Two dependency-free scripts under
+  `.github/scripts/` extract and compile them (`composer i18n`).
+- **`Module::upgrade()`.** Defaults introduced after a site's first install
+  (`iwac_seo_sitemap_ttl`, `iwac_seo_noindex_browse`) previously never reached
+  that site. The hook applies any that are still unset, and never overwrites an
+  administrator's value.
+- `.editorconfig`, a PSR-12 `phpcs.xml.dist` and a `phpstan.neon.dist`, runnable
+  via `composer lint` / `composer analyse`.
+
+### Changed
+- **Citation kinds are a `CitationKind` enum.** The CSL, BibTeX, RIS, Zotero
+  item-type, part-of-work and authority-record tables were facets of one closed
+  vocabulary spread over five classes, with `ENTITY_KINDS` copied verbatim in
+  two. A single `CitationKindMap` service replaces the raw array + default
+  threaded through four factories — which had already drifted, `ZoteroRdf`
+  falling back to `null` where the others fell back to `'item'`. A `class_kinds`
+  typo now degrades to the default instead of producing a kind nothing handles.
+- **The citation record is a `CitationRecord`** (with `Creator` and
+  `IssuedDate`), replacing an `array<string,mixed>` whose twenty-key shape was
+  documented in five docblocks and enforced nowhere. The array form remains at
+  the one boundary that needs it: `toArray()` is what the view helper hands the
+  theme, so **the theme contract is unchanged**.
+- **`SitemapGenerator` split** into `SitemapRepository` (the DBAL queries),
+  `UrlsetWriter` (the XML) and `XmlCache` (the TTL cache), leaving policy. Builds
+  return a `SitemapDocument` carrying its own generation time, replacing the
+  `lastModified()` side channel the controller read off the shared service.
+- **`HeadWriter` extracted from `HeadMetadata`**, isolating the module's one
+  piece of request-scoped mutable state (the applied-signal set spanning the
+  action and layout render passes) with a documented lifetime.
+- **`PingQueue` extracted from `Module`**, which carried ~65 lines of IndexNow
+  policy in the bootstrap class and had to expose its flood cap publicly so the
+  job could agree with it.
+- **`SettingsGate` replaces the `SettingsReader` trait**, which read an
+  undeclared property and so could not be used from a factory — the reason the
+  citation view helper's factory carried a hand-synced copy of the truthiness
+  rule.
+- Instance data (class maps, page translations) moves to
+  `config/instance.config.php`; `module.config.php` is wiring only.
+- Sitemap cache keys are namespaced by site id, so changing `default_site` no
+  longer serves the previous site's XML until the TTL expires.
+
+### Fixed
+- A bulk import ran a cache glob-and-unlink cycle **per saved item**; cache
+  clearing is now debounced per request.
+- `changefreq` and `priority` were interpolated into the sitemap unescaped.
+  Config-sourced, so not exposure — but a config edit could have emitted
+  unparseable XML.
+- `PageSeoStore` re-read and re-decoded the whole page-override map on every
+  call; `Hreflang` linear-scanned 33 page pairs on every page render.
+- Release tarballs shipped `tests/`, `.github/` and `phpunit.xml.dist`.
+
+### Internal
+- Removed: an unused `$locale` parameter, a form action set in both controller
+  and view, unreachable null branches, and `method_exists()` guards on
+  already-typed representations.
+- Deduplicated: the `lang`-helper workaround (twice), guarded `siteUrl()`
+  (seven times), the resource-class-to-id dance (eight times), the page-range
+  rule (twice), and the controllers' response plumbing (three times).
+- Tests: 47 → 103, now covering the sitemap XML writer and cache, the settings
+  gate, the ping queue, the kind vocabulary and creator-name splitting. A
+  bootstrap with guarded Omeka shims makes those reachable at all. CI validates
+  `composer.json`, caches downloads, and fails when the translation template is
+  out of date.
+
 ## 0.6.0 — 2026-07-12
 
 A refactoring & hardening release (see `ROADMAP.md` for the full plan).

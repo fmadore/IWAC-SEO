@@ -12,6 +12,19 @@ Nothing here is a rewrite, and nothing here is urgent. Phases are ordered by
 risk, not by value: each is an independent, reviewable commit, and earlier
 phases never depend on later ones.
 
+> **Status: delivered in 0.7.0**, except for the one item noted below. Each
+> phase landed as its own commit; see `CHANGELOG.md` for what changed and why.
+> The plan is kept here as the record of what was found and the reasoning
+> behind each decision — including the two things it recommends *not* doing.
+>
+> **Not done:** wiring PHPStan and PHP_CodeSniffer into CI. Both are declared,
+> configured (`phpstan.neon.dist`, `phpcs.xml.dist`) and runnable via
+> `composer analyse` / `composer lint`, but neither could be installed in the
+> environment the refactor was carried out in, so neither has ever been run
+> against this codebase. Adding a CI step that has never passed locally would
+> just turn the build red. Run them once, fix what they find, then add the two
+> steps to `.github/workflows/ci.yml`.
+
 ## Phase 1 — Dead code & housekeeping *(no behaviour change)*
 
 - **`CitationFormatter::publisherYear()` takes an unused `$locale`.** All four
