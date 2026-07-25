@@ -3,6 +3,9 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Sitemap\SitemapRepository;
+use IwacSeo\Service\Sitemap\UrlsetWriter;
+use IwacSeo\Service\Sitemap\XmlCache;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 
@@ -22,9 +25,10 @@ final class SitemapGeneratorFactory implements FactoryInterface
         $fileBaseUri = $config['file_store']['local']['base_uri'] ?? null;
 
         return new SitemapGenerator(
-            $container->get('Omeka\Connection'),
-            $sitemapConfig,
-            $cacheDir,
+            new SitemapRepository($container->get('Omeka\Connection')),
+            new UrlsetWriter(),
+            new XmlCache($cacheDir),
+            is_array($sitemapConfig) ? $sitemapConfig : [],
             is_string($fileBaseUri) && $fileBaseUri !== '' ? $fileBaseUri : null,
         );
     }

@@ -6,6 +6,7 @@ namespace IwacSeo\Controller;
 use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\Sitemap\SitemapDocument;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
@@ -26,6 +27,8 @@ use Omeka\Api\Representation\SiteRepresentation;
 class SitemapController extends AbstractActionController
 {
     use SendsResponses;
+
+    private ?int $ttl = null;
 
     public function __construct(
         private readonly SitemapGenerator $generator,
@@ -207,9 +210,10 @@ class SitemapController extends AbstractActionController
         return $slug !== null ? $this->hostUrl($site) . '/s/' . $slug : null;
     }
 
+    /** Memoised: every action reads it for the build and again for the header. */
     private function ttl(): int
     {
-        return $this->settings->int('iwac_seo_sitemap_ttl', 86400);
+        return $this->ttl ??= $this->settings->int('iwac_seo_sitemap_ttl', 86400);
     }
 
     private function sitemapEnabled(): bool
@@ -219,20 +223,18 @@ class SitemapController extends AbstractActionController
 
     /**
      * The XML is already file-cached server-side, so crawlers and any CDN are
-     * told to revalidate rather than refetch for the same window.
+     * told to revalidate rather than refetch for the same window. The document
+     * carries its own generation time, so Last-Modified is honest whether it
+     * was served from the cache or built just now.
      */
-    private function xml(string $body): Response
+    private function xml(SitemapDocument $document): Response
     {
-        $headers = [];
+        $headers = ['Last-Modified' => $document->lastModifiedHeader()];
         $ttl = $this->ttl();
         if ($ttl > 0) {
             $headers['Cache-Control'] = 'public, max-age=' . $ttl;
         }
-        $lastModified = $this->generator->lastModified();
-        if ($lastModified !== null) {
-            $headers['Last-Modified'] = gmdate('D, d M Y H:i:s', $lastModified) . ' GMT';
-        }
-        return $this->respond($body, 'application/xml; charset=utf-8', 200, $headers);
+        return $this->respond($document->xml, 'application/xml; charset=utf-8', 200, $headers);
     }
 
     private function text(string $body): Response
