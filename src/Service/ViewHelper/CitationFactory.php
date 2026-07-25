@@ -6,6 +6,7 @@ namespace IwacSeo\Service\ViewHelper;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationFormatter;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\ZoteroRdf;
 use IwacSeo\View\Helper\Citation;
 use Laminas\ServiceManager\Factory\FactoryInterface;
@@ -16,12 +17,11 @@ final class CitationFactory implements FactoryInterface
     public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): Citation
     {
         $config = $container->get('Config')['iwac_seo']['citation'] ?? [];
-        $settings = $container->get('Omeka\Settings');
 
         // The panel shares the citation kill-switch with the Highwire/DC meta
-        // tags. Same truthiness contract as SettingsReader::boolSetting().
-        $value = $settings->get('iwac_seo_citation_meta', '1');
-        $enabled = $value === '1' || $value === 1 || $value === true;
+        // tags — through the same SettingsGate, so there is one definition of
+        // "on" rather than a copy that has to be kept in sync by hand.
+        $enabled = $container->get(SettingsGate::class)->isOn('iwac_seo_citation_meta', true);
 
         return new Citation(
             $container->get(CitationData::class),

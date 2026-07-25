@@ -23,9 +23,11 @@ declare(strict_types=1);
 
 namespace IwacSeo;
 
-use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\PingQueue;
+use IwacSeo\Service\ResourceUrl;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
@@ -78,15 +80,6 @@ class Module extends AbstractModule
         'iwac_seo_sitemap_ttl'     => '86400',
     ];
 
-    /** How often (seconds) a ping job may be dispatched. */
-    private const PING_INTERVAL = 900;
-
-    /**
-     * Pending-URL queue cap. Public because {@see PingSearchEngines} treats a
-     * full queue as a bulk sync and skips the ping — the two must agree.
-     */
-    public const PING_QUEUE_CAP = 200;
-
     public function getConfig(): array
     {
         return include __DIR__ . '/config/module.config.php';
@@ -94,12 +87,24 @@ class Module extends AbstractModule
 
     public function install(ServiceLocatorInterface $services): void
     {
-        $settings = $services->get('Omeka\Settings');
-        foreach (self::DEFAULTS as $key => $value) {
-            if ($settings->get($key) === null) {
-                $settings->set($key, $value);
-            }
-        }
+        $this->applyDefaults($services->get('Omeka\Settings'));
+    }
+
+    /**
+     * Re-apply any default that is still unset.
+     *
+     * Omeka calls this on a version bump. Without it a default introduced after
+     * a site's first install (iwac_seo_sitemap_ttl and iwac_seo_noindex_browse
+     * both arrived after 0.1) would never reach that site: install() runs once,
+     * and nothing else writes a default. Idempotent, and it never overwrites a
+     * value an administrator has set.
+     */
+    public function upgrade(
+        $oldVersion,
+        $newVersion,
+        ServiceLocatorInterface $services
+    ): void {
+        $this->applyDefaults($services->get('Omeka\Settings'));
     }
 
     public function uninstall(ServiceLocatorInterface $services): void
@@ -256,7 +261,6 @@ class Module extends AbstractModule
     public function handleContentChange(EventInterface $event): void
     {
         $services = $this->getServiceLocator();
-        $settings = $services->get('Omeka\Settings');
 
         $response = $event->getParam('response');
         $resource = $response ? $response->getContent() : null;
@@ -266,9 +270,10 @@ class Module extends AbstractModule
 
         // Invalidate the sitemap cache so the change shows up on the next
         // crawl instead of after the TTL. Any create/update can affect the
-        // URL set or a <lastmod> (including a public→private edit), and
-        // clearing is just a few unlinks, so no public check here.
-        if ((string) $settings->get('iwac_seo_sitemap_enabled', '1') === '1') {
+        // URL set or a <lastmod> (including a public→private edit), so there
+        // is no public check here. The clear is debounced per request, so a
+        // bulk import pays for it once rather than once per saved item.
+        if ($services->get(SettingsGate::class)->isOn('iwac_seo_sitemap_enabled', true)) {
             try {
                 $services->get(SitemapGenerator::class)->clearCache();
             } catch (\Throwable $e) {
@@ -276,10 +281,8 @@ class Module extends AbstractModule
             }
         }
 
-        if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
-            return;
-        }
-        if (trim((string) $settings->get('iwac_seo_indexnow_key', '')) === '') {
+        $queue = $services->get(PingQueue::class);
+        if (!$queue->isEnabled()) {
             return;
         }
         // Creates/updates announce a public URL; a delete is pinged regardless
@@ -296,29 +299,8 @@ class Module extends AbstractModule
             return;
         }
 
-        // Enqueue (deduped, capped so a bulk sync cannot grow it without bound).
-        $pending = $settings->get('iwac_seo_ping_pending', []);
-        if (!is_array($pending)) {
-            $pending = [];
-        }
-        if (count($pending) < self::PING_QUEUE_CAP && !in_array($url, $pending, true)) {
-            $pending[] = $url;
-            $settings->set('iwac_seo_ping_pending', $pending);
-        }
-
-        // Dispatch at most once per interval; the job batches the whole queue.
-        // The throttle is stamped only after a successful dispatch so a failed
-        // dispatch does not burn the window.
-        $last = (int) $settings->get('iwac_seo_ping_last', 0);
-        $now = time();
-        if ($now - $last >= self::PING_INTERVAL) {
-            try {
-                $services->get('Omeka\Job\Dispatcher')->dispatch(PingSearchEngines::class);
-                $settings->set('iwac_seo_ping_last', $now);
-            } catch (\Throwable $e) {
-                // never let SEO bookkeeping break a save
-            }
-        }
+        $queue->push($url);
+        $queue->dispatchIfDue();
     }
 
     // ─── Module configuration form ──────────────────────────────────────────
@@ -367,6 +349,16 @@ class Module extends AbstractModule
 
     // ─── Internals ──────────────────────────────────────────────────────────
 
+    /** Set each default that has no stored value yet. */
+    private function applyDefaults(\Omeka\Settings\Settings $settings): void
+    {
+        foreach (self::DEFAULTS as $key => $value) {
+            if ($settings->get($key) === null) {
+                $settings->set($key, $value);
+            }
+        }
+    }
+
     private function headMetadata(): HeadMetadata
     {
         return $this->getServiceLocator()->get(HeadMetadata::class);
@@ -398,17 +390,9 @@ class Module extends AbstractModule
 
     private function resourcePublicUrl(object $resource): ?string
     {
-        $slug = $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug();
-        if ($slug === null) {
-            return null;
-        }
-        try {
-            if (method_exists($resource, 'siteUrl')) {
-                return $resource->siteUrl($slug, true);
-            }
-        } catch (\Throwable $e) {
-            // ignore
-        }
-        return null;
+        return ResourceUrl::forSite(
+            $resource,
+            $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug()
+        );
     }
 }

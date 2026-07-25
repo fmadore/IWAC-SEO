@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service\Concern;
 
+use IwacSeo\Service\Citation\CitationRecord;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -143,7 +144,7 @@ trait ResourceValueReader
             return null;
         }
         foreach ($resource->media() as $media) {
-            if (method_exists($media, 'isPublic') && !$media->isPublic()) {
+            if (!$media->isPublic()) {
                 continue;
             }
             if ($media->mediaType() === 'application/pdf') {
@@ -157,18 +158,16 @@ trait ResourceValueReader
     }
 
     /**
-     * Whether a linked authority record is an Organisation, per the citation
-     * kind map (resource class id => kind). Institutional creators keep a
-     * single-field name and are never split/inverted.
-     *
-     * @param array<int,string> $classKinds
+     * The resource's citation page range, read from bibo:pageStart/pageEnd.
+     * The join rule itself belongs to the record, so a page range reads the
+     * same whether it came from a resource or from a built citation.
      */
-    private function isOrganizationClass(?AbstractResourceEntityRepresentation $linked, array $classKinds): bool
+    private function pageRange(AbstractResourceEntityRepresentation $resource): ?string
     {
-        if ($linked === null || !$linked->resourceClass()) {
-            return false;
-        }
-        return ($classKinds[$linked->resourceClass()->id()] ?? null) === 'organization';
+        return CitationRecord::joinPages(
+            $this->firstString($resource, ['bibo:pageStart']),
+            $this->firstString($resource, ['bibo:pageEnd'])
+        );
     }
 
     /** Whitespace-normalise, strip tags and clip to $max characters. */

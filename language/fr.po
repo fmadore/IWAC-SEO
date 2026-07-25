@@ -1,0 +1,236 @@
+# IWAC SEO – traduction française
+#
+# This file is distributed under the same license as the IWAC SEO module.
+# Compile with: php .github/scripts/compile-po.php
+#
+msgid ""
+msgstr ""
+"Project-Id-Version: IWAC SEO\n"
+"Report-Msgid-Bugs-To: \n"
+"MIME-Version: 1.0\n"
+"Content-Type: text/plain; charset=UTF-8\n"
+"Content-Transfer-Encoding: 8bit\n"
+"Language: fr\n"
+"Plural-Forms: nplurals=2; plural=(n > 1);\n"
+
+msgid "150–160 characters"
+msgstr "150 à 160 caractères"
+
+msgid "A 8–128 character hex key you choose. The module serves it at /{key}.txt so IndexNow can verify ownership. Generate one with: openssl rand -hex 16."
+msgstr "Une clé hexadécimale de 8 à 128 caractères, de votre choix. Le module la publie à l’adresse /{clé}.txt afin qu’IndexNow puisse vérifier que vous êtes propriétaire du site. Pour en générer une : openssl rand -hex 16."
+
+msgid "Adds Highwire Press (citation_*) and Dublin Core (DC.*) <meta> tags to resource pages so the Zotero Connector, Google Scholar and reference managers capture each item as a proper reference. Recommended."
+msgstr "Ajoute aux pages de ressources des balises <meta> Highwire Press (citation_*) et Dublin Core (DC.*), afin que le connecteur Zotero, Google Scholar et les logiciels de gestion bibliographique enregistrent chaque contenu comme une référence correctement typée. Recommandé."
+
+msgid "Adds a /unapi endpoint and discovery tags to newspaper articles, periodical issues, documents, audiovisual items and photographs. Zotero prefers unAPI over the meta tags, so it imports a richer record — the call number (Cote) from the iwac- identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. Needs “Emit citation meta tags” for the fallback. Recommended."
+msgstr "Ajoute un point d’accès /unapi et des balises de découverte aux articles de presse, numéros de périodiques, documents, documents audiovisuels et photographies. Zotero privilégie unAPI par rapport aux balises meta et importe donc une notice plus riche : la cote (issue de l’identifiant iwac-), les auteurs institutionnels en un seul champ, ainsi que le Sujet et la Couverture spatiale comme marqueurs. Nécessite « Générer les balises meta de citation » comme solution de repli. Recommandé."
+
+msgid "Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended."
+msgstr "Ajoute des données structurées (Person, Place, Organization, CreativeWork/Dataset, types savants…) aux pages de ressources, pour des résultats de recherche enrichis et pour Google Dataset Search. Recommandé."
+
+msgid "Bilingual (hreflang) coverage"
+msgstr "Couverture bilingue (hreflang)"
+
+msgid "Bing Webmaster verification"
+msgstr "Vérification Bing Webmaster"
+
+msgid "Citation tags (Zotero / Scholar)"
+msgstr "Balises de citation (Zotero / Scholar)"
+
+msgid "Configure defaults & verification"
+msgstr "Configurer les valeurs par défaut et la vérification"
+
+msgid "Covering %1$s public items, %2$s item sets and %3$s pages."
+msgstr "Couvre %1$s contenus publics, %2$s collections et %3$s pages."
+
+msgid "Default (indexable)"
+msgstr "Par défaut (indexable)"
+
+msgid "Default meta description"
+msgstr "Méta-description par défaut"
+
+msgid "Default social share image"
+msgstr "Image de partage par défaut"
+
+msgid "Discourage search engines from indexing the whole site"
+msgstr "Demander aux moteurs de recherche de ne pas indexer l’ensemble du site"
+
+msgid "Edit per-page SEO"
+msgstr "Modifier le référencement page par page"
+
+msgid "Emit citation meta tags (Zotero / Google Scholar)"
+msgstr "Générer les balises meta de citation (Zotero / Google Scholar)"
+
+msgid "Emit schema.org JSON-LD"
+msgstr "Générer le JSON-LD schema.org"
+
+msgid "Every public static page has a translated counterpart in the hreflang page map."
+msgstr "Chaque page statique publique possède un équivalent traduit dans la table de correspondance hreflang."
+
+msgid "Feature"
+msgstr "Fonctionnalité"
+
+msgid "Generates a sitemap index plus per-type child sitemaps for all public resources, and a robots.txt that points at it."
+msgstr "Génère un index de sitemap ainsi qu’un sitemap par type pour toutes les ressources publiques, et un robots.txt qui y renvoie."
+
+msgid "Google Search Console verification"
+msgstr "Vérification Google Search Console"
+
+msgid "How long a generated sitemap is cached before it is rebuilt on the next request. Default 86400 (24h). Use the “Regenerate now” button on the SEO admin page to rebuild immediately."
+msgstr "Durée de mise en cache d’un sitemap avant sa reconstruction à la requête suivante. Valeur par défaut : 86400 (24 h). Utilisez le bouton « Régénérer maintenant » de la page d’administration SEO pour le reconstruire immédiatement."
+
+msgid "How to cite"
+msgstr "Comment citer"
+
+msgid "Index, follow"
+msgstr "Indexer, suivre"
+
+msgid "IndexNow key"
+msgstr "Clé IndexNow"
+
+msgid "IndexNow ping"
+msgstr "Notification IndexNow"
+
+msgid "Indexing"
+msgstr "Indexation"
+
+msgid "Invalid form submission."
+msgstr "Envoi du formulaire invalide."
+
+msgid "Keeps faceted and paginated browse URLs out of the index (they add little and dilute crawl budget) while still letting crawlers follow links to the resource pages. Recommended."
+msgstr "Empêche l’indexation des URL de navigation à facettes et paginées (peu utiles, elles diluent le budget d’exploration) tout en laissant les robots suivre les liens vers les pages de ressources. Recommandé."
+
+msgid "Meta description"
+msgstr "Méta-description"
+
+msgid "Meta title"
+msgstr "Titre méta"
+
+msgid "No"
+msgstr "Non"
+
+msgid "No site found."
+msgstr "Aucun site trouvé."
+
+msgid "Noindex"
+msgstr "Ne pas indexer"
+
+msgid "Noindex filtered / paginated browse pages"
+msgstr "Ne pas indexer les pages de navigation filtrées ou paginées"
+
+msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item or page is added or edited, so it is crawled sooner. Throttled, and skipped during bulk syncs. Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
+msgstr "Avertit Bing et Yandex (ainsi que les autres moteurs compatibles IndexNow) lorsqu’un contenu ou une page publique est ajouté ou modifié, afin d’accélérer son exploration. La fréquence est limitée et les synchronisations en masse sont ignorées. Google n’est pas notifié (son point d’accès a été supprimé : Google s’appuie sur robots.txt et la Search Console)."
+
+msgid "Off"
+msgstr "Désactivé"
+
+msgid "On"
+msgstr "Activé"
+
+msgid "Optional. Paste the <meta name=\"msvalidate.01\" …> tag or its token from Bing Webmaster Tools."
+msgstr "Facultatif. Collez la balise <meta name=\"msvalidate.01\" …> fournie par Bing Webmaster Tools, ou uniquement son jeton."
+
+msgid "Optional. The site account, e.g. @ZMO_Berlin — emitted as twitter:site."
+msgstr "Facultatif. Le compte du site, par exemple @ZMO_Berlin — publié dans twitter:site."
+
+msgid "Override the title, description, share image and indexing for individual static pages. Leave a field blank to fall back to the page’s own content and the site-wide defaults set in Configure. Resource (item) pages derive their SEO automatically and are not listed here."
+msgstr "Personnalisez le titre, la description, l’image de partage et l’indexation de chaque page statique. Laissez un champ vide pour utiliser le contenu de la page et les valeurs par défaut définies dans Configurer. Les pages de ressources (contenus) déterminent leur référencement automatiquement et ne figurent pas ici."
+
+msgid "Page"
+msgstr "Page"
+
+msgid "Paste the HTML-tag snippet Google gives you (the whole <meta name=\"google-site-verification\" …> tag) or just the token. It is injected into the <head> of every public page so Google can verify ownership. Then add the site at search.google.com/search-console and submit /sitemap.xml."
+msgstr "Collez l’extrait HTML fourni par Google (la balise <meta name=\"google-site-verification\" …> complète) ou uniquement le jeton. Il est inséré dans le <head> de chaque page publique afin que Google puisse vérifier que vous êtes propriétaire du site. Ajoutez ensuite le site sur search.google.com/search-console et soumettez /sitemap.xml."
+
+msgid "Ping IndexNow when content changes"
+msgstr "Notifier IndexNow lors d’une modification de contenu"
+
+msgid "SEO"
+msgstr "Référencement"
+
+msgid "Save"
+msgstr "Enregistrer"
+
+msgid "Serve /sitemap.xml and /robots.txt"
+msgstr "Publier /sitemap.xml et /robots.txt"
+
+msgid "Serve unAPI (Zotero RDF) for primary sources"
+msgstr "Publier unAPI (Zotero RDF) pour les sources primaires"
+
+msgid "Share image"
+msgstr "Image de partage"
+
+msgid "Site"
+msgstr "Site"
+
+msgid "Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production."
+msgstr "L’option « ne pas indexer le site » est ACTIVÉE : chaque page porte la directive noindex et robots.txt interdit tout. Désactivez-la dans Configurer pour la mise en production."
+
+msgid "Sitemap"
+msgstr "Sitemap"
+
+msgid "Sitemap cache cleared — it will be rebuilt on the next request."
+msgstr "Cache du sitemap vidé : il sera reconstruit à la prochaine requête."
+
+msgid "Sitemap cache lifetime (seconds)"
+msgstr "Durée de vie du cache du sitemap (secondes)"
+
+msgid "Staging switch. When on, every page gets robots \"noindex, nofollow\" and robots.txt disallows everything. Turn OFF in production."
+msgstr "Interrupteur pour les environnements de préproduction. Une fois activé, chaque page reçoit la directive robots « noindex, nofollow » et robots.txt interdit tout. À DÉSACTIVER en production."
+
+msgid "State"
+msgstr "État"
+
+msgid "Static pages"
+msgstr "Pages statiques"
+
+msgid "Static-page SEO"
+msgstr "Référencement des pages statiques"
+
+msgid "Static-page SEO saved."
+msgstr "Référencement des pages statiques enregistré."
+
+msgid "Status"
+msgstr "État"
+
+msgid "Switch"
+msgstr "Changer"
+
+msgid "The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16."
+msgstr "La clé IndexNow doit comporter de 8 à 128 caractères hexadécimaux (0-9, a-f). Pour en générer une : openssl rand -hex 16."
+
+msgid "The og:image / Twitter card image used when a page (or an item with no media) is shared. A landscape image around 1200×630 works best."
+msgstr "L’image og:image / Twitter Card utilisée lorsqu’une page (ou un contenu sans média) est partagée. Une image au format paysage d’environ 1200 × 630 pixels convient le mieux."
+
+msgid "The sitemap is cached. Clear the cache to rebuild it immediately after a large content change."
+msgstr "Le sitemap est mis en cache. Videz le cache pour le reconstruire immédiatement après une modification importante du contenu."
+
+msgid "These public pages have no entry in the hreflang page map (iwac_seo.hreflang.page_pairs), so they are published without cross-language alternate links. Add a pair when a translation exists."
+msgstr "Ces pages publiques ne figurent pas dans la table de correspondance hreflang (iwac_seo.hreflang.page_pairs) : elles sont publiées sans lien alternatif vers l’autre langue. Ajoutez une correspondance lorsqu’une traduction existe."
+
+msgid "This site has no pages yet."
+msgstr "Ce site ne comporte encore aucune page."
+
+msgid "Twitter / X @handle"
+msgstr "Identifiant Twitter / X"
+
+msgid "Used on pages that have no description of their own (the home page, browse and search pages). Resource pages derive their own description from the item metadata. Aim for 150–160 characters."
+msgstr "Utilisée sur les pages dépourvues de description propre (accueil, navigation, recherche). Les pages de ressources tirent leur description des métadonnées du contenu. Visez 150 à 160 caractères."
+
+msgid "XML sitemap & robots.txt"
+msgstr "Sitemap XML et robots.txt"
+
+msgid "Yes"
+msgstr "Oui"
+
+msgid "key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail"
+msgstr "la clé ne comporte pas de 8 à 128 caractères hexadécimaux : /{clé}.txt ne peut pas être publié et la vérification échouera"
+
+msgid "no key set"
+msgstr "aucune clé définie"
+
+msgid "paste your snippet in Configure"
+msgstr "collez votre extrait dans Configurer"
+
+msgid "schema.org JSON-LD"
+msgstr "JSON-LD schema.org"

@@ -5,13 +5,14 @@ namespace IwacSeo\Controller;
 
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
-use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Controller\Concern\SendsResponses;
+use IwacSeo\Service\ResourceUrl;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * /cite/:id/:format — single-item citation downloads (BibTeX, RIS, CSL-JSON).
@@ -25,13 +26,13 @@ use Omeka\Settings\Settings;
  */
 class CitationController extends AbstractActionController
 {
-    use SettingsReader;
+    use SendsResponses;
 
     public function __construct(
         private readonly CitationData $citationData,
         private readonly CitationExport $citationExport,
         private readonly ApiManager $api,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
     ) {
     }
@@ -79,49 +80,34 @@ class CitationController extends AbstractActionController
         if (!$item instanceof ItemRepresentation) {
             return null;
         }
-        if (method_exists($item, 'isPublic') && !$item->isPublic()) {
+        if (!$item->isPublic()) {
             return null;
         }
-        $classId = $item->resourceClass() ? $item->resourceClass()->id() : null;
-        return $this->citationData->isCitable($classId) ? $item : null;
+        return $this->citationData->isCitable(ResourceUrl::classId($item)) ? $item : null;
     }
 
     /** The default site's public page URL — the citation's stable canonical. */
     private function itemUrl(ItemRepresentation $item): ?string
     {
-        $slug = $this->siteResolver->defaultSlug();
-        if ($slug === null) {
-            return null;
-        }
-        try {
-            return $item->siteUrl($slug, true);
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return ResourceUrl::forSite($item, $this->siteResolver->defaultSlug());
     }
 
     private function enabled(): bool
     {
         // Shares the citation kill-switch with the Highwire/DC meta tags.
-        return $this->boolSetting('iwac_seo_citation_meta', true);
+        return $this->settings->isOn('iwac_seo_citation_meta', true);
     }
 
     private function fileResponse(string $content, string $contentType, string $filename): Response
     {
-        $response = $this->getResponse();
-        $response->setContent($content);
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', $contentType);
         // filename() is sanitised to [A-Za-z0-9._-], safe inside the header.
-        $headers->addHeaderLine('Content-Disposition', 'attachment; filename="' . $filename . '"');
-        $headers->addHeaderLine('X-Robots-Tag', 'noindex');
-        return $response;
+        return $this->respond($content, $contentType, 200, [
+            'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+        ]);
     }
 
     private function status(int $code): Response
     {
-        $response = $this->getResponse();
-        $response->setStatusCode($code);
-        return $response;
+        return $this->respondWithStatus($code);
     }
 }

@@ -1,0 +1,35 @@
+parameters:
+    level: 6
+
+    paths:
+        - Module.php
+        - src
+        - tests
+
+    # Omeka S is not a Composer dependency (the module ships no vendor/ and is
+    # autoloaded by the application), so its classes are absent when the module
+    # is analysed on its own. The test shims cover the few that are exercised
+    # directly; everything else is genuinely unknown here.
+    bootstrapFiles:
+        - tests/Shim/omeka.php
+
+    ignoreErrors:
+        # Unknown Omeka/Laminas classes, and calls into them. Analysis of the
+        # module's own logic — types, nullability, dead branches, unused
+        # parameters — is unaffected; only the application boundary is opaque.
+        - identifier: class.notFound
+        - identifier: missingType.generics
+        -
+            message: '#^Call to method .* on an unknown class#'
+        -
+            message: '#^Parameter .* has invalid type#'
+        -
+            message: '#^Property .* has unknown class .* as its type#'
+        -
+            message: '#^(Method|Function) .* has invalid return type#'
+        # PhpRenderer resolves helpers through __call(), so every $view->foo()
+        # is dynamic by design.
+        -
+            message: '#^Call to an undefined method Laminas\\View\\Renderer\\PhpRenderer::#'
+
+    treatPhpDocTypesAsCertain: false

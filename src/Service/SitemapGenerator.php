@@ -3,32 +3,28 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
-use Doctrine\DBAL\Connection;
+use IwacSeo\Service\Sitemap\SitemapDocument;
+use IwacSeo\Service\Sitemap\SitemapRepository;
+use IwacSeo\Service\Sitemap\UrlsetWriter;
+use IwacSeo\Service\Sitemap\XmlCache;
 
 /**
  * Builds the sitemap index and the per-type child sitemaps for one site.
  *
- * Resource ids + modified timestamps are read with a single lean DBAL query per
- * type (public resources only, scoped to the site), so even ~9k items render in
- * well under a second. Output is cached to a writable directory with a TTL;
- * any cache failure silently falls back to live generation.
+ * This class is now only the *policy*: which URLs belong in which document, in
+ * what order, at which priority. The three mechanisms it used to carry inline
+ * live beside it — {@see SitemapRepository} (the lean DBAL queries),
+ * {@see UrlsetWriter} (the XML) and {@see XmlCache} (the TTL file cache) — so
+ * the part that produces the actual protocol output is pure and testable.
  *
  * URL construction is intentionally string-based (the caller passes the
  * already-canonical host and site roots) rather than invoking the URL helper
  * thousands of times.
- *
- * Cache keys are per-type only, not per-host: the generated XML embeds the
- * request-derived canonical host, so the first request's host is baked into
- * the cache for the TTL. Fine for IWAC's single-host deployment; include the
- * host in the key if the instance ever answers under several hostnames.
  */
 class SitemapGenerator
 {
     /** Sitemaps protocol hard cap is 50,000 URLs / 50 MB per file. */
     private const MAX_URLS_PER_FILE = 50000;
-
-    /** When the most recently served document was generated (see lastModified()). */
-    private ?int $lastModified = null;
 
     /**
      * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
@@ -37,9 +33,10 @@ class SitemapGenerator
      *   site URL at build time ({site base}/files)
      */
     public function __construct(
-        private readonly Connection $connection,
+        private readonly SitemapRepository $repository,
+        private readonly UrlsetWriter $writer,
+        private readonly XmlCache $cache,
         private readonly array $config,
-        private readonly ?string $cacheDir,
         private readonly ?string $fileBaseUri = null,
     ) {
     }
@@ -52,24 +49,17 @@ class SitemapGenerator
 
     // ─── Index ──────────────────────────────────────────────────────────────
 
-    public function buildIndex(string $hostUrl, int $siteId, int $ttl): string
+    public function buildIndex(string $hostUrl, int $siteId, int $ttl): SitemapDocument
     {
-        return $this->cached('index', $ttl, function () use ($hostUrl, $siteId) {
+        return $this->cache->remember($this->key($siteId, 'index'), $ttl, function () use ($hostUrl, $siteId) {
             $children = ['sitemap-pages.xml', 'sitemap-item-sets.xml'];
-            $chunks = max(1, (int) ceil($this->countItems($siteId) / $this->chunkSize()));
-            for ($i = 1; $i <= $chunks; $i++) {
+            for ($i = 1, $n = $this->itemChunkCount($siteId); $i <= $n; $i++) {
                 $children[] = 'sitemap-items-' . $i . '.xml';
             }
-
-            $now = (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('c');
-            $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-                . '<sitemapindex xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">' . "\n";
-            foreach ($children as $child) {
-                $xml .= '  <sitemap><loc>' . $this->esc($hostUrl . '/' . $child) . '</loc>'
-                    . '<lastmod>' . $now . '</lastmod></sitemap>' . "\n";
-            }
-            $xml .= '</sitemapindex>' . "\n";
-            return $xml;
+            return $this->writer->renderIndex(
+                array_map(static fn (string $child): string => $hostUrl . '/' . $child, $children),
+                UrlsetWriter::now()
+            );
         });
     }
 
@@ -89,62 +79,164 @@ class SitemapGenerator
         int $ttl,
         array $navTree = [],
         ?int $homepageId = null
-    ): string {
-        return $this->cached('pages', $ttl, function () use ($siteUrl, $siteId, $navTree, $homepageId) {
-            // All public pages, keyed by id.
-            $pagesById = [];
-            foreach ($this->fetchPages($siteId) as $row) {
-                $pagesById[(int) $row['id']] = $row;
-            }
+    ): SitemapDocument {
+        return $this->cache->remember(
+            $this->key($siteId, 'pages'),
+            $ttl,
+            function () use ($siteUrl, $siteId, $navTree, $homepageId): string {
+                // All public pages, keyed by id.
+                $pagesById = [];
+                foreach ($this->repository->fetchPages($siteId) as $row) {
+                    $pagesById[(int) $row['id']] = $row;
+                }
 
-            $urls = [];
-            $emitted = [];
-            $pageUrl = function (array $row, ?string $priority, ?string $changefreq) use ($siteUrl): array {
-                return [
+                $urls = [];
+                $emitted = [];
+                $pageUrl = fn (array $row, ?string $priority, ?string $changefreq): array => [
                     'loc'        => $siteUrl . '/page/' . rawurlencode((string) $row['slug']),
-                    'lastmod'    => $this->w3c($row['modified'] ?? null),
+                    'lastmod'    => UrlsetWriter::w3cDate($row['modified'] ?? null),
                     'changefreq' => $changefreq,
                     'priority'   => $priority,
                 ];
-            };
 
-            // Home first, at its canonical /page/{slug}. The bare site root only
-            // redirects there, so listing the page URL avoids both a redirect and
-            // a duplicate entry. Falls back to the root if the homepage is unknown.
-            if ($homepageId !== null && isset($pagesById[$homepageId])) {
-                $urls[] = $pageUrl($pagesById[$homepageId], $this->priority('home'), $this->changefreq('home'));
-                $emitted[$homepageId] = true;
-            } else {
-                $urls[] = [
-                    'loc'        => $siteUrl . '/',
-                    'changefreq' => $this->changefreq('home'),
-                    'priority'   => $this->priority('home'),
-                ];
-            }
-
-            // Navigation pages, in menu order; priority by depth.
-            foreach ($this->flattenNav($navTree) as $nav) {
-                $id = $nav['id'];
-                if (isset($emitted[$id]) || !isset($pagesById[$id])) {
-                    continue;
+                // Home first, at its canonical /page/{slug}. The bare site root
+                // only redirects there, so listing the page URL avoids both a
+                // redirect and a duplicate entry. Falls back to the root if the
+                // homepage is unknown.
+                if ($homepageId !== null && isset($pagesById[$homepageId])) {
+                    $urls[] = $pageUrl($pagesById[$homepageId], $this->priority('home'), $this->changefreq('home'));
+                    $emitted[$homepageId] = true;
+                } else {
+                    $urls[] = [
+                        'loc'        => $siteUrl . '/',
+                        'changefreq' => $this->changefreq('home'),
+                        'priority'   => $this->priority('home'),
+                    ];
                 }
-                $priority = $nav['depth'] === 0 ? $this->priority('section') : $this->priority('page');
-                $urls[] = $pageUrl($pagesById[$id], $priority, $this->changefreq('page'));
-                $emitted[$id] = true;
-            }
 
-            // Public pages not reachable from the navigation (e.g. a search
-            // page) — kept for coverage but demoted.
-            foreach ($pagesById as $id => $row) {
-                if (isset($emitted[$id])) {
-                    continue;
+                // Navigation pages, in menu order; priority by depth.
+                foreach ($this->flattenNav($navTree) as $nav) {
+                    $id = $nav['id'];
+                    if (isset($emitted[$id]) || !isset($pagesById[$id])) {
+                        continue;
+                    }
+                    $priority = $nav['depth'] === 0 ? $this->priority('section') : $this->priority('page');
+                    $urls[] = $pageUrl($pagesById[$id], $priority, $this->changefreq('page'));
+                    $emitted[$id] = true;
                 }
-                $urls[] = $pageUrl($row, $this->priority('browse'), $this->changefreq('page'));
-            }
 
-            return $this->renderUrlset($urls);
-        });
+                // Public pages not reachable from the navigation (e.g. a search
+                // page) — kept for coverage but demoted.
+                foreach ($pagesById as $id => $row) {
+                    if (!isset($emitted[$id])) {
+                        $urls[] = $pageUrl($row, $this->priority('browse'), $this->changefreq('page'));
+                    }
+                }
+
+                return $this->writer->renderUrlset($urls);
+            }
+        );
     }
+
+    /**
+     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
+     */
+    public function buildItemSets(
+        string $siteUrl,
+        int $siteId,
+        int $ttl,
+        array $altBases = [],
+        ?string $xDefaultBase = null
+    ): SitemapDocument {
+        return $this->cache->remember(
+            $this->key($siteId, 'item-sets'),
+            $ttl,
+            function () use ($siteUrl, $siteId, $altBases, $xDefaultBase): string {
+                $urls = [];
+                foreach ($this->repository->fetchItemSets($siteId) as $row) {
+                    $path = '/item-set/' . (int) $row['id'];
+                    $urls[] = [
+                        'loc'        => $siteUrl . $path,
+                        'lastmod'    => UrlsetWriter::w3cDate($row['modified'] ?? null),
+                        'changefreq' => $this->changefreq('browse'),
+                        'priority'   => $this->priority('section'),
+                        'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
+                    ];
+                }
+                return $this->writer->renderUrlset($urls);
+            }
+        );
+    }
+
+    /**
+     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
+     */
+    public function buildItems(
+        string $siteUrl,
+        int $siteId,
+        int $chunk,
+        int $ttl,
+        array $altBases = [],
+        ?string $xDefaultBase = null
+    ): SitemapDocument {
+        $chunk = max(1, $chunk);
+        return $this->cache->remember(
+            $this->key($siteId, 'items-' . $chunk),
+            $ttl,
+            function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase): string {
+                $size = $this->chunkSize();
+                $withImages = (bool) ($this->config['include_images'] ?? true);
+                $imageBase = $withImages ? $this->imageBase($siteUrl) : null;
+
+                $urls = [];
+                foreach ($this->repository->fetchItems($siteId, ($chunk - 1) * $size, $size, $withImages) as $row) {
+                    $path = '/item/' . (int) $row['id'];
+                    $url = [
+                        'loc'        => $siteUrl . $path,
+                        'lastmod'    => UrlsetWriter::w3cDate($row['modified'] ?? null),
+                        'changefreq' => $this->changefreq('item'),
+                        'priority'   => $this->priority('item'),
+                        'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
+                    ];
+                    // Google Images: the item's primary-media large thumbnail
+                    // (the page scan / cover) as an <image:image> entry.
+                    if ($imageBase !== null && !empty($row['storage_id'])) {
+                        $url['image'] = $imageBase . '/large/' . $row['storage_id'] . '.jpg';
+                    }
+                    $urls[] = $url;
+                }
+                return $this->writer->renderUrlset($urls);
+            }
+        );
+    }
+
+    public function itemChunkCount(int $siteId): int
+    {
+        return max(1, (int) ceil($this->repository->countItems($siteId) / $this->chunkSize()));
+    }
+
+    /** @return array{items:int,itemSets:int,pages:int} */
+    public function counts(int $siteId): array
+    {
+        return [
+            'items'    => $this->repository->countItems($siteId),
+            'itemSets' => $this->repository->countItemSets($siteId),
+            'pages'    => $this->repository->countPages($siteId),
+        ];
+    }
+
+    public function clearCache(): void
+    {
+        $this->cache->clear();
+    }
+
+    /** Clear the cache and remove the cache directory itself (uninstall). */
+    public function destroyCache(): void
+    {
+        $this->cache->destroy();
+    }
+
+    // ─── Helpers ────────────────────────────────────────────────────────────
 
     /**
      * Flattens the Omeka navigation tree into an ordered list of page links with
@@ -169,70 +261,6 @@ class SitemapGenerator
             }
         }
         return $acc;
-    }
-
-    /**
-     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
-     */
-    public function buildItemSets(
-        string $siteUrl,
-        int $siteId,
-        int $ttl,
-        array $altBases = [],
-        ?string $xDefaultBase = null
-    ): string {
-        return $this->cached('item-sets', $ttl, function () use ($siteUrl, $siteId, $altBases, $xDefaultBase) {
-            $urls = [];
-            foreach ($this->fetchItemSets($siteId) as $row) {
-                $path = '/item-set/' . (int) $row['id'];
-                $urls[] = [
-                    'loc'        => $siteUrl . $path,
-                    'lastmod'    => $this->w3c($row['modified'] ?? null),
-                    'changefreq' => $this->changefreq('browse'),
-                    'priority'   => $this->priority('section'),
-                    'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
-                ];
-            }
-            return $this->renderUrlset($urls);
-        });
-    }
-
-    /**
-     * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
-     */
-    public function buildItems(
-        string $siteUrl,
-        int $siteId,
-        int $chunk,
-        int $ttl,
-        array $altBases = [],
-        ?string $xDefaultBase = null
-    ): string {
-        $chunk = max(1, $chunk);
-        return $this->cached('items-' . $chunk, $ttl, function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase) {
-            $size = $this->chunkSize();
-            $offset = ($chunk - 1) * $size;
-            $withImages = (bool) ($this->config['include_images'] ?? true);
-            $imageBase = $withImages ? $this->imageBase($siteUrl) : null;
-            $urls = [];
-            foreach ($this->fetchItems($siteId, $offset, $size, $withImages) as $row) {
-                $path = '/item/' . (int) $row['id'];
-                $url = [
-                    'loc'        => $siteUrl . $path,
-                    'lastmod'    => $this->w3c($row['modified'] ?? null),
-                    'changefreq' => $this->changefreq('item'),
-                    'priority'   => $this->priority('item'),
-                    'alternates' => $this->altLinks($altBases, $xDefaultBase, $path),
-                ];
-                // Google Images: the item's primary-media large thumbnail
-                // (the page scan / cover) as an <image:image> entry.
-                if ($imageBase !== null && !empty($row['storage_id'])) {
-                    $url['image'] = $imageBase . '/large/' . $row['storage_id'] . '.jpg';
-                }
-                $urls[] = $url;
-            }
-            return $this->renderUrlset($urls);
-        });
     }
 
     /**
@@ -271,207 +299,13 @@ class SitemapGenerator
         return $links;
     }
 
-    public function itemChunkCount(int $siteId): int
-    {
-        return max(1, (int) ceil($this->countItems($siteId) / $this->chunkSize()));
-    }
-
-    public function clearCache(): void
-    {
-        if ($this->cacheDir === null || !is_dir($this->cacheDir)) {
-            return;
-        }
-        foreach (glob($this->cacheDir . '/*.xml') ?: [] as $file) {
-            @unlink($file);
-        }
-    }
-
-    /** Clear the cache and remove the cache directory itself (uninstall). */
-    public function destroyCache(): void
-    {
-        $this->clearCache();
-        if ($this->cacheDir !== null && is_dir($this->cacheDir)) {
-            @rmdir($this->cacheDir);
-        }
-    }
-
-    /** @return array{items:int,itemSets:int,pages:int} */
-    public function counts(int $siteId): array
-    {
-        return [
-            'items'    => $this->countItems($siteId),
-            'itemSets' => $this->countScalar(
-                'SELECT COUNT(*) FROM resource r
-                 JOIN site_item_set sis ON sis.item_set_id = r.id
-                 WHERE r.resource_type = :t AND r.is_public = 1 AND sis.site_id = :s',
-                ['t' => 'Omeka\\Entity\\ItemSet', 's' => $siteId]
-            ),
-            // Home is one of these.
-            'pages'    => $this->countScalar(
-                'SELECT COUNT(*) FROM site_page WHERE site_id = :s AND is_public = 1',
-                ['s' => $siteId]
-            ),
-        ];
-    }
-
     /**
-     * When the most recently served document was generated: the cache file's
-     * mtime on a hit, the build moment on a live build, null before any call.
-     * Lets the controller emit an honest Last-Modified header.
+     * Cache key, namespaced by site id. Without the site id, changing
+     * `default_site` served the previous site's XML until the TTL expired.
      */
-    public function lastModified(): ?int
+    private function key(int $siteId, string $type): string
     {
-        return $this->lastModified;
-    }
-
-    // ─── Data (lean DBAL) ───────────────────────────────────────────────────
-
-    private function countItems(int $siteId): int
-    {
-        return $this->countScalar(
-            'SELECT COUNT(*) FROM resource r
-             JOIN item_site isi ON isi.item_id = r.id
-             WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s',
-            ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
-        );
-    }
-
-    /** @param array<string,mixed> $params */
-    private function countScalar(string $sql, array $params): int
-    {
-        try {
-            return (int) $this->connection->fetchOne($sql, $params);
-        } catch (\Throwable $e) {
-            return 0;
-        }
-    }
-
-    /** @return array<array{id:int,modified:?string,storage_id?:?string}> */
-    private function fetchItems(int $siteId, int $offset, int $limit, bool $withImages = false): array
-    {
-        // LIMIT/OFFSET are inlined as already-cast integers: PDO refuses bound
-        // parameters there under emulated prepares, and casting makes it safe.
-        $limit = max(0, $limit);
-        $offset = max(0, $offset);
-
-        // With images: the storage id of the item's representative thumbnail —
-        // the primary media when set (and public, with thumbnails), else the
-        // first public media with thumbnails, in position order. Mirrors how
-        // primaryMedia() picks the og:image source.
-        $imageColumn = $withImages
-            ? ', (SELECT m.storage_id FROM media m
-                  JOIN resource rm ON rm.id = m.id
-                  WHERE m.item_id = r.id AND m.has_thumbnails = 1 AND rm.is_public = 1
-                  ORDER BY COALESCE(m.id = i.primary_media_id, 0) DESC, m.position ASC, m.id ASC
-                  LIMIT 1) AS storage_id'
-            : '';
-        $itemJoin = $withImages ? ' JOIN item i ON i.id = r.id' : '';
-
-        try {
-            return $this->connection->fetchAllAssociative(
-                'SELECT r.id, r.modified' . $imageColumn . ' FROM resource r'
-                . $itemJoin
-                . ' JOIN item_site isi ON isi.item_id = r.id
-                 WHERE r.resource_type = :t AND r.is_public = 1 AND isi.site_id = :s
-                 ORDER BY r.id LIMIT ' . $limit . ' OFFSET ' . $offset,
-                ['t' => 'Omeka\\Entity\\Item', 's' => $siteId]
-            );
-        } catch (\Throwable $e) {
-            // A failing image subquery (schema drift) must not empty the
-            // sitemap — retry lean before giving up.
-            return $withImages ? $this->fetchItems($siteId, $offset, $limit, false) : [];
-        }
-    }
-
-    /** @return array<array{id:int,modified:?string}> */
-    private function fetchItemSets(int $siteId): array
-    {
-        try {
-            return $this->connection->fetchAllAssociative(
-                'SELECT r.id, r.modified FROM resource r
-                 JOIN site_item_set sis ON sis.item_set_id = r.id
-                 WHERE r.resource_type = :t AND r.is_public = 1 AND sis.site_id = :s
-                 ORDER BY r.id',
-                ['t' => 'Omeka\\Entity\\ItemSet', 's' => $siteId]
-            );
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
-    /** @return array<array{id:int,slug:string,modified:?string}> */
-    private function fetchPages(int $siteId): array
-    {
-        try {
-            return $this->connection->fetchAllAssociative(
-                'SELECT id, slug, modified FROM site_page
-                 WHERE site_id = :s AND is_public = 1 ORDER BY id',
-                ['s' => $siteId]
-            );
-        } catch (\Throwable $e) {
-            return [];
-        }
-    }
-
-    // ─── XML rendering ──────────────────────────────────────────────────────
-
-    /** @param array<array<string,mixed>> $urls */
-    private function renderUrlset(array $urls): string
-    {
-        // Declare the xhtml/image namespaces only when actually used.
-        $hasAlternates = false;
-        $hasImages = false;
-        foreach ($urls as $u) {
-            $hasAlternates = $hasAlternates || !empty($u['alternates']);
-            $hasImages = $hasImages || !empty($u['image']);
-            if ($hasAlternates && $hasImages) {
-                break;
-            }
-        }
-        $ns = ($hasAlternates ? ' xmlns:xhtml="http://www.w3.org/1999/xhtml"' : '')
-            . ($hasImages ? ' xmlns:image="http://www.google.com/schemas/sitemap-image/1.1"' : '');
-
-        $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
-            . '<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9"' . $ns . '>' . "\n";
-        foreach ($urls as $u) {
-            $xml .= '  <url><loc>' . $this->esc((string) $u['loc']) . '</loc>';
-            if (!empty($u['lastmod'])) {
-                $xml .= '<lastmod>' . $this->esc((string) $u['lastmod']) . '</lastmod>';
-            }
-            if (!empty($u['changefreq'])) {
-                $xml .= '<changefreq>' . $u['changefreq'] . '</changefreq>';
-            }
-            if (!empty($u['priority'])) {
-                $xml .= '<priority>' . $u['priority'] . '</priority>';
-            }
-            foreach ($u['alternates'] ?? [] as $alt) {
-                $xml .= '<xhtml:link rel="alternate" hreflang="' . $this->esc((string) $alt['hreflang'])
-                    . '" href="' . $this->esc((string) $alt['href']) . '"/>';
-            }
-            if (!empty($u['image'])) {
-                $xml .= '<image:image><image:loc>' . $this->esc((string) $u['image']) . '</image:loc></image:image>';
-            }
-            $xml .= '</url>' . "\n";
-        }
-        $xml .= '</urlset>' . "\n";
-        return $xml;
-    }
-
-    private function esc(string $value): string
-    {
-        return htmlspecialchars($value, ENT_QUOTES | ENT_XML1, 'UTF-8');
-    }
-
-    private function w3c(?string $dbDatetime): ?string
-    {
-        if (!$dbDatetime) {
-            return null;
-        }
-        try {
-            return (new \DateTimeImmutable($dbDatetime, new \DateTimeZone('UTC')))->format('c');
-        } catch (\Throwable $e) {
-            return null;
-        }
+        return 'site-' . $siteId . '-' . $type;
     }
 
     private function changefreq(string $kind): ?string
@@ -482,43 +316,5 @@ class SitemapGenerator
     private function priority(string $kind): ?string
     {
         return $this->config['priority'][$kind] ?? null;
-    }
-
-    // ─── Cache ────────────────────────────────────────────────────────────
-
-    /** @param callable():string $build */
-    private function cached(string $key, int $ttl, callable $build): string
-    {
-        $this->lastModified = time();
-        if ($this->cacheDir === null || $ttl <= 0) {
-            return $build();
-        }
-        $file = $this->cacheDir . '/' . $key . '.xml';
-        try {
-            $mtime = is_file($file) ? filemtime($file) : false;
-            if ($mtime !== false && (time() - $mtime) < $ttl) {
-                $cached = file_get_contents($file);
-                if ($cached !== false) {
-                    $this->lastModified = $mtime;
-                    return $cached;
-                }
-            }
-        } catch (\Throwable $e) {
-            // fall through to live build
-        }
-
-        $xml = $build();
-
-        try {
-            if (!is_dir($this->cacheDir)) {
-                @mkdir($this->cacheDir, 0775, true);
-            }
-            if (is_dir($this->cacheDir) && is_writable($this->cacheDir)) {
-                file_put_contents($file, $xml, LOCK_EX);
-            }
-        } catch (\Throwable $e) {
-            // caching is best-effort
-        }
-        return $xml;
     }
 }

@@ -3,8 +3,12 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Citation\CitationRecord;
+use IwacSeo\Service\Citation\Creator;
+use IwacSeo\Service\Citation\IssuedDate;
+
 /**
- * Serialises a normalized {@see CitationData} record to the machine-readable
+ * Serialises a {@see CitationRecord} to the machine-readable
  * citation formats offered on the item page: **BibTeX**, **RIS** and
  * **CSL-JSON**. Together with the formatted-text citation and the existing
  * Zotero-RDF (unAPI) endpoint, these replace the BulkExport block for
@@ -22,23 +26,7 @@ final class CitationExport
         'csljson' => ['json', 'application/vnd.citationstyles.csl+json; charset=utf-8'],
     ];
 
-    /** Citation kind => BibTeX entry type. */
-    private const BIBTEX_TYPE = [
-        'article' => 'article', 'review' => 'article', 'newspaper' => 'article', 'magazine' => 'article',
-        'chapter' => 'incollection', 'book' => 'book', 'thesis' => 'phdthesis', 'report' => 'techreport',
-        'communication' => 'inproceedings', 'post' => 'online',
-        'av' => 'misc', 'photo' => 'misc', 'document' => 'misc', 'item' => 'misc',
-    ];
-
-    /** Citation kind => RIS reference type (TY). */
-    private const RIS_TYPE = [
-        'newspaper' => 'NEWS', 'magazine' => 'MGZN', 'article' => 'JOUR', 'review' => 'JOUR',
-        'chapter' => 'CHAP', 'book' => 'BOOK', 'thesis' => 'THES', 'report' => 'RPRT',
-        'communication' => 'CONF', 'post' => 'BLOG', 'av' => 'VIDEO', 'photo' => 'ART',
-        'document' => 'GEN', 'item' => 'GEN',
-    ];
-
-    public function serialize(array $record, string $format): ?string
+    public function serialize(CitationRecord $record, string $format): ?string
     {
         return match ($format) {
             'bibtex'  => $this->bibtex($record),
@@ -49,84 +37,86 @@ final class CitationExport
     }
 
     /** Download filename stem — the accession id (Cote) if present, else item-<id>. */
-    public function filename(array $record, string $format): string
+    public function filename(CitationRecord $record, string $format): string
     {
         [$ext] = self::FORMATS[$format] ?? ['txt', ''];
-        $stem = $record['accession'] ?? null;
-        $stem = $stem ? preg_replace('/[^A-Za-z0-9._-]+/', '-', $stem) : 'item-' . (int) ($record['id'] ?? 0);
+        $stem = $record->accession !== null
+            ? preg_replace('/[^A-Za-z0-9._-]+/', '-', $record->accession)
+            : 'item-' . $record->id;
         return trim((string) $stem, '-') . '.' . $ext;
     }
 
     // ─── BibTeX ──────────────────────────────────────────────────────────────
 
-    private function bibtex(array $record): string
+    private function bibtex(CitationRecord $record): string
     {
-        $type = self::BIBTEX_TYPE[$record['kind']] ?? 'misc';
+        $kind = $record->kind;
+        $type = $kind->bibtexType();
         $key = $this->citeKey($record);
 
         $fields = [];
-        $authors = $this->nameListBibtex($record['authors'] ?? []);
+        $authors = $this->nameListBibtex($record->authors);
         if ($authors !== '') {
             $fields['author'] = $authors;
         }
-        $editors = $this->nameListBibtex($record['editors'] ?? []);
+        $editors = $this->nameListBibtex($record->editors);
         if ($editors !== '') {
             $fields['editor'] = $editors;
         }
-        if ($record['title']) {
+        if ($record->title !== null) {
             // Wrap in an extra pair of braces to protect title-case.
-            $fields['title'] = '{' . $this->bibtexEscape($record['title']) . '}';
+            $fields['title'] = '{' . $this->bibtexEscape($record->title) . '}';
         }
 
         // Container routes to journal / booktitle / publisher-adjacent fields.
-        switch ($record['kind']) {
-            case 'article':
-            case 'review':
-            case 'newspaper':
-            case 'magazine':
-                $this->addField($fields, 'journal', $record['container']);
+        switch ($kind) {
+            case CitationKind::Article:
+            case CitationKind::Review:
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+                $this->addField($fields, 'journal', $record->container);
                 break;
-            case 'chapter':
-                $this->addField($fields, 'booktitle', $record['bookTitle']);
-                $this->addField($fields, 'publisher', $record['publisher']);
+            case CitationKind::Chapter:
+                $this->addField($fields, 'booktitle', $record->bookTitle);
+                $this->addField($fields, 'publisher', $record->publisher);
                 break;
-            case 'thesis':
-                $this->addField($fields, 'school', $record['publisher']);
+            case CitationKind::Thesis:
+                $this->addField($fields, 'school', $record->publisher);
                 break;
-            case 'report':
-                $this->addField($fields, 'institution', $record['publisher']);
+            case CitationKind::Report:
+                $this->addField($fields, 'institution', $record->publisher);
                 break;
-            case 'book':
-                $this->addField($fields, 'publisher', $record['publisher']);
+            case CitationKind::Book:
+                $this->addField($fields, 'publisher', $record->publisher);
                 break;
             default:
-                $this->addField($fields, 'howpublished', $record['container']);
+                $this->addField($fields, 'howpublished', $record->container);
                 break;
         }
 
-        if (($record['issued']['year'] ?? null)) {
-            $fields['year'] = (string) $record['issued']['year'];
+        if ($record->issued->hasYear()) {
+            $fields['year'] = (string) $record->issued->year;
         }
-        $this->addField($fields, 'volume', $record['volume']);
-        $this->addField($fields, 'number', $record['issue']);
-        $pages = CitationData::pageRange($record);
+        $this->addField($fields, 'volume', $record->volume);
+        $this->addField($fields, 'number', $record->issue);
+        $pages = $record->pageRange();
         if ($pages !== null) {
             $fields['pages'] = str_replace('-', '--', $pages);
         }
         // DOI/URL are verbatim fields — do NOT LaTeX-escape them (the French site
         // slug "afrique_ouest" carries an underscore biber must read literally).
-        if (!empty($record['doi'])) {
-            $fields['doi'] = $record['doi'];
+        if ($record->doi !== null) {
+            $fields['doi'] = $record->doi;
         }
-        if (!empty($record['url'])) {
-            $fields['url'] = $record['url'];
+        if ($record->url !== null) {
+            $fields['url'] = $record->url;
         }
-        $this->addField($fields, 'language', $record['language']);
-        if (!empty($record['keywords'])) {
-            $fields['keywords'] = $this->bibtexEscape(implode(', ', $record['keywords']));
+        $this->addField($fields, 'language', $record->language);
+        if ($record->keywords !== []) {
+            $fields['keywords'] = $this->bibtexEscape(implode(', ', $record->keywords));
         }
-        if (!empty($record['abstract'])) {
-            $fields['abstract'] = $this->bibtexEscape($record['abstract']);
+        if ($record->abstract !== null) {
+            $fields['abstract'] = $this->bibtexEscape($record->abstract);
         }
 
         $lines = ["@{$type}{{$key},"];
@@ -141,23 +131,28 @@ final class CitationExport
         return implode("\n", $lines) . "\n";
     }
 
-    private function citeKey(array $record): string
+    private function citeKey(CitationRecord $record): string
     {
-        $base = $record['accession'] ?? ('item-' . (int) ($record['id'] ?? 0));
-        return preg_replace('/[^A-Za-z0-9:_-]+/', '', (string) $base) ?: 'iwac';
+        $base = $record->accession ?? ('item-' . $record->id);
+        return preg_replace('/[^A-Za-z0-9:_-]+/', '', $base) ?: 'iwac';
     }
 
-    /** BibTeX author/editor list, " and "-joined; institutions kept in braces. */
+    /**
+     * BibTeX author/editor list, " and "-joined; institutions kept in braces.
+     *
+     * @param Creator[] $people
+     */
     private function nameListBibtex(array $people): string
     {
         $out = [];
-        foreach ($people as $p) {
-            if (!empty($p['isInstitution']) || ($p['family'] ?? null) === null) {
-                $out[] = '{' . $this->bibtexEscape($p['literal']) . '}';
-            } elseif (($p['given'] ?? '') !== '') {
-                $out[] = $this->bibtexEscape($p['family']) . ', ' . $this->bibtexEscape($p['given']);
+        foreach ($people as $person) {
+            if ($person->isSingleField()) {
+                $out[] = '{' . $this->bibtexEscape($person->literal) . '}';
+            } elseif ($person->given !== null) {
+                $out[] = $this->bibtexEscape((string) $person->family)
+                    . ', ' . $this->bibtexEscape($person->given);
             } else {
-                $out[] = $this->bibtexEscape($p['family']);
+                $out[] = $this->bibtexEscape((string) $person->family);
             }
         }
         return implode(' and ', $out);
@@ -176,42 +171,41 @@ final class CitationExport
 
     // ─── RIS ─────────────────────────────────────────────────────────────────
 
-    private function ris(array $record): string
+    private function ris(CitationRecord $record): string
     {
         $eol = "\r\n";
         $lines = [];
-        $lines[] = $this->risLine('TY', self::RIS_TYPE[$record['kind']] ?? 'GEN');
+        $lines[] = $this->risLine('TY', $record->kind->risType());
 
-        foreach ($record['authors'] ?? [] as $p) {
-            $lines[] = $this->risLine('AU', $this->nameRis($p));
+        foreach ($record->authors as $person) {
+            $lines[] = $this->risLine('AU', $this->nameRis($person));
         }
-        foreach ($record['editors'] ?? [] as $p) {
-            $lines[] = $this->risLine('ED', $this->nameRis($p));
+        foreach ($record->editors as $person) {
+            $lines[] = $this->risLine('ED', $this->nameRis($person));
         }
-        $lines[] = $this->risLine('TI', $record['title']);
+        $lines[] = $this->risLine('TI', $record->title);
 
         // Container: T2 is the generic secondary/container title (journal, book,
         // newspaper, blog) that Zotero/EndNote map correctly for every type.
-        $container = $record['container'] ?? ($record['bookTitle'] ?? null);
-        $lines[] = $this->risLine('T2', $container);
-        $lines[] = $this->risLine('PB', $record['publisher']);
+        $lines[] = $this->risLine('T2', $record->container ?? $record->bookTitle);
+        $lines[] = $this->risLine('PB', $record->publisher);
 
-        if (($record['issued']['year'] ?? null)) {
-            $lines[] = $this->risLine('PY', (string) $record['issued']['year']);
-            $lines[] = $this->risLine('DA', $this->risDate($record['issued']));
+        if ($record->issued->hasYear()) {
+            $lines[] = $this->risLine('PY', (string) $record->issued->year);
+            $lines[] = $this->risLine('DA', $this->risDate($record->issued));
         }
-        $lines[] = $this->risLine('VL', $record['volume']);
-        $lines[] = $this->risLine('IS', $record['issue']);
-        $lines[] = $this->risLine('SP', $record['pageFirst']);
-        $lines[] = $this->risLine('EP', $record['pageLast']);
-        $lines[] = $this->risLine('DO', $record['doi']);
-        $lines[] = $this->risLine('UR', $record['url']);
-        $lines[] = $this->risLine('LA', $record['language']);
-        foreach ($record['keywords'] ?? [] as $kw) {
-            $lines[] = $this->risLine('KW', $kw);
+        $lines[] = $this->risLine('VL', $record->volume);
+        $lines[] = $this->risLine('IS', $record->issue);
+        $lines[] = $this->risLine('SP', $record->pageFirst);
+        $lines[] = $this->risLine('EP', $record->pageLast);
+        $lines[] = $this->risLine('DO', $record->doi);
+        $lines[] = $this->risLine('UR', $record->url);
+        $lines[] = $this->risLine('LA', $record->language);
+        foreach ($record->keywords as $keyword) {
+            $lines[] = $this->risLine('KW', $keyword);
         }
-        if (!empty($record['abstract'])) {
-            $lines[] = $this->risLine('AB', $record['abstract']);
+        if ($record->abstract !== null) {
+            $lines[] = $this->risLine('AB', $record->abstract);
         }
         $lines[] = 'ER  - ';
 
@@ -228,25 +222,27 @@ final class CitationExport
         return sprintf('%-2s  - %s', $tag, $value);
     }
 
-    private function nameRis(array $p): string
+    private function nameRis(Creator $person): string
     {
-        if (!empty($p['isInstitution']) || ($p['family'] ?? null) === null) {
-            return (string) $p['literal'];
+        if ($person->isSingleField()) {
+            return $person->literal;
         }
-        return ($p['given'] ?? '') !== '' ? $p['family'] . ', ' . $p['given'] : (string) $p['family'];
+        return $person->given !== null
+            ? $person->family . ', ' . $person->given
+            : (string) $person->family;
     }
 
-    private function risDate(array $issued): ?string
+    private function risDate(IssuedDate $issued): ?string
     {
-        if (!($issued['year'] ?? null)) {
+        if (!$issued->hasYear()) {
             return null;
         }
         // RIS DA is YYYY/MM/DD/ (trailing parts optional, slashes kept).
-        $out = sprintf('%04d', $issued['year']);
-        if ($issued['month'] ?? null) {
-            $out .= sprintf('/%02d', $issued['month']);
-            if ($issued['day'] ?? null) {
-                $out .= sprintf('/%02d', $issued['day']);
+        $out = sprintf('%04d', $issued->year);
+        if ($issued->month !== null) {
+            $out .= sprintf('/%02d', $issued->month);
+            if ($issued->day !== null) {
+                $out .= sprintf('/%02d', $issued->day);
             }
         }
         return $out;
@@ -254,59 +250,59 @@ final class CitationExport
 
     // ─── CSL-JSON ────────────────────────────────────────────────────────────
 
-    private function cslJson(array $record): string
+    private function cslJson(CitationRecord $record): string
     {
         $item = [
-            'id'   => $record['accession'] ?: ('iwac-' . (int) $record['id']),
-            'type' => $record['cslType'] ?? 'document',
+            'id'   => $record->accession ?? ('iwac-' . $record->id),
+            'type' => $record->cslType(),
         ];
-        if ($record['title']) {
-            $item['title'] = $record['title'];
+        if ($record->title !== null) {
+            $item['title'] = $record->title;
         }
-        $authors = $this->nameListCsl($record['authors'] ?? []);
+        $authors = $this->nameListCsl($record->authors);
         if ($authors) {
             $item['author'] = $authors;
         }
-        $editors = $this->nameListCsl($record['editors'] ?? []);
+        $editors = $this->nameListCsl($record->editors);
         if ($editors) {
             $item['editor'] = $editors;
         }
 
-        $container = $record['container'] ?? ($record['bookTitle'] ?? null);
-        if ($container) {
+        $container = $record->container ?? $record->bookTitle;
+        if ($container !== null) {
             $item['container-title'] = $container;
         }
-        if ($record['publisher']) {
-            $item['publisher'] = $record['publisher'];
+        if ($record->publisher !== null) {
+            $item['publisher'] = $record->publisher;
         }
-        if ($record['volume']) {
-            $item['volume'] = (string) $record['volume'];
+        if ($record->volume !== null) {
+            $item['volume'] = $record->volume;
         }
-        if ($record['issue']) {
-            $item['issue'] = (string) $record['issue'];
+        if ($record->issue !== null) {
+            $item['issue'] = $record->issue;
         }
-        $pages = CitationData::pageRange($record);
+        $pages = $record->pageRange();
         if ($pages !== null) {
             $item['page'] = $pages;
         }
-        $dateParts = $this->cslDateParts($record['issued']);
+        $dateParts = $this->cslDateParts($record->issued);
         if ($dateParts) {
             $item['issued'] = ['date-parts' => [$dateParts]];
         }
-        if ($record['doi']) {
-            $item['DOI'] = $record['doi'];
+        if ($record->doi !== null) {
+            $item['DOI'] = $record->doi;
         }
-        if ($record['url']) {
-            $item['URL'] = $record['url'];
+        if ($record->url !== null) {
+            $item['URL'] = $record->url;
         }
-        if ($record['language']) {
-            $item['language'] = $record['language'];
+        if ($record->language !== null) {
+            $item['language'] = $record->language;
         }
-        if (!empty($record['abstract'])) {
-            $item['abstract'] = $record['abstract'];
+        if ($record->abstract !== null) {
+            $item['abstract'] = $record->abstract;
         }
-        if (!empty($record['keywords'])) {
-            $item['keyword'] = implode(', ', $record['keywords']);
+        if ($record->keywords !== []) {
+            $item['keyword'] = implode(', ', $record->keywords);
         }
 
         // CSL-JSON is an array of item objects.
@@ -316,35 +312,38 @@ final class CitationExport
         ) . "\n";
     }
 
-    /** @return array<int,array<string,string>> */
+    /**
+     * @param Creator[] $people
+     * @return array<int,array<string,string>>
+     */
     private function nameListCsl(array $people): array
     {
         $out = [];
-        foreach ($people as $p) {
-            if (!empty($p['isInstitution']) || ($p['family'] ?? null) === null) {
-                $out[] = ['literal' => (string) $p['literal']];
-            } else {
-                $name = ['family' => (string) $p['family']];
-                if (($p['given'] ?? '') !== '') {
-                    $name['given'] = (string) $p['given'];
-                }
-                $out[] = $name;
+        foreach ($people as $person) {
+            if ($person->isSingleField()) {
+                $out[] = ['literal' => $person->literal];
+                continue;
             }
+            $name = ['family' => (string) $person->family];
+            if ($person->given !== null) {
+                $name['given'] = $person->given;
+            }
+            $out[] = $name;
         }
         return $out;
     }
 
     /** @return array<int,int> date-parts [year(,month(,day))] or [] */
-    private function cslDateParts(array $issued): array
+    private function cslDateParts(IssuedDate $issued): array
     {
-        if (!($issued['year'] ?? null)) {
+        if (!$issued->hasYear()) {
             return [];
         }
-        $parts = [(int) $issued['year']];
-        if ($issued['month'] ?? null) {
-            $parts[] = (int) $issued['month'];
-            if ($issued['day'] ?? null) {
-                $parts[] = (int) $issued['day'];
+        $parts = [(int) $issued->year];
+        if ($issued->month !== null) {
+            $parts[] = $issued->month;
+            if ($issued->day !== null) {
+                $parts[] = $issued->day;
             }
         }
         return $parts;

@@ -3,14 +3,15 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller;
 
-use IwacSeo\Service\Concern\SettingsReader;
+use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\Sitemap\SitemapDocument;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * Public, anonymous endpoints served at the host root (the routes fall through
@@ -25,12 +26,14 @@ use Omeka\Settings\Settings;
  */
 class SitemapController extends AbstractActionController
 {
-    use SettingsReader;
+    use SendsResponses;
+
+    private ?int $ttl = null;
 
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly SiteResolver $siteResolver,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly Hreflang $hreflang,
     ) {
     }
@@ -130,7 +133,7 @@ class SitemapController extends AbstractActionController
     public function robotsAction(): Response
     {
         $lines = ['User-agent: *'];
-        if ($this->boolSetting('iwac_seo_noindex_site')) {
+        if ($this->settings->isOn('iwac_seo_noindex_site')) {
             $lines[] = 'Disallow: /';
         } else {
             $lines[] = 'Disallow: /admin/';
@@ -150,7 +153,7 @@ class SitemapController extends AbstractActionController
 
     public function indexNowKeyAction(): Response
     {
-        $configured = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
+        $configured = $this->settings->text('iwac_seo_indexnow_key');
         $requested = (string) $this->params()->fromRoute('key', '');
         if ($configured === '' || !hash_equals($configured, $requested)) {
             return $this->notFound();
@@ -207,49 +210,41 @@ class SitemapController extends AbstractActionController
         return $slug !== null ? $this->hostUrl($site) . '/s/' . $slug : null;
     }
 
+    /** Memoised: every action reads it for the build and again for the header. */
     private function ttl(): int
     {
-        return (int) $this->settings->get('iwac_seo_sitemap_ttl', 86400);
+        return $this->ttl ??= $this->settings->int('iwac_seo_sitemap_ttl', 86400);
     }
 
     private function sitemapEnabled(): bool
     {
-        return $this->boolSetting('iwac_seo_sitemap_enabled', true);
+        return $this->settings->isOn('iwac_seo_sitemap_enabled', true);
     }
 
-    private function xml(string $body): Response
+    /**
+     * The XML is already file-cached server-side, so crawlers and any CDN are
+     * told to revalidate rather than refetch for the same window. The document
+     * carries its own generation time, so Last-Modified is honest whether it
+     * was served from the cache or built just now.
+     */
+    private function xml(SitemapDocument $document): Response
     {
-        $response = $this->getResponse();
-        $response->setContent($body);
-        $headers = $response->getHeaders();
-        $headers->addHeaderLine('Content-Type', 'application/xml; charset=utf-8');
-        $headers->addHeaderLine('X-Robots-Tag', 'noindex'); // don't index the sitemap file itself
-
-        // The XML is already file-cached server-side; let crawlers and any
-        // CDN revalidate instead of refetching for the same window.
+        $headers = ['Last-Modified' => $document->lastModifiedHeader()];
         $ttl = $this->ttl();
         if ($ttl > 0) {
-            $headers->addHeaderLine('Cache-Control', 'public, max-age=' . $ttl);
+            $headers['Cache-Control'] = 'public, max-age=' . $ttl;
         }
-        $lastModified = $this->generator->lastModified();
-        if ($lastModified !== null) {
-            $headers->addHeaderLine('Last-Modified', gmdate('D, d M Y H:i:s', $lastModified) . ' GMT');
-        }
-        return $response;
+        return $this->respond($document->xml, 'application/xml; charset=utf-8', 200, $headers);
     }
 
     private function text(string $body): Response
     {
-        $response = $this->getResponse();
-        $response->setContent($body);
-        $response->getHeaders()->addHeaderLine('Content-Type', 'text/plain; charset=utf-8');
-        return $response;
+        // robots.txt is a directive file, not a document: no X-Robots-Tag.
+        return $this->respond($body, 'text/plain; charset=utf-8', 200, [], false);
     }
 
     private function notFound(): Response
     {
-        $response = $this->getResponse();
-        $response->setStatusCode(404);
-        return $response;
+        return $this->respondWithStatus(404);
     }
 }

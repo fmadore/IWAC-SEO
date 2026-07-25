@@ -37,6 +37,15 @@ class Hreflang
     /** @var array<int,array<string,string>> each row: [siteSlug => pageSlug] */
     private array $pagePairs;
 
+    /**
+     * Pair rows indexed for lookup, built once in the constructor: a page
+     * render used to linear-scan the whole map (33 rows at IWAC) to answer
+     * "which row mentions this page?".
+     *
+     * @var array<string,array<string,array<string,string>>> siteSlug => pageSlug => row
+     */
+    private array $pairIndex = [];
+
     /** @param array<string,mixed> $config the iwac_seo.hreflang block */
     public function __construct(array $config)
     {
@@ -46,6 +55,16 @@ class Hreflang
         $this->xDefaultSlug = isset($config['x_default']) ? (string) $config['x_default'] : null;
         $pairs = $config['page_pairs'] ?? [];
         $this->pagePairs = is_array($pairs) ? $pairs : [];
+
+        foreach ($this->pagePairs as $pair) {
+            if (!is_array($pair)) {
+                continue;
+            }
+            foreach ($pair as $siteSlug => $pageSlug) {
+                // First row wins, matching the previous linear scan.
+                $this->pairIndex[(string) $siteSlug][(string) $pageSlug] ??= $pair;
+            }
+        }
     }
 
     /** Only meaningful with at least two configured sites. */
@@ -78,12 +97,8 @@ class Hreflang
         }
         $out = [];
         foreach ($this->sites as $slug => $lang) {
-            try {
-                $href = $resource->siteUrl($slug, true);
-            } catch (\Throwable $e) {
-                continue;
-            }
-            if ($href) {
+            $href = ResourceUrl::forSite($resource, (string) $slug);
+            if ($href !== null) {
                 $out[] = ['lang' => (string) $lang, 'href' => $href, 'slug' => (string) $slug];
             }
         }
@@ -140,13 +155,7 @@ class Hreflang
      */
     public function coveredSlugs(string $siteSlug): array
     {
-        $out = [];
-        foreach ($this->pagePairs as $pair) {
-            if (is_array($pair) && isset($pair[$siteSlug])) {
-                $out[(string) $pair[$siteSlug]] = true;
-            }
-        }
-        return array_keys($out);
+        return array_keys($this->pairIndex[$siteSlug] ?? []);
     }
 
     /**
@@ -156,11 +165,6 @@ class Hreflang
      */
     private function pairFor(string $siteSlug, string $pageSlug): ?array
     {
-        foreach ($this->pagePairs as $pair) {
-            if (is_array($pair) && ($pair[$siteSlug] ?? null) === $pageSlug) {
-                return $pair;
-            }
-        }
-        return null;
+        return $this->pairIndex[$siteSlug][$pageSlug] ?? null;
     }
 }

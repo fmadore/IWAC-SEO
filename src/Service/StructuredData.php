@@ -48,8 +48,7 @@ class StructuredData
         ?string $canonical,
         ?string $image
     ): ?array {
-        $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
-        $type = $this->classTypes[$classId] ?? $this->defaultType;
+        $type = $this->classTypes[ResourceUrl::classId($resource)] ?? $this->defaultType;
 
         $data = [
             '@context' => 'https://schema.org',
@@ -351,10 +350,9 @@ class StructuredData
                 $linked = $value->valueResource();
                 if ($linked) {
                     $node = ['@type' => $type, 'name' => (string) $linked->displayTitle()];
-                    try {
-                        $node['url'] = $linked->siteUrl($site->slug(), true);
-                    } catch (\Throwable $e) {
-                        // no url
+                    $url = ResourceUrl::forSite($linked, $site->slug());
+                    if ($url !== null) {
+                        $node['url'] = $url;
                     }
                     $out[$node['name']] = $node;
                 } else {
@@ -383,13 +381,10 @@ class StructuredData
         }
         $linked = $value->valueResource();
         if ($linked) {
-            $url = null;
-            try {
-                $url = $linked->siteUrl($site->slug(), true);
-            } catch (\Throwable $e) {
-                // ignore
-            }
-            return ['name' => (string) $linked->displayTitle(), 'url' => $url];
+            return [
+                'name' => (string) $linked->displayTitle(),
+                'url'  => ResourceUrl::forSite($linked, $site->slug()),
+            ];
         }
         $name = trim(strip_tags((string) $value));
         return $name !== '' ? ['name' => $name, 'url' => null] : null;

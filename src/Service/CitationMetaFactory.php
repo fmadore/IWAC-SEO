@@ -10,10 +10,6 @@ final class CitationMetaFactory implements FactoryInterface
 {
     public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): CitationMeta
     {
-        $config = $container->get('Config')['iwac_seo']['citation'] ?? [];
-        return new CitationMeta(
-            $config['class_kinds'] ?? [],
-            $config['default_kind'] ?? 'item',
-        );
+        return new CitationMeta($container->get(CitationKindMap::class));
     }
 }

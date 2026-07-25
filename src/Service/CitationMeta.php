@@ -42,36 +42,30 @@ class CitationMeta
 {
     use ResourceValueReader;
 
-    /** Kinds that are descriptive authority records, not citable works → Dublin Core only. */
-    private const ENTITY_KINDS = ['person', 'place', 'organization', 'event', 'subject'];
-
     /**
-     * Kinds with no Highwire container tag, typed instead via DC.type (a Zotero
-     * item-type id). kind => Zotero type id.
+     * Kinds with no Highwire container tag, typed instead through DC.type
+     * (carrying the kind's Zotero item-type id — see CitationKind).
+     *
+     * Fieldwork photographs (class 58) are publicly discoverable since
+     * IwacSearch 3.3.0; without the override they captured as a generic
+     * document. Books (authored + edited volumes) carry no Highwire container
+     * tag either, so the Embedded Metadata translator would default them to
+     * journalArticle; citation_publisher is not a container tag, so this
+     * override wins and Zotero captures a "book" (with editors, for an edited
+     * volume).
      */
-    private const DC_TYPE_OVERRIDES = [
-        'newspaper'     => 'newspaperArticle',
-        'magazine'      => 'magazineArticle',
-        'post'          => 'blogPost',
-        'av'            => 'videoRecording',
-        'communication' => 'presentation',
-        // Fieldwork photographs (class 58) — publicly discoverable since
-        // IwacSearch 3.3.0; without this they captured as a generic document.
-        'photo'         => 'artwork',
-        // Books (authored + edited volumes) carry no Highwire container tag, so
-        // the Embedded Metadata translator would default them to journalArticle.
-        // citation_publisher is not a container tag, so this DC.type override
-        // wins — Zotero captures a "book" (with editors, for an edited volume).
-        'book'          => 'book',
+    private const DC_TYPE_OVERRIDE_KINDS = [
+        CitationKind::Newspaper,
+        CitationKind::Magazine,
+        CitationKind::Post,
+        CitationKind::Av,
+        CitationKind::Communication,
+        CitationKind::Photo,
+        CitationKind::Book,
     ];
 
-    /**
-     * @param array<int,string> $classKinds resource class id => citation kind
-     */
-    public function __construct(
-        private readonly array $classKinds,
-        private readonly string $defaultKind = 'item',
-    ) {
+    public function __construct(private readonly CitationKindMap $kinds)
+    {
     }
 
     public function apply(
@@ -81,13 +75,13 @@ class CitationMeta
         ?string $canonical
     ): void {
         $headMeta = $view->headMeta();
-        $kind = $this->classKinds[$classId] ?? $this->defaultKind;
+        $kind = $this->kinds->forClassId($classId);
 
         // Dublin Core for every resource.
         $this->dublinCore($headMeta, $resource, $canonical);
 
         // Highwire only for citable works.
-        if (!in_array($kind, self::ENTITY_KINDS, true)) {
+        if (!$kind->isAuthorityRecord()) {
             $this->highwire($headMeta, $resource, $kind, $canonical);
         }
     }
@@ -97,7 +91,7 @@ class CitationMeta
     private function highwire(
         \Laminas\View\Helper\HeadMeta $headMeta,
         AbstractResourceEntityRepresentation $resource,
-        string $kind,
+        CitationKind $kind,
         ?string $canonical
     ): void {
         $this->single($headMeta, 'citation_title', $this->firstString($resource, ['dcterms:title']));
@@ -139,33 +133,33 @@ class CitationMeta
         $lastPage = $this->firstString($resource, ['bibo:pageEnd']);
 
         switch ($kind) {
-            case 'article':   // journal article
-            case 'review':    // book review (published in a journal)
+            case CitationKind::Article:   // journal article
+            case CitationKind::Review:    // book review (published in a journal)
                 $this->single($headMeta, 'citation_journal_title', $container);
                 $this->single($headMeta, 'citation_volume', $this->firstString($resource, ['bibo:volume']));
                 $this->single($headMeta, 'citation_issue', $this->firstString($resource, ['bibo:issue']));
                 $this->single($headMeta, 'citation_firstpage', $firstPage);
                 $this->single($headMeta, 'citation_lastpage', $lastPage);
                 break;
-            case 'chapter':
+            case CitationKind::Chapter:
                 // IWAC stores the book title in dcterms:alternative.
                 $this->single($headMeta, 'citation_inbook_title', $this->firstString($resource, ['dcterms:alternative']));
                 $this->single($headMeta, 'citation_publisher', $container);
                 $this->single($headMeta, 'citation_firstpage', $firstPage);
                 $this->single($headMeta, 'citation_lastpage', $lastPage);
                 break;
-            case 'book':
+            case CitationKind::Book:
                 $this->single($headMeta, 'citation_publisher', $container);
                 break;
-            case 'thesis':
+            case CitationKind::Thesis:
                 $this->single($headMeta, 'citation_dissertation_institution', $container);
                 break;
-            case 'report':
+            case CitationKind::Report:
                 $this->single($headMeta, 'citation_technical_report_institution', $container);
                 break;
-            case 'newspaper':
-            case 'magazine':
-            case 'post':
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+            case CitationKind::Post:
                 // No Highwire container tag (it would force journalArticle). The
                 // Zotero type is set via DC.type below; the publication name
                 // travels through prism.publicationName → publicationTitle.
@@ -180,8 +174,9 @@ class CitationMeta
         // overwrites the generic class-label DC.type set in dublinCore();
         // because no citation_* container tag is present for these kinds, the
         // Embedded Metadata translator's RDF backend honours DC.type.
-        if (isset(self::DC_TYPE_OVERRIDES[$kind])) {
-            $headMeta->setName('DC.type', self::DC_TYPE_OVERRIDES[$kind]);
+        $zoteroType = $kind->zoteroItemType();
+        if ($zoteroType !== null && in_array($kind, self::DC_TYPE_OVERRIDE_KINDS, true)) {
+            $headMeta->setName('DC.type', $zoteroType);
         }
     }
 
@@ -198,8 +193,7 @@ class CitationMeta
         }
         $this->single($headMeta, 'DC.date', $this->firstString($resource, self::DATE_TERMS));
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
-        $this->single($headMeta, 'DC.type',
-            $resource->resourceClass() ? $resource->resourceClass()->label() : null);
+        $this->single($headMeta, 'DC.type', ResourceUrl::classLabel($resource));
         $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));
 
         // DC.identifier is the resource's own (canonical) URL. The DOI is

@@ -10,10 +10,6 @@ final class CitationDataFactory implements FactoryInterface
 {
     public function __invoke(ContainerInterface $container, $requestedName, ?array $options = null): CitationData
     {
-        $config = $container->get('Config')['iwac_seo']['citation'] ?? [];
-        return new CitationData(
-            $config['class_kinds'] ?? [],
-            $config['default_kind'] ?? 'item',
-        );
+        return new CitationData($container->get(CitationKindMap::class));
     }
 }

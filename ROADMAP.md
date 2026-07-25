@@ -1,104 +1,203 @@
 # IWAC SEO — Refactoring & Improvement Roadmap
 
-Outcome of a full-codebase review (v0.5.1, ~6,200 lines). The module is in good
-shape — well-documented, dependency-injected, defensively coded — so nothing
-here is a rewrite. The phases below consolidate duplication, fix small
-inconsistencies, harden the HTTP/perf story, add a handful of features, and
-put a test suite + CI underneath the code that regresses most silently (the
-citation formatting). Each phase is an independent, reviewable commit; earlier
+Outcome of a second full-codebase review (v0.6.0, 40 source files / ~6,900
+lines). The previous round — dead code, the `SiteResolver` / `SettingsReader` /
+`ResourceValueReader` consolidation, HTTP caching, the image sitemap, the
+hreflang coverage report and the first test suite — shipped in 0.6.0; see
+`CHANGELOG.md`. That work removed the *copy-paste* duplication, so this round
+is about the layer underneath it: implicit contracts, classes that carry three
+concerns, and the vocabulary that is still spelled out in seven places.
+
+Nothing here is a rewrite, and nothing here is urgent. Phases are ordered by
+risk, not by value: each is an independent, reviewable commit, and earlier
 phases never depend on later ones.
+
+> **Status: delivered in 0.7.0**, except for the one item noted below. Each
+> phase landed as its own commit; see `CHANGELOG.md` for what changed and why.
+> The plan is kept here as the record of what was found and the reasoning
+> behind each decision — including the two things it recommends *not* doing.
+>
+> **Not done:** wiring PHPStan and PHP_CodeSniffer into CI. Both are declared,
+> configured (`phpstan.neon.dist`, `phpcs.xml.dist`) and runnable via
+> `composer analyse` / `composer lint`, but neither could be installed in the
+> environment the refactor was carried out in, so neither has ever been run
+> against this codebase. Adding a CI step that has never passed locally would
+> just turn the build red. Run them once, fix what they find, then add the two
+> steps to `.github/workflows/ci.yml`.
 
 ## Phase 1 — Dead code & housekeeping *(no behaviour change)*
 
-- Remove `PageSeoStore::set()` — never called (the admin save uses
-  `replaceAll()` exclusively).
-- Remove `CitationFormatter::publisherYear()`'s `$trailingYear` parameter —
-  never passed as `false`.
-- Remove the vestigial `jsonld` per-page override from the `PageSeoStore` and
-  `HeadMetadata::applyPage()` docblocks — never written by the admin form,
-  never read.
-- Drop the unused `$view` parameter from `StructuredData::forResource()`.
-- Drop `ext-dom` from `composer.json` — all XML is string-built.
-- Introduce `Module::INTERNAL_SETTINGS` for the ping-bookkeeping keys instead
-  of two inline arrays.
-- Derive `ConfigForm`'s "everything optional" input-filter loop from the
-  form's own elements so a new field cannot be forgotten.
+- **`CitationFormatter::publisherYear()` takes an unused `$locale`.** All four
+  call sites pass it; the body never reads it. Drop the parameter.
+- **The regenerate form's action is set twice** — once in
+  `SeoController::dashboardAction()` (line 61) and again in
+  `dashboard.phtml` (line 103). Keep the controller's; the view should just
+  render what it is handed.
+- **`HeadMetadata::applyGlobals()` accepts `?SiteRepresentation`** but
+  `Module::handleLayout()` returns early when there is no site, so the null
+  branch inside is unreachable. Tighten the signature and delete the branch.
+- **`HeadMetadata::setOpenGraph()` tests `$content === null`** on a parameter
+  typed `array<string,string>`; the `''` check is the one that fires.
+- **`method_exists($x, 'isPublic')` guards on already-typed representations**
+  (`CitationController:82`, `UnapiController:103`, `SeoController:93`,
+  `ResourceValueReader:146`) are always true. Keep the guard only in
+  `Module::handleContentChange()`, where the value really is an untyped
+  `object` off the API response.
+- **`.gitattributes` under-ignores.** Only `.gitattributes` and `.gitignore`
+  are `export-ignore`d, so `composer archive` / release tarballs ship
+  `tests/`, `.github/`, `phpunit.xml.dist` and this file. Add them.
+- **`language/template.pot` is stale.** 30 msgids against ~80 translatable
+  strings — every one of `ConfigForm`'s 29 labels and info texts is missing —
+  and no `.po`/`.mo` ships at all, on a deployment whose primary audience is
+  francophone. Regenerate the template and add a `fr` catalogue.
 
-## Phase 2 — Consolidation *(no behaviour change)*
+## Phase 2 — Deduplication *(no behaviour change)*
 
-- **`SiteResolver` service** — one implementation of "default site → first
-  site" resolution plus the canonical host URL, with a per-request cache.
-  Replaces four copies: `Module::defaultSiteSlug()`,
-  `SitemapController::resolveSite()`, `CitationController::defaultSiteSlug()`,
-  `SeoController::resolveSite()` (and the two duplicated `hostUrl()` helpers).
-- **`SettingsReader` trait** — one `boolSetting()` / `stringSetting()` shared
-  by `HeadMetadata`, the three public controllers and the admin controller,
-  replacing three identical copies and three subtly different inline variants.
-- **Extend `ResourceValueReader`** with the helpers still duplicated across
-  the citation services: `cote()`, `doi()`, `pdfUrl()`, `clip()`,
-  `isOrganizationClass()`, plus shared `DATE_TERMS` / `ABSTRACT_TERMS`
-  constants for the repeated property lists.
-- **`StructuredData` adopts the trait** — its private `firstLiteral()`,
-  `firstValueLabel()` and `valueLabels()` are re-implementations of the
-  trait's `firstString()`, `firstLabel()` and `labels()`.
-- **Single ping flood-cap constant** — `PingSearchEngines` references
-  `Module::PING_QUEUE_CAP` instead of shadowing it with its own `FLOOD_CAP`.
+- **`classId()`** — `$r->resourceClass() ? $r->resourceClass()->id() : null`
+  appears eight times (plus twice more for `->label()`), including in the two
+  controllers and the view helper that do not use `ResourceValueReader`. One
+  helper, reachable from all three layers.
+- **Guarded canonical URLs** — seven copies of
+  `try { $r->siteUrl($slug, true); } catch (\Throwable) { null; }` across
+  `Hreflang`, `HeadMetadata` (×2), `StructuredData` (×2), `CitationController`,
+  `View\Helper\Citation` and `Module`. Extract
+  `ResourceUrl::forSite($resource, $slug): ?string`.
+- **Page range, twice** — `CitationData::pageRange(array $record)` (static,
+  record-based) and `ZoteroRdf::pageRange(ItemRepresentation)` encode the same
+  first/last/single rule. Put the rule in the trait and have both call it.
+- **One citation vocabulary, seven tables.** `ENTITY_KINDS` is duplicated
+  verbatim in `CitationData` and `CitationMeta`; `CSL_TYPE`, `BIBTEX_TYPE`,
+  `RIS_TYPE`, `ZOTERO_TYPE`, `BIB_TYPE`, `DC_TYPE_OVERRIDES`, `PART_KINDS` and
+  `ELIGIBLE_KINDS` are each a facet of the same closed set of ~14 kinds, spread
+  over five classes. A `CitationKind` enum (PHP 8.2 is already the floor) that
+  owns *is this an authority record*, *is this a part-of work*, and the four
+  export-type mappings would make an unmapped kind a compile-time-ish error
+  instead of a silent `?? 'misc'`.
+- **Kind lookup, four times** — `$classKinds[$classId] ?? $default` lives in
+  `CitationData::kind()`, `CitationMeta::apply()` and `ZoteroRdf` (twice), fed
+  by four separate factories that each re-read
+  `Config['iwac_seo']['citation']`. Note the drift this already allows:
+  `ZoteroRdf` uses `?? null`, the others `?? 'item'`. Harmless today only
+  because `'item'` is not an eligible kind. Inject one `CitationKindMap`
+  service instead of threading the raw array + default through four factories.
+- **Locale resolution, twice** — `HeadMetadata::locale()` and
+  `View\Helper\Citation::locale()` are the same workaround for `lang` being a
+  `__call` helper, carrying the same explanatory comment about the bug it
+  fixed. Extract it once; the comment is worth keeping in one place.
+- **Controller response plumbing** — `status()`, `notFound()`, `text()`,
+  `xml()`, `body()` and `fileResponse()` are hand-rolled across the three
+  public controllers. One `Concern\SendsResponses` trait.
 
-## Phase 3 — Correctness fixes
+## Phase 3 — Design & modularity
 
-- Emit `og:locale` through the same `language_TERRITORY` mapping already used
-  for `og:locale:alternate` (currently a bare `fr` can slip through).
-- Validate the IndexNow key in `ConfigForm` against the route's
-  `[A-Fa-f0-9]{8,128}` constraint, and warn on the dashboard when a stored key
-  can never be served — today a non-hex key fails silently.
-- Stamp the ping throttle (`iwac_seo_ping_last`) only after a successful job
-  dispatch, so a failed dispatch doesn't burn the 15-minute window.
-- Document the *deliberate* difference in description-source ordering (meta
-  description prefers `bibo:shortDescription`, citations prefer
-  `dcterms:abstract`) so a future cleanup doesn't "unify" it by accident.
+- **`SettingsReader` depends on an undeclared property.** The trait reads
+  `$this->settings`, which nothing in the trait declares — an implicit contract
+  PHP only enforces at call time, and one a factory cannot satisfy at all.
+  That is exactly why `ViewHelper\CitationFactory` re-implements the truthiness
+  rule inline, with a comment saying it must stay in sync. Replace the trait
+  with a small injectable `SettingsGate` (`isOn()`, `text()`) registered in the
+  service manager, so controllers, `HeadMetadata` *and* factories share one
+  object and one definition of "on".
+- **Move the IndexNow queue out of `Module`.** `handleContentChange()` is ~65
+  lines of business logic — cache invalidation, visibility policy, dedupe,
+  queue cap, throttle stamping, job dispatch — living in the bootstrap class,
+  and `Module::PING_QUEUE_CAP` is `public` solely so `PingSearchEngines` can
+  read it (the docblock says as much). A `PingQueue` service would own the cap
+  and the throttle, `Module` would keep only the listener wiring, the job would
+  ask the service to drain, and the whole thing would become unit-testable.
+- **There is no `Module::upgrade()`.** Install applies `DEFAULTS`, uninstall
+  drops `SETTINGS`, but Omeka's upgrade hook is unimplemented — so any default
+  added after a site's first install (`iwac_seo_sitemap_ttl` and
+  `iwac_seo_noindex_browse` both arrived after 0.1) is never applied to an
+  existing instance. An idempotent "set the DEFAULTS that are still null" is
+  five lines and closes the gap for good.
+- **Split `SitemapGenerator` (524 lines, three concerns).** It is
+  simultaneously a DBAL repository (four queries), an XML writer (pure string
+  building) and a TTL file cache. Splitting them makes the writer — the part
+  that produces the actual protocol output — unit-testable; today the sitemap
+  is the module's largest untested surface.
+- **Replace the `lastModified()` side channel.** `SitemapController` calls
+  `buildX()`, then reads mutable state back off the *shared* generator to write
+  the `Last-Modified` header. Returning a `SitemapDocument{xml, lastModified}`
+  removes the temporal coupling and the shared mutable field.
+- **Isolate `HeadMetadata`'s request state.** 540 lines and three mutable
+  fields (`$applied`, `$description`, `$defaultImage*`) on a shared service.
+  It is correct under Omeka's process-per-request model, but it is the module's
+  only piece of global mutable state and it is what makes the two-phase
+  apply/gap-fill dance hard to follow. Extract a `HeadWriter` that owns the
+  placeholder setters *and* the applied-set, leaving `HeadMetadata` as the
+  policy layer deciding what to write.
+- **Give the citation record a type.** `CitationData::build()` returns an
+  `array<string,mixed>` whose 20-key shape is documented in five docblocks and
+  enforced nowhere, then read by string key in `CitationFormatter`,
+  `CitationExport`, the view helper and the theme partial. A readonly
+  `CitationRecord` (+ `Creator` for the `{family,given,literal,isInstitution}`
+  quadruple) would collapse those docblocks into a signature. The tell that the
+  array is really an object: `pageRange()` is a *static* method on the builder,
+  called from two other classes.
+- **Separate wiring from instance data.** `config/module.config.php` is 354
+  lines, of which roughly half is IWAC-specific tables — 20 `class_types`, 19
+  `class_kinds`, 33 `page_pairs`. Moving them to `config/instance.config.php`
+  (merged in) separates "how the module is wired" from "what this archive's
+  class ids mean", and is the single change that would let another Omeka
+  instance adopt the module without editing framework wiring.
+- **`Hreflang::pairFor()` linear-scans 33 pairs on every page render.** Index
+  by `[siteSlug][pageSlug]` once in the constructor. Longer term, consider
+  moving `page_pairs` to a site setting: today adding a static page requires a
+  code deploy, and the dashboard's gap report exists precisely because that
+  drifts.
 
-## Phase 4 — Performance & HTTP caching
+## Phase 4 — Performance & correctness
 
-- `Cache-Control: public, max-age=<ttl>` + `Last-Modified` on the sitemap
-  responses so crawlers and any CDN can revalidate instead of refetching.
-- `COUNT(*)` queries for the dashboard's item-set and page counts (items
-  already count server-side; the other two fetch full row sets).
-- Skip the chunk-bound `COUNT` query when serving `sitemap-items-1.xml` —
-  chunk 1 always exists, and at IWAC's scale it is the only chunk.
-- Invalidate the sitemap cache when public content changes, so new items
-  appear in the sitemap immediately instead of after the TTL.
+- **The sitemap cache is cleared on every single content change.** A bulk
+  import of N items runs N × (`glob` + unlinks), and unlike the ping queue —
+  which has an explicit bulk guard — the invalidation has none. Debounce to
+  once per request.
+- **Sitemap cache keys are per-type, not per-site.** The docblock notes the
+  host is baked in; the site id is too, and unmentioned. Changing
+  `default_site` serves the previous site's XML until the TTL expires. Add the
+  site id to the key.
+- **`renderUrlset()` escapes `loc`, `lastmod`, alternates and images but
+  interpolates `changefreq` and `priority` raw.** Config-sourced today, so not
+  exploitable — but the asymmetry means a future config edit could emit invalid
+  XML. Escape them for consistency.
+- **`SitemapController::xml()` re-reads the TTL setting** after the generator
+  has already been given it. Pass it through.
+- **`PageSeoStore::get()` re-reads and re-decodes the whole page map** from
+  site settings on each call. Memoize per target id.
+- **Name the entity-class literals.** `'Omeka\Entity\Item'` /
+  `'Omeka\Entity\ItemSet'` appear as raw strings in five queries.
 
-## Phase 5 — Features
+## Phase 5 — Toolchain & tests
 
-- **IndexNow on removal** — also ping when an item/page is deleted or goes
-  private (engines recrawl and see the 404), not just on create/update.
-- **hreflang coverage report** — a dashboard table of public pages that have
-  no `page_pairs` entry, surfacing drift the moment a page is added or
-  renamed instead of relying on someone remembering the config map.
-- **Image sitemap entries** — `<image:image>` (the item's primary-media large
-  thumbnail) in the items sitemap for Google Images, config-gated
-  (`iwac_seo.sitemap.include_images`).
-- **Asset picker** for the share-image column of the static-page table,
-  replacing the raw asset-ID number input (feasibility-checked against
-  Omeka's admin asset sidebar; falls back to the current input if the core
-  helper can't be reused cleanly).
-- **Uninstall cleanup** — clear the sitemap cache directory on uninstall.
-
-## Phase 6 — Tests, CI & release
-
-- **PHPUnit suite** for the pure, Omeka-independent logic: `CitationFormatter`
-  (3 styles × 2 locales × the kind matrix), `CitationExport` (BibTeX escaping,
-  RIS dates, CSL-JSON date-parts), `CitationData::pageRange()`, `Hreflang`
-  pair resolution, and the text utilities (`truncate`, `extractToken`) —
-  extracted to a small static `Text` class so they are testable.
-- **GitHub Actions** — `php -l` over the module + PHPUnit on PHP 8.2/8.3/8.4.
-- **CHANGELOG.md** reconstructed from the tagged history.
-- Version bump to **0.6.0**; README updated for the new behaviour.
+- **Add static analysis.** PHPStan at level 6–7, with the documented array
+  shapes as real types, would have found the unused `$locale`, the undeclared
+  `$this->settings`, the unreachable null branches and the `?? null` /
+  `?? 'item'` divergence — every Phase 1 item, mechanically. Add a PSR-12 check
+  (PHP_CodeSniffer or php-cs-fixer) alongside it, and wire both into CI and
+  `composer.json` scripts.
+- **Close the test gaps.** 47 tests cover 6 of the 25 non-factory source files,
+  and they cover the *pure* ones. The untested surfaces that regress silently
+  are the sitemap XML writer (once split), `ZoteroRdf::render()` — verified
+  only against Zotero's translator by hand — `CitationMeta` (testable against a
+  `HeadMeta` double), and the ping queue (once extracted from `Module`).
+- **CI polish.** Cache `~/.composer/cache` between runs, and add
+  `composer validate --strict`.
+- **Add `.editorconfig`** — the codebase is uniformly 4-space / LF, but nothing
+  states it.
 
 ## Deliberately out of scope
 
-The hand-rolled citation formatter (vs a CSL processor), string-built XML
-(vs DOM/XMLWriter), the settings-based page-SEO store (vs a DB table) and the
-class-id dispatch maps are all justified, documented trade-offs for a
-self-contained, vendor-free module — replacing them would add complexity, not
-remove it.
+Unchanged from the previous round, and still right: the hand-rolled citation
+formatter (vs a CSL processor), string-built XML (vs DOM/XMLWriter), the
+settings-backed page-SEO store (vs a database table) and class-id dispatch (vs
+resource templates) are justified, documented trade-offs for a self-contained,
+vendor-free module.
+
+One addition. `CitationFormatter`'s three ~95-line style methods share a
+skeleton — creator, title, container, link — and each branches over the same
+kind matrix, which reads as an obvious candidate for a Strategy per style. It
+is well covered by tests, so the refactor would be safe; but the styles differ
+in *ordering* and *punctuation* at nearly every joint, and a shared skeleton
+would have to be parameterised until it was less readable than the three
+explicit methods. Leave it, unless a fourth style is ever added.

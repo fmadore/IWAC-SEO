@@ -5,6 +5,7 @@ namespace IwacSeo\Service\Controller;
 
 use IwacSeo\Controller\UnapiController;
 use IwacSeo\Service\ZoteroRdf;
+use IwacSeo\Service\SettingsGate;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 
@@ -15,7 +16,7 @@ final class UnapiControllerFactory implements FactoryInterface
         return new UnapiController(
             $container->get(ZoteroRdf::class),
             $container->get('Omeka\ApiManager'),
-            $container->get('Omeka\Settings'),
+            $container->get(SettingsGate::class),
         );
     }
 }

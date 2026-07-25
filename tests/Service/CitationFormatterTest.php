@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Service;
 
 use IwacSeo\Service\CitationFormatter;
+use IwacSeo\Service\Citation\CitationRecord;
 use PHPUnit\Framework\TestCase;
 
 final class CitationFormatterTest extends TestCase
@@ -15,10 +16,10 @@ final class CitationFormatterTest extends TestCase
         $this->formatter = new CitationFormatter();
     }
 
-    /** A record shaped like CitationData::build() output. */
-    private function record(array $overrides = []): array
+    /** A CitationData::build() record, described as the array form for brevity. */
+    private function record(array $overrides = []): CitationRecord
     {
-        return array_merge([
+        return CitationRecord::fromArray(array_merge([
             'id'        => 123,
             'kind'      => 'item',
             'cslType'   => 'document',
@@ -39,7 +40,7 @@ final class CitationFormatterTest extends TestCase
             'abstract'  => null,
             'keywords'  => [],
             'accession' => null,
-        ], $overrides);
+        ], $overrides));
     }
 
     private function person(string $given, string $family): array

@@ -3,14 +3,12 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
-use IwacSeo\Service\Concern\SettingsReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * Computes and injects every <head> SEO signal into Omeka's request-global head
@@ -26,24 +24,21 @@ use Omeka\Settings\Settings;
  *      the site-wide constants (og:site_name, verification tags, …) and
  *      gap-fills anything the first phase did not set.
  *
- * The $applied set records which signals phase 1 produced so phase 2 only fills
- * gaps and never clobbers a resource value.
+ * Which signals phase 1 produced is tracked by {@see HeadWriter}, which also
+ * performs the writes, so phase 2 only fills gaps and never clobbers a resource
+ * value. This class is the policy — what a resource, page or browse listing
+ * should say — and holds no per-request state beyond a memoised default image.
  */
 class HeadMetadata
 {
-    use SettingsReader;
-
     private const DESCRIPTION_MAX = 160;
 
-    /** @var array<string,bool> Signals already emitted this request. */
-    private array $applied = [];
-
-    private ?string $description = null;
     private ?string $defaultImageUrl = null;
     private bool $defaultImageResolved = false;
 
     public function __construct(
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
+        private readonly HeadWriter $head,
         private readonly StructuredData $structuredData,
         private readonly CitationMeta $citationMeta,
         private readonly Hreflang $hreflang,
@@ -65,47 +60,46 @@ class HeadMetadata
     ): ?string {
         $title = (string) $resource->displayTitle();
         $description = $this->resourceDescription($resource, $site);
-        $canonical = $this->absoluteResourceUrl($resource, $site);
+        $canonical = ResourceUrl::forSite($resource, $site->slug());
         $image = $this->resourceImage($view, $resource);
 
-        $this->setOpenGraph($view, [
+        $this->head->openGraph($view, [
             'og:type'  => 'article',
             'og:title' => $title,
             'og:url'   => $canonical,
         ]);
         if ($description !== null) {
-            $this->setDescription($view, $description);
-            $this->setOpenGraph($view, ['og:description' => $description]);
+            $this->head->description($view, $description);
+            $this->head->openGraph($view, ['og:description' => $description]);
         }
         if ($canonical !== null) {
-            $this->setCanonical($view, $canonical);
+            $this->head->canonical($view, $canonical);
         }
         if ($image !== null) {
-            $this->setImage($view, $image);
+            $this->head->image($view, $image);
         }
-        $this->markApplied('og:title');
+        $this->head->mark('og:title');
 
         if ($this->jsonLdEnabled()) {
             $data = $this->structuredData->forResource($resource, $site, $canonical, $image);
             if ($data !== null) {
-                $this->addJsonLd($view, $data);
+                $this->head->jsonLd($view, $data);
             }
             $breadcrumb = $this->structuredData->breadcrumb($view, $resource, $site, $canonical);
             if ($breadcrumb !== null) {
-                $this->addJsonLd($view, $breadcrumb);
+                $this->head->jsonLd($view, $breadcrumb);
             }
         }
 
         // Highwire Press + Dublin Core <meta> so Zotero / Google Scholar capture
         // the page as a reference.
-        if ($this->boolSetting('iwac_seo_citation_meta', true)) {
-            $classId = $resource->resourceClass() ? $resource->resourceClass()->id() : null;
-            $this->citationMeta->apply($view, $resource, $classId, $canonical);
+        if ($this->settings->isOn('iwac_seo_citation_meta', true)) {
+            $this->citationMeta->apply($view, $resource, ResourceUrl::classId($resource), $canonical);
         }
 
         // Bilingual: link this item to its counterpart on the other-language
         // site (the same o:id, different site slug).
-        $this->emitAlternates($view, $this->hreflang->forResource($resource));
+        $this->alternates($view, $this->hreflang->forResource($resource));
 
         // unAPI discovery for primary-source items. Advertise a Zotero-RDF
         // endpoint so the Zotero Connector imports the rich record (call number,
@@ -114,8 +108,8 @@ class HeadMetadata
         // Returns the <abbr class="unapi-id"> element to echo in the page body.
         if ($canonical !== null
             && $resource instanceof ItemRepresentation
-            && $this->boolSetting('iwac_seo_unapi', true)
-            && $this->zoteroRdf->isEligible($resource->resourceClass() ? $resource->resourceClass()->id() : null)
+            && $this->settings->isOn('iwac_seo_unapi', true)
+            && $this->zoteroRdf->isEligible(ResourceUrl::classId($resource))
         ) {
             $view->headLink([
                 'rel'   => 'unapi-server',
@@ -143,8 +137,8 @@ class HeadMetadata
         array $overrides,
         bool $isHomepage
     ): void {
-        $canonical = $page->siteUrl($site->slug(), true);
-        $this->setCanonical($view, $canonical);
+        $canonical = ResourceUrl::forSite($page, $site->slug());
+        $this->head->canonical($view, $canonical);
 
         $title = isset($overrides['title']) && $overrides['title'] !== ''
             ? $overrides['title']
@@ -153,15 +147,14 @@ class HeadMetadata
         // first so the page's default title segment is replaced, not appended);
         // the theme appends the site + installation suffix afterwards.
         if (isset($overrides['title']) && $overrides['title'] !== '') {
-            $view->headTitle()->getContainer()->exchangeArray([]);
-            $view->headTitle()->append($overrides['title']);
+            $this->head->title($view, (string) $overrides['title']);
         }
 
         $description = isset($overrides['description']) && $overrides['description'] !== ''
             ? $this->truncate($overrides['description'])
             : null;
         if ($description !== null) {
-            $this->setDescription($view, $description);
+            $this->head->description($view, $description);
         }
 
         $image = null;
@@ -169,28 +162,28 @@ class HeadMetadata
             $image = $this->assetUrl($view, (int) $overrides['image']);
         }
         if ($image !== null) {
-            $this->setImage($view, $image);
+            $this->head->image($view, $image);
         }
 
-        $this->setOpenGraph($view, array_filter([
+        $this->head->openGraph($view, array_filter([
             'og:type'        => 'website',
             'og:title'       => $title,
             'og:url'         => $canonical,
             'og:description' => $description,
         ], static fn ($v) => $v !== null && $v !== ''));
-        $this->markApplied('og:title');
+        $this->head->mark('og:title');
 
         if (!empty($overrides['robots'])) {
-            $this->setRobots($view, (string) $overrides['robots']);
+            $this->head->robots($view, (string) $overrides['robots']);
         }
 
         if ($isHomepage && $this->jsonLdEnabled()) {
-            $this->addJsonLd($view, $this->structuredData->webSite($view, $site));
+            $this->head->jsonLd($view, $this->structuredData->webSite($view, $site));
         }
 
         // Bilingual: link this static page to its translated counterpart on the
         // other-language site (resolved from the configured page-slug map).
-        $this->emitAlternates($view, $this->hreflang->forPage($view, $page, $site));
+        $this->alternates($view, $this->hreflang->forPage($view, $page, $site));
     }
 
     // ─── Phase 1: browse / search listing pages ─────────────────────────────
@@ -201,160 +194,90 @@ class HeadMetadata
         // variants from looking like duplicate content while staying safe for
         // paginated pages (no collapsing page 2 onto page 1).
         $current = $view->serverUrl(true);
-        $this->setCanonical($view, $current);
+        $this->head->canonical($view, $current);
 
         // Only noindex faceted / paginated / sorted variants (which carry a
         // query string). Clean landing pages stay indexable — crucially the
         // item-set pages (/item-set/{id}), which are listed in the sitemap;
         // marking them noindex made Search Console reject that sitemap.
         $hasQuery = ((string) (parse_url($current, PHP_URL_QUERY) ?? '')) !== '';
-        if ($hasQuery && $this->boolSetting('iwac_seo_noindex_browse')) {
-            $this->setRobots($view, 'noindex, follow');
+        if ($hasQuery && $this->settings->isOn('iwac_seo_noindex_browse')) {
+            $this->head->robots($view, 'noindex, follow');
         }
     }
 
     // ─── Phase 2: site-wide constants + gap-fill (view.layout) ──────────────
 
-    public function applyGlobals(PhpRenderer $view, ?SiteRepresentation $site): void
+    public function applyGlobals(PhpRenderer $view, SiteRepresentation $site): void
     {
         $headMeta = $view->headMeta();
 
         // Master noindex (staging) overrides everything.
-        if ($this->boolSetting('iwac_seo_noindex_site')) {
-            $this->setRobots($view, 'noindex, nofollow', true);
+        if ($this->settings->isOn('iwac_seo_noindex_site')) {
+            $this->head->robots($view, 'noindex, nofollow', true);
         }
 
         // Verification tags — site-wide, on every public page.
-        $gsc = Text::extractToken($this->stringSetting('iwac_seo_gsc_verification'));
+        $gsc = Text::extractToken($this->settings->raw('iwac_seo_gsc_verification'));
         if ($gsc !== '') {
             $headMeta->appendName('google-site-verification', $gsc);
         }
-        $bing = Text::extractToken($this->stringSetting('iwac_seo_bing_verification'));
+        $bing = Text::extractToken($this->settings->raw('iwac_seo_bing_verification'));
         if ($bing !== '') {
             $headMeta->appendName('msvalidate.01', $bing);
         }
 
         // Open Graph / Twitter constants.
-        if ($site !== null) {
-            $headMeta->setProperty('og:site_name', $site->title());
-            // Through ogLocale() so a bare site locale ("fr") still emits the
-            // language_TERRITORY form Open Graph expects, matching the
-            // og:locale:alternate values below.
-            $headMeta->setProperty('og:locale', $this->ogLocale($this->locale($view)));
-            // Advertise the other-language site(s) as og:locale:alternate.
-            if ($this->hreflang->isEnabled()) {
-                $currentSlug = $site->slug();
-                foreach ($this->hreflang->sites() as $slug => $lang) {
-                    if ($slug !== $currentSlug) {
-                        $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
-                    }
+        $headMeta->setProperty('og:site_name', $site->title());
+        // Through ogLocale() so a bare site locale ("fr") still emits the
+        // language_TERRITORY form Open Graph expects, matching the
+        // og:locale:alternate values below.
+        $headMeta->setProperty('og:locale', $this->ogLocale(ViewLocale::resolve($view)));
+        // Advertise the other-language site(s) as og:locale:alternate.
+        if ($this->hreflang->isEnabled()) {
+            $currentSlug = $site->slug();
+            foreach ($this->hreflang->sites() as $slug => $lang) {
+                if ($slug !== $currentSlug) {
+                    $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
                 }
             }
         }
         $headMeta->appendName('twitter:card', 'summary_large_image');
-        $twitter = trim($this->stringSetting('iwac_seo_twitter_site'));
+        $twitter = $this->settings->text('iwac_seo_twitter_site');
         if ($twitter !== '') {
             $headMeta->appendName('twitter:site', $twitter);
         }
 
         // Gap-fills (only when phase 1 set nothing).
-        if (!$this->isApplied('description')) {
-            $default = trim($this->stringSetting('iwac_seo_default_description'));
+        if (!$this->head->has('description')) {
+            $default = $this->settings->text('iwac_seo_default_description');
             if ($default !== '') {
-                $this->setDescription($view, $this->truncate($default));
+                $this->head->description($view, $this->truncate($default));
             }
         }
-        if (!$this->isApplied('image')) {
+        if (!$this->head->has('image')) {
             $img = $this->resolveDefaultImage($view);
             if ($img !== null) {
-                $this->setImage($view, $img);
+                $this->head->image($view, $img);
             }
         }
-        if (!$this->isApplied('canonical')) {
-            $this->setCanonical($view, $view->serverUrl(true));
+        if (!$this->head->has('canonical')) {
+            $this->head->canonical($view, $view->serverUrl(true));
         }
-        if (!$this->isApplied('og:title')) {
+        if (!$this->head->has('og:title')) {
             // Mirror the rendered <title>'s leading segment as og/twitter title.
-            $titleParts = $view->headTitle()->getContainer()->getArrayCopy();
-            $title = $titleParts[0] ?? ($site ? $site->title() : '');
+            $title = $this->head->leadingTitle($view) ?? $site->title();
             if ($title !== '') {
-                $this->setOpenGraph($view, ['og:title' => (string) $title, 'og:type' => 'website']);
+                $this->head->openGraph($view, ['og:title' => $title, 'og:type' => 'website']);
             }
         }
         // Mirror description → og/twitter description if still missing.
-        if ($this->description !== null && !$this->isApplied('og:description')) {
-            $this->setOpenGraph($view, ['og:description' => $this->description]);
+        $written = $this->head->writtenDescription();
+        if ($written !== null && !$this->head->has('og:description')) {
+            $this->head->openGraph($view, ['og:description' => $written]);
         }
-        if (!$this->isApplied('og:url')) {
+        if (!$this->head->has('og:url')) {
             $headMeta->setProperty('og:url', $view->serverUrl(true));
-        }
-    }
-
-    // ─── Low-level setters (track what was applied) ─────────────────────────
-
-    public function setDescription(PhpRenderer $view, string $description): void
-    {
-        $view->headMeta()->setName('description', $description);
-        // Twitter reads og:description, but set the explicit one too for clarity.
-        $view->headMeta()->appendName('twitter:description', $description);
-        $this->description = $description;
-        $this->markApplied('description');
-    }
-
-    public function setCanonical(PhpRenderer $view, ?string $url): void
-    {
-        if ($url === null || $url === '') {
-            return;
-        }
-        $view->headLink(['rel' => 'canonical', 'href' => $url]);
-        $this->markApplied('canonical');
-    }
-
-    public function setImage(PhpRenderer $view, string $url): void
-    {
-        $this->setOpenGraph($view, ['og:image' => $url]);
-        $view->headMeta()->appendName('twitter:image', $url);
-        $this->markApplied('image');
-    }
-
-    public function setRobots(PhpRenderer $view, string $value, bool $force = false): void
-    {
-        if (!$force && $this->isApplied('robots')) {
-            return;
-        }
-        $view->headMeta()->setName('robots', $value);
-        $this->markApplied('robots');
-    }
-
-    /** @param array<string,string> $tags og property => content */
-    public function setOpenGraph(PhpRenderer $view, array $tags): void
-    {
-        $headMeta = $view->headMeta();
-        foreach ($tags as $property => $content) {
-            if ($content === '' || $content === null) {
-                continue;
-            }
-            $headMeta->setProperty($property, $content);
-            // Twitter falls back to og:* for most fields; mirror title only.
-            if ($property === 'og:title') {
-                $headMeta->appendName('twitter:title', $content);
-            }
-            $this->markApplied($property);
-        }
-    }
-
-    /** @param array<mixed> $data A JSON-LD document. */
-    public function addJsonLd(PhpRenderer $view, array $data): void
-    {
-        // application/ld+json must not be wrapped in the JS CDATA/comment guard
-        // HeadScript adds for inline scripts; disable it (HTML5 needs no guard).
-        $view->headScript()->setAutoEscape(false);
-        $json = json_encode(
-            $data,
-            JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_PRETTY_PRINT
-        );
-        if ($json !== false) {
-            $view->headScript()->appendScript($json, 'application/ld+json');
         }
     }
 
@@ -386,7 +309,7 @@ class HeadMetadata
         // sites without needing translation here.
         $title = (string) $resource->displayTitle();
         if ($title === '') {
-            $title = $resource->resourceClass() ? $resource->resourceClass()->label() : 'Record';
+            $title = ResourceUrl::classLabel($resource) ?? 'Record';
         }
         return $this->truncate(sprintf('%s — %s', $title, $site->title()));
     }
@@ -421,24 +344,13 @@ class HeadMetadata
         return $view->serverUrl($url);
     }
 
-    private function absoluteResourceUrl(
-        AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site
-    ): ?string {
-        try {
-            return $resource->siteUrl($site->slug(), true);
-        } catch (\Throwable $e) {
-            return null;
-        }
-    }
-
     private function resolveDefaultImage(PhpRenderer $view): ?string
     {
         if ($this->defaultImageResolved) {
             return $this->defaultImageUrl;
         }
         $this->defaultImageResolved = true;
-        $assetId = (int) $this->stringSetting('iwac_seo_default_share_image');
+        $assetId = $this->settings->int('iwac_seo_default_share_image');
         if ($assetId > 0) {
             $this->defaultImageUrl = $this->assetUrl($view, $assetId);
         }
@@ -463,50 +375,12 @@ class HeadMetadata
         return Text::truncate($text, self::DESCRIPTION_MAX);
     }
 
-    private function locale(PhpRenderer $view): string
-    {
-        // `lang` is a view helper invoked via __call, so method_exists($view,
-        // 'lang') is always false — this used to pin og:locale to en_US even on
-        // the French site. Resolve it through the plugin manager.
-        $lang = 'en';
-        try {
-            $helpers = $view->getHelperPluginManager();
-            if ($helpers->has('lang')) {
-                $resolved = (string) $view->lang();
-                if ($resolved !== '') {
-                    $lang = $resolved;
-                }
-            }
-        } catch (\Throwable $e) {
-        }
-        // BCP-47 (en-US) → Open Graph locale (en_US).
-        return str_replace('-', '_', $lang) ?: 'en_US';
-    }
-
     /**
-     * Emit reciprocal hreflang alternate <link>s (plus x-default). A self link
-     * is included so each language version references the whole set, as Google
-     * requires. Skipped when there is fewer than two versions, keeping
-     * single-language pages clean.
-     *
      * @param array<int,array{lang:string,href:string,slug:string}> $alternates
      */
-    private function emitAlternates(PhpRenderer $view, array $alternates): void
+    private function alternates(PhpRenderer $view, array $alternates): void
     {
-        if (count($alternates) < 2) {
-            return;
-        }
-        $xDefaultSlug = $this->hreflang->xDefaultSlug();
-        $xDefaultHref = null;
-        foreach ($alternates as $alt) {
-            $view->headLink(['rel' => 'alternate', 'hreflang' => $alt['lang'], 'href' => $alt['href']]);
-            if ($xDefaultSlug !== null && $alt['slug'] === $xDefaultSlug) {
-                $xDefaultHref = $alt['href'];
-            }
-        }
-        if ($xDefaultHref !== null) {
-            $view->headLink(['rel' => 'alternate', 'hreflang' => 'x-default', 'href' => $xDefaultHref]);
-        }
+        $this->head->alternates($view, $alternates, $this->hreflang->xDefaultSlug());
     }
 
     /**
@@ -525,16 +399,6 @@ class HeadMetadata
 
     private function jsonLdEnabled(): bool
     {
-        return $this->boolSetting('iwac_seo_jsonld_enabled', true);
-    }
-
-    private function markApplied(string $key): void
-    {
-        $this->applied[$key] = true;
-    }
-
-    private function isApplied(string $key): bool
-    {
-        return !empty($this->applied[$key]);
+        return $this->settings->isOn('iwac_seo_jsonld_enabled', true);
     }
 }

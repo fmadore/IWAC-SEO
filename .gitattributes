@@ -13,5 +13,14 @@
 *.mo   binary
 
 # Exclude development cruft from `composer archive` / GitHub release tarballs.
-/.gitattributes export-ignore
-/.gitignore     export-ignore
+# Only the module runtime (Module.php, src/, config/, view/, asset/, language/,
+# README, CHANGELOG, LICENSE) should reach an Omeka installation.
+/.gitattributes   export-ignore
+/.gitignore       export-ignore
+/.editorconfig    export-ignore
+/.github          export-ignore
+/tests            export-ignore
+/phpunit.xml.dist export-ignore
+/phpstan.neon.dist export-ignore
+/phpcs.xml.dist   export-ignore
+/ROADMAP.md       export-ignore
