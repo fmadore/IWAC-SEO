@@ -23,7 +23,7 @@ use Omeka\Api\Representation\ItemRepresentation;
  * resource is an authority record (person / place / organisation / …), which is
  * not a citable work. Otherwise returns:
  *   [
- *     'record'       => <normalized CitationData record>,
+ *     'record'       => <CitationRecord::toArray()>,
  *     'defaultStyle' => 'chicago',
  *     'styles'       => ['chicago' => ['label'=>…, 'html'=>…], 'apa'=>…, 'mla'=>…],
  *     'downloads'    => ['bibtex' => ['url'=>…, 'label'=>…, 'ext'=>…], 'ris'=>…, …],
@@ -95,7 +95,7 @@ class Citation extends AbstractHelper
                 continue;
             }
             $downloads[$fmt] = [
-                'url'   => $view->serverUrl('/cite/' . $record['id'] . '/' . $fmt),
+                'url'   => $view->serverUrl('/cite/' . $record->id . '/' . $fmt),
                 'label' => self::FORMAT_LABELS[$fmt] ?? strtoupper($fmt),
                 'ext'   => CitationExport::FORMATS[$fmt][0],
             ];
@@ -107,7 +107,9 @@ class Citation extends AbstractHelper
         }
 
         return [
-            'record'       => $record,
+            // The theme reads the record as an array; toArray() is that
+            // published contract, and the only place the array form is built.
+            'record'       => $record->toArray(),
             'defaultStyle' => isset($styles[$this->defaultStyle]) ? $this->defaultStyle : (string) array_key_first($styles),
             'styles'       => $styles,
             'downloads'    => $downloads,

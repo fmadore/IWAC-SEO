@@ -19,20 +19,39 @@ class PageSeoStore
 {
     private const KEY = 'iwac_seo_pages';
 
+    /**
+     * The decoded map, memoised per target site. get() is called once per page
+     * render and all() once per admin table row, and each call otherwise re-read
+     * and re-decoded the whole JSON blob.
+     *
+     * @var array<int,array<string,mixed>>|null
+     */
+    private ?array $cached = null;
+
+    /** The site id $cached belongs to, so a switch invalidates it. */
+    private ?int $cachedSiteId = null;
+
     public function __construct(private readonly SiteSettings $siteSettings)
     {
     }
 
     public function setSite(int $siteId): void
     {
+        if ($siteId !== $this->cachedSiteId) {
+            $this->cached = null;
+        }
+        $this->cachedSiteId = $siteId;
         $this->siteSettings->setTargetId($siteId);
     }
 
     /** @return array<int,array<string,mixed>> */
     public function all(): array
     {
+        if ($this->cached !== null) {
+            return $this->cached;
+        }
         $value = $this->siteSettings->get(self::KEY, []);
-        return is_array($value) ? $value : [];
+        return $this->cached = is_array($value) ? $value : [];
     }
 
     /** @return array<string,mixed> */
@@ -46,5 +65,6 @@ class PageSeoStore
     public function replaceAll(array $map): void
     {
         $this->siteSettings->set(self::KEY, $map);
+        $this->cached = $map;
     }
 }

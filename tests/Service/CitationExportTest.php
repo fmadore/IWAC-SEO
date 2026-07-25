@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Service;
 
 use IwacSeo\Service\CitationExport;
+use IwacSeo\Service\Citation\CitationRecord;
 use PHPUnit\Framework\TestCase;
 
 final class CitationExportTest extends TestCase
@@ -15,9 +16,9 @@ final class CitationExportTest extends TestCase
         $this->export = new CitationExport();
     }
 
-    private function record(array $overrides = []): array
+    private function record(array $overrides = []): CitationRecord
     {
-        return array_merge([
+        return CitationRecord::fromArray(array_merge([
             'id'        => 123,
             'kind'      => 'newspaper',
             'cslType'   => 'article-newspaper',
@@ -40,7 +41,7 @@ final class CitationExportTest extends TestCase
             'abstract'  => 'Un résumé.',
             'keywords'  => ['Islam', 'Côte d\'Ivoire'],
             'accession' => 'iwac-article-0000123',
-        ], $overrides);
+        ], $overrides));
     }
 
     public function testUnknownFormatReturnsNull(): void

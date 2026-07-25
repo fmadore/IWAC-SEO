@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service\Concern;
 
+use IwacSeo\Service\Citation\CitationRecord;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -157,25 +158,13 @@ trait ResourceValueReader
     }
 
     /**
-     * Join a first/last page pair into a citation page range: "185-209", a
-     * single page when they match or only one is present, else null. The rule
-     * is shared by the record builder and the Zotero-RDF serialiser.
+     * The resource's citation page range, read from bibo:pageStart/pageEnd.
+     * The join rule itself belongs to the record, so a page range reads the
+     * same whether it came from a resource or from a built citation.
      */
-    private static function joinPageRange(?string $first, ?string $last): ?string
-    {
-        if ($first === null && $last === null) {
-            return null;
-        }
-        if ($first !== null && $last !== null && $last !== $first) {
-            return $first . '-' . $last;
-        }
-        return $first ?? $last;
-    }
-
-    /** The resource's citation page range, read from bibo:pageStart/pageEnd. */
     private function pageRange(AbstractResourceEntityRepresentation $resource): ?string
     {
-        return self::joinPageRange(
+        return CitationRecord::joinPages(
             $this->firstString($resource, ['bibo:pageStart']),
             $this->firstString($resource, ['bibo:pageEnd'])
         );

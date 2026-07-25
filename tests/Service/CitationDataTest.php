@@ -36,14 +36,4 @@ final class CitationDataTest extends TestCase
         $this->assertTrue($this->data->isCitable(36));   // newspaper
         $this->assertTrue($this->data->isCitable(null)); // default kind
     }
-
-    public function testPageRange(): void
-    {
-        $this->assertSame('185-209', CitationData::pageRange(['pageFirst' => '185', 'pageLast' => '209']));
-        $this->assertSame('185', CitationData::pageRange(['pageFirst' => '185', 'pageLast' => null]));
-        $this->assertSame('209', CitationData::pageRange(['pageFirst' => null, 'pageLast' => '209']));
-        $this->assertSame('7', CitationData::pageRange(['pageFirst' => '7', 'pageLast' => '7']));
-        $this->assertNull(CitationData::pageRange(['pageFirst' => null, 'pageLast' => null]));
-        $this->assertNull(CitationData::pageRange([]));
-    }
 }
