@@ -6,14 +6,13 @@ namespace IwacSeo\Controller;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Controller\Concern\SendsResponses;
-use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\ResourceUrl;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * /cite/:id/:format — single-item citation downloads (BibTeX, RIS, CSL-JSON).
@@ -28,13 +27,12 @@ use Omeka\Settings\Settings;
 class CitationController extends AbstractActionController
 {
     use SendsResponses;
-    use SettingsReader;
 
     public function __construct(
         private readonly CitationData $citationData,
         private readonly CitationExport $citationExport,
         private readonly ApiManager $api,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
     ) {
     }
@@ -97,7 +95,7 @@ class CitationController extends AbstractActionController
     private function enabled(): bool
     {
         // Shares the citation kill-switch with the Highwire/DC meta tags.
-        return $this->boolSetting('iwac_seo_citation_meta', true);
+        return $this->settings->isOn('iwac_seo_citation_meta', true);
     }
 
     private function fileResponse(string $content, string $contentType, string $filename): Response

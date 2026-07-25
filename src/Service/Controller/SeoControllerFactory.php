@@ -8,6 +8,7 @@ use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
+use IwacSeo\Service\SettingsGate;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 
@@ -19,7 +20,7 @@ final class SeoControllerFactory implements FactoryInterface
             $container->get(SitemapGenerator::class),
             $container->get(PageSeoStore::class),
             $container->get('Omeka\ApiManager'),
-            $container->get('Omeka\Settings'),
+            $container->get(SettingsGate::class),
             $container->get(SiteResolver::class),
             $container->get(Hreflang::class),
         );

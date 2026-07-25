@@ -4,16 +4,15 @@ declare(strict_types=1);
 namespace IwacSeo\Controller\Admin;
 
 use IwacSeo\Form\PageSeoForm;
-use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * Admin → SEO. A status dashboard (what is configured, sitemap URLs + counts,
@@ -21,13 +20,12 @@ use Omeka\Settings\Settings;
  */
 class SeoController extends AbstractActionController
 {
-    use SettingsReader;
 
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly PageSeoStore $pageSeoStore,
         private readonly ApiManager $api,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
         private readonly Hreflang $hreflang,
     ) {
@@ -37,16 +35,16 @@ class SeoController extends AbstractActionController
     {
         $site = $this->resolveSite();
         $hostUrl = $site ? $this->hostUrl($site) : '';
-        $indexNowKey = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
+        $indexNowKey = $this->settings->text('iwac_seo_indexnow_key');
 
         $view = new ViewModel([
             'site'           => $site,
-            'gscConfigured'  => trim((string) $this->settings->get('iwac_seo_gsc_verification', '')) !== '',
-            'jsonLdEnabled'  => $this->boolSetting('iwac_seo_jsonld_enabled', true),
-            'citationEnabled' => $this->boolSetting('iwac_seo_citation_meta', true),
-            'sitemapEnabled' => $this->boolSetting('iwac_seo_sitemap_enabled', true),
-            'noindexSite'    => $this->boolSetting('iwac_seo_noindex_site'),
-            'pingEnabled'    => $this->boolSetting('iwac_seo_ping_enabled'),
+            'gscConfigured'  => $this->settings->text('iwac_seo_gsc_verification') !== '',
+            'jsonLdEnabled'  => $this->settings->isOn('iwac_seo_jsonld_enabled', true),
+            'citationEnabled' => $this->settings->isOn('iwac_seo_citation_meta', true),
+            'sitemapEnabled' => $this->settings->isOn('iwac_seo_sitemap_enabled', true),
+            'noindexSite'    => $this->settings->isOn('iwac_seo_noindex_site'),
+            'pingEnabled'    => $this->settings->isOn('iwac_seo_ping_enabled'),
             'indexNowKey'    => $indexNowKey,
             // The /{key}.txt route only matches a hex key; a non-hex key can
             // never be served, so IndexNow verification would fail silently.

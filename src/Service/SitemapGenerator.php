@@ -30,6 +30,9 @@ class SitemapGenerator
     /** When the most recently served document was generated (see lastModified()). */
     private ?int $lastModified = null;
 
+    /** Whether clearCache() has already run this request (see clearCache()). */
+    private bool $cleared = false;
+
     /**
      * @param array<string,mixed> $config the 'iwac_seo.sitemap' config block
      * @param string|null $fileBaseUri the file store's public base URI
@@ -276,11 +279,21 @@ class SitemapGenerator
         return max(1, (int) ceil($this->countItems($siteId) / $this->chunkSize()));
     }
 
+    /**
+     * Drop every cached document.
+     *
+     * Debounced per request: the API listener calls this on every content
+     * change, so a bulk import of N items would otherwise run N glob-and-unlink
+     * cycles to achieve what the first one already did. The flag is reset
+     * whenever a document is written back to the cache, so a later clear in the
+     * same request still takes effect.
+     */
     public function clearCache(): void
     {
-        if ($this->cacheDir === null || !is_dir($this->cacheDir)) {
+        if ($this->cleared || $this->cacheDir === null || !is_dir($this->cacheDir)) {
             return;
         }
+        $this->cleared = true;
         foreach (glob($this->cacheDir . '/*.xml') ?: [] as $file) {
             @unlink($file);
         }
@@ -289,6 +302,7 @@ class SitemapGenerator
     /** Clear the cache and remove the cache directory itself (uninstall). */
     public function destroyCache(): void
     {
+        $this->cleared = false; // uninstall must always sweep, debounce or not
         $this->clearCache();
         if ($this->cacheDir !== null && is_dir($this->cacheDir)) {
             @rmdir($this->cacheDir);
@@ -515,6 +529,7 @@ class SitemapGenerator
             }
             if (is_dir($this->cacheDir) && is_writable($this->cacheDir)) {
                 file_put_contents($file, $xml, LOCK_EX);
+                $this->cleared = false;
             }
         } catch (\Throwable $e) {
             // caching is best-effort

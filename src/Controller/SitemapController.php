@@ -4,14 +4,13 @@ declare(strict_types=1);
 namespace IwacSeo\Controller;
 
 use IwacSeo\Controller\Concern\SendsResponses;
-use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * Public, anonymous endpoints served at the host root (the routes fall through
@@ -27,12 +26,11 @@ use Omeka\Settings\Settings;
 class SitemapController extends AbstractActionController
 {
     use SendsResponses;
-    use SettingsReader;
 
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly SiteResolver $siteResolver,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly Hreflang $hreflang,
     ) {
     }
@@ -132,7 +130,7 @@ class SitemapController extends AbstractActionController
     public function robotsAction(): Response
     {
         $lines = ['User-agent: *'];
-        if ($this->boolSetting('iwac_seo_noindex_site')) {
+        if ($this->settings->isOn('iwac_seo_noindex_site')) {
             $lines[] = 'Disallow: /';
         } else {
             $lines[] = 'Disallow: /admin/';
@@ -152,7 +150,7 @@ class SitemapController extends AbstractActionController
 
     public function indexNowKeyAction(): Response
     {
-        $configured = trim((string) $this->settings->get('iwac_seo_indexnow_key', ''));
+        $configured = $this->settings->text('iwac_seo_indexnow_key');
         $requested = (string) $this->params()->fromRoute('key', '');
         if ($configured === '' || !hash_equals($configured, $requested)) {
             return $this->notFound();
@@ -211,12 +209,12 @@ class SitemapController extends AbstractActionController
 
     private function ttl(): int
     {
-        return (int) $this->settings->get('iwac_seo_sitemap_ttl', 86400);
+        return $this->settings->int('iwac_seo_sitemap_ttl', 86400);
     }
 
     private function sitemapEnabled(): bool
     {
-        return $this->boolSetting('iwac_seo_sitemap_enabled', true);
+        return $this->settings->isOn('iwac_seo_sitemap_enabled', true);
     }
 
     /**

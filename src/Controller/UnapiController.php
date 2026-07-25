@@ -4,14 +4,13 @@ declare(strict_types=1);
 namespace IwacSeo\Controller;
 
 use IwacSeo\Controller\Concern\SendsResponses;
-use IwacSeo\Service\Concern\SettingsReader;
 use IwacSeo\Service\ResourceUrl;
+use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * unAPI endpoint (/unapi) — serves IWAC primary-source items as Zotero RDF.
@@ -31,7 +30,6 @@ use Omeka\Settings\Settings;
 class UnapiController extends AbstractActionController
 {
     use SendsResponses;
-    use SettingsReader;
 
     /** The only format we serve; rdf_zotero is Zotero's most-preferred unAPI format. */
     private const FORMAT = 'rdf_zotero';
@@ -39,7 +37,7 @@ class UnapiController extends AbstractActionController
     public function __construct(
         private readonly ZoteroRdf $zoteroRdf,
         private readonly ApiManager $api,
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
     ) {
     }
 
@@ -120,7 +118,7 @@ class UnapiController extends AbstractActionController
 
     private function enabled(): bool
     {
-        return $this->boolSetting('iwac_seo_unapi', true);
+        return $this->settings->isOn('iwac_seo_unapi', true);
     }
 
     private function body(string $content, string $contentType, int $status = 200): Response

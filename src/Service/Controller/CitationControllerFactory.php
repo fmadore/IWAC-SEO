@@ -7,6 +7,7 @@ use IwacSeo\Controller\CitationController;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\SiteResolver;
+use IwacSeo\Service\SettingsGate;
 use Laminas\ServiceManager\Factory\FactoryInterface;
 use Psr\Container\ContainerInterface;
 
@@ -18,7 +19,7 @@ final class CitationControllerFactory implements FactoryInterface
             $container->get(CitationData::class),
             $container->get(CitationExport::class),
             $container->get('Omeka\ApiManager'),
-            $container->get('Omeka\Settings'),
+            $container->get(SettingsGate::class),
             $container->get(SiteResolver::class),
         );
     }

@@ -3,14 +3,12 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
-use IwacSeo\Service\Concern\SettingsReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
-use Omeka\Settings\Settings;
 
 /**
  * Computes and injects every <head> SEO signal into Omeka's request-global head
@@ -31,8 +29,6 @@ use Omeka\Settings\Settings;
  */
 class HeadMetadata
 {
-    use SettingsReader;
-
     private const DESCRIPTION_MAX = 160;
 
     /** @var array<string,bool> Signals already emitted this request. */
@@ -43,7 +39,7 @@ class HeadMetadata
     private bool $defaultImageResolved = false;
 
     public function __construct(
-        private readonly Settings $settings,
+        private readonly SettingsGate $settings,
         private readonly StructuredData $structuredData,
         private readonly CitationMeta $citationMeta,
         private readonly Hreflang $hreflang,
@@ -98,7 +94,7 @@ class HeadMetadata
 
         // Highwire Press + Dublin Core <meta> so Zotero / Google Scholar capture
         // the page as a reference.
-        if ($this->boolSetting('iwac_seo_citation_meta', true)) {
+        if ($this->settings->isOn('iwac_seo_citation_meta', true)) {
             $this->citationMeta->apply($view, $resource, ResourceUrl::classId($resource), $canonical);
         }
 
@@ -113,7 +109,7 @@ class HeadMetadata
         // Returns the <abbr class="unapi-id"> element to echo in the page body.
         if ($canonical !== null
             && $resource instanceof ItemRepresentation
-            && $this->boolSetting('iwac_seo_unapi', true)
+            && $this->settings->isOn('iwac_seo_unapi', true)
             && $this->zoteroRdf->isEligible(ResourceUrl::classId($resource))
         ) {
             $view->headLink([
@@ -207,7 +203,7 @@ class HeadMetadata
         // item-set pages (/item-set/{id}), which are listed in the sitemap;
         // marking them noindex made Search Console reject that sitemap.
         $hasQuery = ((string) (parse_url($current, PHP_URL_QUERY) ?? '')) !== '';
-        if ($hasQuery && $this->boolSetting('iwac_seo_noindex_browse')) {
+        if ($hasQuery && $this->settings->isOn('iwac_seo_noindex_browse')) {
             $this->setRobots($view, 'noindex, follow');
         }
     }
@@ -219,16 +215,16 @@ class HeadMetadata
         $headMeta = $view->headMeta();
 
         // Master noindex (staging) overrides everything.
-        if ($this->boolSetting('iwac_seo_noindex_site')) {
+        if ($this->settings->isOn('iwac_seo_noindex_site')) {
             $this->setRobots($view, 'noindex, nofollow', true);
         }
 
         // Verification tags — site-wide, on every public page.
-        $gsc = Text::extractToken($this->stringSetting('iwac_seo_gsc_verification'));
+        $gsc = Text::extractToken($this->settings->raw('iwac_seo_gsc_verification'));
         if ($gsc !== '') {
             $headMeta->appendName('google-site-verification', $gsc);
         }
-        $bing = Text::extractToken($this->stringSetting('iwac_seo_bing_verification'));
+        $bing = Text::extractToken($this->settings->raw('iwac_seo_bing_verification'));
         if ($bing !== '') {
             $headMeta->appendName('msvalidate.01', $bing);
         }
@@ -249,14 +245,14 @@ class HeadMetadata
             }
         }
         $headMeta->appendName('twitter:card', 'summary_large_image');
-        $twitter = trim($this->stringSetting('iwac_seo_twitter_site'));
+        $twitter = $this->settings->text('iwac_seo_twitter_site');
         if ($twitter !== '') {
             $headMeta->appendName('twitter:site', $twitter);
         }
 
         // Gap-fills (only when phase 1 set nothing).
         if (!$this->isApplied('description')) {
-            $default = trim($this->stringSetting('iwac_seo_default_description'));
+            $default = $this->settings->text('iwac_seo_default_description');
             if ($default !== '') {
                 $this->setDescription($view, $this->truncate($default));
             }
@@ -424,7 +420,7 @@ class HeadMetadata
             return $this->defaultImageUrl;
         }
         $this->defaultImageResolved = true;
-        $assetId = (int) $this->stringSetting('iwac_seo_default_share_image');
+        $assetId = $this->settings->int('iwac_seo_default_share_image');
         if ($assetId > 0) {
             $this->defaultImageUrl = $this->assetUrl($view, $assetId);
         }
@@ -491,7 +487,7 @@ class HeadMetadata
 
     private function jsonLdEnabled(): bool
     {
-        return $this->boolSetting('iwac_seo_jsonld_enabled', true);
+        return $this->settings->isOn('iwac_seo_jsonld_enabled', true);
     }
 
     private function markApplied(string $key): void

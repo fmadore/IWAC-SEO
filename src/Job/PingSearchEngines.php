@@ -3,8 +3,9 @@ declare(strict_types=1);
 
 namespace IwacSeo\Job;
 
-use IwacSeo\Module;
 use IwacSeo\Service\Pinger;
+use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\PingQueue;
 use Omeka\Job\AbstractJob;
 
 /**
@@ -14,34 +15,31 @@ use Omeka\Job\AbstractJob;
  *
  * If the queue is at the flood cap the change almost certainly came from a bulk
  * sync, so the ping is skipped — those URLs are discovered through the sitemap
- * instead, and IndexNow is reserved for genuine incremental edits.
+ * instead, and IndexNow is reserved for genuine incremental edits. The cap is
+ * PingQueue's, so the queue and its drain can no longer disagree about it.
  */
 class PingSearchEngines extends AbstractJob
 {
-
     public function perform(): void
     {
         $services = $this->getServiceLocator();
-        $settings = $services->get('Omeka\Settings');
         $logger = $services->get('Omeka\Logger');
+        $queue = $services->get(PingQueue::class);
 
-        if ((string) $settings->get('iwac_seo_ping_enabled', '0') !== '1') {
+        if (!$services->get(SettingsGate::class)->isOn('iwac_seo_ping_enabled')) {
             return;
         }
-        $key = trim((string) $settings->get('iwac_seo_indexnow_key', ''));
+        $key = $queue->key();
         if ($key === '') {
             $logger->warn('IwacSeo: IndexNow ping enabled but no key is configured.');
             return;
         }
 
-        $pending = $settings->get('iwac_seo_ping_pending', []);
-        $settings->set('iwac_seo_ping_pending', []); // claim & clear the queue
-        if (!is_array($pending) || $pending === []) {
+        $urls = $queue->drain();
+        if ($urls === []) {
             return;
         }
-
-        $urls = array_values(array_unique(array_filter($pending)));
-        if (count($urls) >= Module::PING_QUEUE_CAP) {
+        if ($queue->isBulk($urls)) {
             $logger->info(sprintf(
                 'IwacSeo: skipped IndexNow ping for a bulk change (%d URLs); the sitemap covers discovery.',
                 count($urls)
@@ -49,9 +47,8 @@ class PingSearchEngines extends AbstractJob
             return;
         }
 
-        $first = $urls[0];
-        $host = (string) (parse_url($first, PHP_URL_HOST) ?: '');
-        $scheme = (string) (parse_url($first, PHP_URL_SCHEME) ?: 'https');
+        $host = (string) (parse_url($urls[0], PHP_URL_HOST) ?: '');
+        $scheme = (string) (parse_url($urls[0], PHP_URL_SCHEME) ?: 'https');
         if ($host === '') {
             return;
         }
