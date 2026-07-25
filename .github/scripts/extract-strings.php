@@ -25,7 +25,7 @@ $iterator = new RecursiveIteratorIterator(
         static function (SplFileInfo $file): bool {
             $name = $file->getFilename();
             if ($file->isDir()) {
-                return !in_array($name, ['vendor', '.git', 'node_modules', '.github'], true);
+                return !in_array($name, ['vendor', '.git', 'node_modules', '.github', 'tests'], true);
             }
             return in_array($file->getExtension(), ['php', 'phtml'], true);
         }

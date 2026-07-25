@@ -122,8 +122,8 @@ msgstr ""
 msgid "Indexing"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:116
-#: src/Controller/Admin/SeoController.php:160
+#: src/Controller/Admin/SeoController.php:114
+#: src/Controller/Admin/SeoController.php:158
 msgid "Invalid form submission."
 msgstr ""
 
@@ -143,7 +143,7 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:130
+#: src/Controller/Admin/SeoController.php:128
 msgid "No site found."
 msgstr ""
 
@@ -191,7 +191,7 @@ msgstr ""
 msgid "Ping IndexNow when content changes"
 msgstr ""
 
-#: config/module.config.php:192
+#: config/module.config.php:204
 #: view/iwac-seo/admin/seo/dashboard.phtml:28
 #: view/iwac-seo/admin/seo/pages.phtml:23
 msgid "SEO"
@@ -225,7 +225,7 @@ msgstr ""
 msgid "Sitemap"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:114
+#: src/Controller/Admin/SeoController.php:112
 msgid "Sitemap cache cleared — it will be rebuilt on the next request."
 msgstr ""
 
@@ -241,7 +241,7 @@ msgstr ""
 msgid "State"
 msgstr ""
 
-#: config/module.config.php:197
+#: config/module.config.php:209
 #: view/iwac-seo/admin/seo/dashboard.phtml:124
 msgid "Static pages"
 msgstr ""
@@ -250,7 +250,7 @@ msgstr ""
 msgid "Static-page SEO"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:157
+#: src/Controller/Admin/SeoController.php:155
 msgid "Static-page SEO saved."
 msgstr ""
 
