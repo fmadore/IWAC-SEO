@@ -8,6 +8,15 @@ declare(strict_types=1);
  *   • PHP  — a string literal on a line ending in `// @translate`
  *   • .phtml — `$this->translate('…')` / `translate("…")` calls
  *
+ * `#:` references carry the file path only, deliberately — no line numbers.
+ * With them, the template went stale whenever an edit merely *moved* a string:
+ * deleting one blank line in SeoController.php shifted six references and
+ * failed --check without a single msgid changing. Since the module is
+ * developed without PHP available, regenerating is not a local one-liner, so
+ * a gate that fires on layout rather than content costs a CI round trip every
+ * time. Paths alone keep --check meaningful — it now fails when the set of
+ * translatable strings actually changes.
+ *
  * Usage: php .github/scripts/extract-strings.php [--check]
  *   --check exits non-zero when the committed template is out of date
  *   (so CI catches a new string that was never extracted).
@@ -16,7 +25,7 @@ declare(strict_types=1);
 $root = dirname(__DIR__, 2);
 $target = $root . '/language/template.pot';
 
-/** @var array<string,string[]> msgid => ["relative/path:line", …] */
+/** @var array<string,string[]> msgid => ["relative/path", …] */
 $strings = [];
 
 $iterator = new RecursiveIteratorIterator(
@@ -40,7 +49,7 @@ foreach ($iterator as $file) {
     if ($lines === false) {
         continue;
     }
-    foreach ($lines as $i => $line) {
+    foreach ($lines as $line) {
         $found = [];
 
         // `'Some text', // @translate` — take the last literal before the marker.
@@ -65,7 +74,7 @@ foreach ($iterator as $file) {
             if (trim($value) === '') {
                 continue;
             }
-            $strings[$value][] = $relative . ':' . ($i + 1);
+            $strings[$value][] = $relative;
         }
     }
 }

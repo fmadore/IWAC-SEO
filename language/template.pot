@@ -13,304 +13,303 @@ msgstr ""
 "Language: \n"
 "Plural-Forms: nplurals=2; plural=(n != 1);\n"
 
-#: view/iwac-seo/admin/seo/pages.phtml:77
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "150–160 characters"
 msgstr ""
 
-#: src/Form/ConfigForm.php:170
+#: src/Form/ConfigForm.php
 msgid "A 8–128 character hex key you choose. The module serves it at /{key}.txt so IndexNow can verify ownership. Generate one with: openssl rand -hex 16."
 msgstr ""
 
-#: src/Form/ConfigForm.php:118
+#: src/Form/ConfigForm.php
 msgid "Adds Highwire Press (citation_*) and Dublin Core (DC.*) <meta> tags to resource pages so the Zotero Connector, Google Scholar and reference managers capture each item as a proper reference. Recommended."
 msgstr ""
 
-#: src/Form/ConfigForm.php:128
+#: src/Form/ConfigForm.php
 msgid "Adds a /unapi endpoint and discovery tags to newspaper articles, periodical issues, documents, audiovisual items and photographs. Zotero prefers unAPI over the meta tags, so it imports a richer record — the call number (Cote) from the iwac- identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. Needs “Emit citation meta tags” for the fallback. Recommended."
 msgstr ""
 
-#: src/Form/ConfigForm.php:108
+#: src/Form/ConfigForm.php
 msgid "Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:106
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Bilingual (hreflang) coverage"
 msgstr ""
 
-#: src/Form/ConfigForm.php:44
+#: src/Form/ConfigForm.php
 msgid "Bing Webmaster verification"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:58
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Citation tags (Zotero / Scholar)"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:130
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Configure defaults & verification"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:95
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Covering %1$s public items, %2$s item sets and %3$s pages."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:14
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Default (indexable)"
 msgstr ""
 
-#: src/Form/ConfigForm.php:55
+#: src/Form/ConfigForm.php
 msgid "Default meta description"
 msgstr ""
 
-#: src/Form/ConfigForm.php:65
+#: src/Form/ConfigForm.php
 msgid "Default social share image"
 msgstr ""
 
-#: src/Form/ConfigForm.php:86
+#: src/Form/ConfigForm.php
 msgid "Discourage search engines from indexing the whole site"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:127
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Edit per-page SEO"
 msgstr ""
 
-#: src/Form/ConfigForm.php:117
+#: src/Form/ConfigForm.php
 msgid "Emit citation meta tags (Zotero / Google Scholar)"
 msgstr ""
 
-#: src/Form/ConfigForm.php:107
+#: src/Form/ConfigForm.php
 msgid "Emit schema.org JSON-LD"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:108
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Every public static page has a translated counterpart in the hreflang page map."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:40
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Feature"
 msgstr ""
 
-#: src/Form/ConfigForm.php:139
+#: src/Form/ConfigForm.php
 msgid "Generates a sitemap index plus per-type child sitemaps for all public resources, and a robots.txt that points at it."
 msgstr ""
 
-#: src/Form/ConfigForm.php:31
-#: view/iwac-seo/admin/seo/dashboard.phtml:46
+#: src/Form/ConfigForm.php
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Google Search Console verification"
 msgstr ""
 
-#: src/Form/ConfigForm.php:149
+#: src/Form/ConfigForm.php
 msgid "How long a generated sitemap is cached before it is rebuilt on the next request. Default 86400 (24h). Use the “Regenerate now” button on the SEO admin page to rebuild immediately."
 msgstr ""
 
-#: src/Site/ResourcePageBlockLayout/Citation.php:28
+#: src/Site/ResourcePageBlockLayout/Citation.php
 msgid "How to cite"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:15
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Index, follow"
 msgstr ""
 
-#: src/Form/ConfigForm.php:169
+#: src/Form/ConfigForm.php
 msgid "IndexNow key"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:66
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "IndexNow ping"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:55
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Indexing"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:113
-#: src/Controller/Admin/SeoController.php:157
+#: src/Controller/Admin/SeoController.php
 msgid "Invalid form submission."
 msgstr ""
 
-#: src/Form/ConfigForm.php:97
+#: src/Form/ConfigForm.php
 msgid "Keeps faceted and paginated browse URLs out of the index (they add little and dilute crawl budget) while still letting crawlers follow links to the resource pages. Recommended."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:53
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Meta description"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:52
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Meta title"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:23
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "No"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:127
+#: src/Controller/Admin/SeoController.php
 msgid "No site found."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:16
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Noindex"
 msgstr ""
 
-#: src/Form/ConfigForm.php:96
+#: src/Form/ConfigForm.php
 msgid "Noindex filtered / paginated browse pages"
 msgstr ""
 
-#: src/Form/ConfigForm.php:160
+#: src/Form/ConfigForm.php
 msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item or page is added or edited, so it is crawled sooner. Throttled, and skipped during bulk syncs. Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:25
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Off"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:24
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "On"
 msgstr ""
 
-#: src/Form/ConfigForm.php:45
+#: src/Form/ConfigForm.php
 msgid "Optional. Paste the <meta name=\"msvalidate.01\" …> tag or its token from Bing Webmaster Tools."
 msgstr ""
 
-#: src/Form/ConfigForm.php:76
+#: src/Form/ConfigForm.php
 msgid "Optional. The site account, e.g. @ZMO_Berlin — emitted as twitter:site."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:27
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Override the title, description, share image and indexing for individual static pages. Leave a field blank to fall back to the page’s own content and the site-wide defaults set in Configure. Resource (item) pages derive their SEO automatically and are not listed here."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:51
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Page"
 msgstr ""
 
-#: src/Form/ConfigForm.php:32
+#: src/Form/ConfigForm.php
 msgid "Paste the HTML-tag snippet Google gives you (the whole <meta name=\"google-site-verification\" …> tag) or just the token. It is injected into the <head> of every public page so Google can verify ownership. Then add the site at search.google.com/search-console and submit /sitemap.xml."
 msgstr ""
 
-#: src/Form/ConfigForm.php:159
+#: src/Form/ConfigForm.php
 msgid "Ping IndexNow when content changes"
 msgstr ""
 
-#: config/module.config.php:204
-#: view/iwac-seo/admin/seo/dashboard.phtml:28
-#: view/iwac-seo/admin/seo/pages.phtml:23
+#: config/module.config.php
+#: view/iwac-seo/admin/seo/dashboard.phtml
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "SEO"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:107
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Save"
 msgstr ""
 
-#: src/Form/ConfigForm.php:138
+#: src/Form/ConfigForm.php
 msgid "Serve /sitemap.xml and /robots.txt"
 msgstr ""
 
-#: src/Form/ConfigForm.php:127
+#: src/Form/ConfigForm.php
 msgid "Serve unAPI (Zotero RDF) for primary sources"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:54
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Share image"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:32
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Site"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:33
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:80
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Sitemap"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:111
+#: src/Controller/Admin/SeoController.php
 msgid "Sitemap cache cleared — it will be rebuilt on the next request."
 msgstr ""
 
-#: src/Form/ConfigForm.php:148
+#: src/Form/ConfigForm.php
 msgid "Sitemap cache lifetime (seconds)"
 msgstr ""
 
-#: src/Form/ConfigForm.php:87
+#: src/Form/ConfigForm.php
 msgid "Staging switch. When on, every page gets robots \"noindex, nofollow\" and robots.txt disallows everything. Turn OFF in production."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:41
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "State"
 msgstr ""
 
-#: config/module.config.php:209
-#: view/iwac-seo/admin/seo/dashboard.phtml:124
+#: config/module.config.php
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Static pages"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:23
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Static-page SEO"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:154
+#: src/Controller/Admin/SeoController.php
 msgid "Static-page SEO saved."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:36
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Status"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:40
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "Switch"
 msgstr ""
 
-#: src/Form/ConfigForm.php:195
+#: src/Form/ConfigForm.php
 msgid "The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16."
 msgstr ""
 
-#: src/Form/ConfigForm.php:66
+#: src/Form/ConfigForm.php
 msgid "The og:image / Twitter card image used when a page (or an item with no media) is shared. A landscape image around 1200×630 works best."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:101
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "The sitemap is cached. Clear the cache to rebuild it immediately after a large content change."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:110
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "These public pages have no entry in the hreflang page map (iwac_seo.hreflang.page_pairs), so they are published without cross-language alternate links. Add a pair when a translation exists."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/pages.phtml:102
+#: view/iwac-seo/admin/seo/pages.phtml
 msgid "This site has no pages yet."
 msgstr ""
 
-#: src/Form/ConfigForm.php:75
+#: src/Form/ConfigForm.php
 msgid "Twitter / X @handle"
 msgstr ""
 
-#: src/Form/ConfigForm.php:56
+#: src/Form/ConfigForm.php
 msgid "Used on pages that have no description of their own (the home page, browse and search pages). Resource pages derive their own description from the item metadata. Aim for 150–160 characters."
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:62
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "XML sitemap & robots.txt"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:22
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Yes"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:72
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:70
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "no key set"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:49
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "paste your snippet in Configure"
 msgstr ""
 
-#: view/iwac-seo/admin/seo/dashboard.phtml:54
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "schema.org JSON-LD"
 msgstr ""
 

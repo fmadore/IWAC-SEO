@@ -34,6 +34,13 @@ All notable changes to the IWAC SEO module. Versions follow
   `foreach ([…] as $x)` literals hoisted to named arrays.
 
 ### Fixed
+- **The translation template no longer goes stale when a string merely moves.**
+  `#:` references now carry the file path alone; with line numbers, deleting one
+  blank line in `SeoController.php` shifted six references and failed
+  `composer i18n:check` without a single msgid changing. Since the module is
+  developed without PHP, regenerating is not a local one-liner, so a gate that
+  fired on layout rather than content cost a CI round trip each time. It now
+  fails when the set of translatable strings actually changes.
 - **`CitationFormatter::creators()` documented the wrong parameter type** —
   `@param array<string,mixed> $record` against a native `CitationRecord`, left
   behind when 0.7.0 gave the record a type.

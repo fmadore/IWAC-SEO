@@ -70,10 +70,11 @@ jobs:
         run: composer analyse
 
       # The translation template needs PHP to *fix*, not just to detect, and
-      # this module is developed without it. Its `#:` references carry line
-      # numbers, so any edit that shifts a line near a translatable string
-      # fails the gate above with no string having changed. On failure,
-      # regenerate and publish it so it can be committed back.
+      # this module is developed without it. The gate should now only fire
+      # when the set of translatable strings genuinely changes — its `#:`
+      # references carry no line numbers — but that still means a new string
+      # cannot be extracted locally. On failure, regenerate and publish the
+      # template so it can be committed back.
       #
       # Deliberately not doing the same for phpstan-baseline.neon: with the
       # baseline in `includes`, its own entries are already suppressed during
