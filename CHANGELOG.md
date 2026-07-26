@@ -3,6 +3,25 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+### Changed
+- **CI runs the whole of `composer check`.** A second `quality` job adds the
+  PSR-12 check, PHPStan (level 6) and the translation-template freshness gate,
+  which were declared in 0.7.0 but enforced nowhere — a green build previously
+  covered only `php -l` and PHPUnit. Its steps run independently of each other's
+  failures, so one push reports every category at once; this is the first time
+  either analyser has run against the codebase, so early builds are a backlog,
+  not a regression. `actions/checkout` moved v4 → v7 (Node runtime; the v7
+  fork-PR restriction applies to `pull_request_target`/`workflow_run`, neither
+  of which this workflow uses).
+
+### Added
+- `CLAUDE.md`, recording the constraints that are not visible from the tree —
+  no PHP or Composer in the development environment, the class-id dispatch rule,
+  the `module.config.php` / `instance.config.php` split, and the head-metadata
+  write ordering.
+
 ## 0.7.0 — 2026-07-25
 
 A structural refactoring release: no new features, no change to what any page,

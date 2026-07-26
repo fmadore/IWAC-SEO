@@ -13,7 +13,7 @@ jobs:
         php: ['8.2', '8.3', '8.4']
     name: PHP ${{ matrix.php }}
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - uses: shivammathur/setup-php@v2
         with:
@@ -30,3 +30,37 @@ jobs:
 
       - name: Run tests
         run: vendor/bin/phpunit
+
+  # The other half of `composer check`. Kept off the matrix: PSR-12 compliance
+  # and the PHPStan result do not vary across 8.2–8.4, so running them three
+  # times would triple the wall clock for no extra signal.
+  quality:
+    runs-on: ubuntu-latest
+    name: Lint & analyse
+    steps:
+      - uses: actions/checkout@v7
+
+      # 8.2 is the module's declared floor, and phpstan.neon.dist sets no
+      # phpVersion — PHPStan reports against the version it runs on, so
+      # analysing here is what would catch a floor violation.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Install dependencies
+        run: composer install --no-interaction --no-progress
+
+      # Each check runs even when an earlier one fails, so a push reports every
+      # category at once rather than revealing them one re-run at a time. The
+      # job still fails if any of them does.
+      - name: Translation template is current
+        run: composer i18n:check
+
+      - name: Coding standard (PSR-12)
+        if: ${{ !cancelled() }}
+        run: composer lint
+
+      - name: Static analysis (PHPStan level 6)
+        if: ${{ !cancelled() }}
+        run: composer analyse

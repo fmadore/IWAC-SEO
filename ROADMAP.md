@@ -17,13 +17,17 @@ phases never depend on later ones.
 > The plan is kept here as the record of what was found and the reasoning
 > behind each decision — including the two things it recommends *not* doing.
 >
-> **Not done:** wiring PHPStan and PHP_CodeSniffer into CI. Both are declared,
-> configured (`phpstan.neon.dist`, `phpcs.xml.dist`) and runnable via
-> `composer analyse` / `composer lint`, but neither could be installed in the
-> environment the refactor was carried out in, so neither has ever been run
-> against this codebase. Adding a CI step that has never passed locally would
-> just turn the build red. Run them once, fix what they find, then add the two
-> steps to `.github/workflows/ci.yml`.
+> **Since 0.7.0:** PHPStan, PHP_CodeSniffer and the i18n freshness check are now
+> wired into CI as a `quality` job, closing the gap where a green build covered
+> only `php -l` and PHPUnit — half of what `composer check` runs.
+>
+> The original note here said to run them locally first and fix what they found,
+> because a step that has never passed just turns the build red. That advice
+> could not be followed: neither tool can be installed in the environment this
+> module is developed in (no PHP, no Composer), which is why neither had ever
+> been run. CI is therefore the first execution, and the `quality` job is built
+> to report all three categories in one run rather than one per re-run. Expect
+> the first build to be red, and treat its output as the backlog.
 
 ## Phase 1 — Dead code & housekeeping *(no behaviour change)*
 
