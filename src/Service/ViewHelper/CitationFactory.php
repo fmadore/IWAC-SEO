@@ -4,7 +4,6 @@ declare(strict_types=1);
 namespace IwacSeo\Service\ViewHelper;
 
 use IwacSeo\Service\CitationData;
-use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationFormatter;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\ZoteroRdf;
@@ -26,7 +25,6 @@ final class CitationFactory implements FactoryInterface
         return new Citation(
             $container->get(CitationData::class),
             $container->get(CitationFormatter::class),
-            $container->get(CitationExport::class),
             $container->get(ZoteroRdf::class),
             $config['default_style'] ?? 'chicago',
             $config['styles'] ?? ['chicago' => 'Chicago', 'apa' => 'APA', 'mla' => 'MLA'],

@@ -333,7 +333,7 @@ class StructuredData
      * Linked (or literal) resources for the first of $terms that has values.
      *
      * @param string[] $terms
-     * @return array<array{@type:string,name:string,url?:string}>
+     * @return array<array{'@type': string, name: string, url?: string}>
      */
     private function links(
         AbstractResourceEntityRepresentation $resource,

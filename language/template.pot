@@ -122,8 +122,8 @@ msgstr ""
 msgid "Indexing"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:114
-#: src/Controller/Admin/SeoController.php:158
+#: src/Controller/Admin/SeoController.php:113
+#: src/Controller/Admin/SeoController.php:157
 msgid "Invalid form submission."
 msgstr ""
 
@@ -143,7 +143,7 @@ msgstr ""
 msgid "No"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:128
+#: src/Controller/Admin/SeoController.php:127
 msgid "No site found."
 msgstr ""
 
@@ -225,7 +225,7 @@ msgstr ""
 msgid "Sitemap"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:112
+#: src/Controller/Admin/SeoController.php:111
 msgid "Sitemap cache cleared — it will be rebuilt on the next request."
 msgstr ""
 
@@ -250,7 +250,7 @@ msgstr ""
 msgid "Static-page SEO"
 msgstr ""
 
-#: src/Controller/Admin/SeoController.php:155
+#: src/Controller/Admin/SeoController.php:154
 msgid "Static-page SEO saved."
 msgstr ""
 

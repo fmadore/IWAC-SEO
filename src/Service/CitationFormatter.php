@@ -362,8 +362,6 @@ final class CitationFormatter
     /**
      * The creator slot: the authors, or — for an edited work with no authors
      * (an edited volume) — the editors followed by an "ed(s)." role label.
-     *
-     * @param array<string,mixed> $record
      */
     private function creators(CitationRecord $record, string $locale, string $style): string
     {

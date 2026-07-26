@@ -45,7 +45,6 @@ class Citation extends AbstractHelper
     public function __construct(
         private readonly CitationData $citationData,
         private readonly CitationFormatter $formatter,
-        private readonly CitationExport $export,
         private readonly ZoteroRdf $zoteroRdf,
         private readonly string $defaultStyle,
         private readonly array $styleLabels,
