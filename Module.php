@@ -157,11 +157,12 @@ class Module extends AbstractModule
     public function attachListeners(SharedEventManagerInterface $sharedEventManager): void
     {
         // Resource show pages — derive meta + JSON-LD from the resource.
-        foreach ([
+        $resourceControllers = [
             'Omeka\Controller\Site\Item',
             'Omeka\Controller\Site\ItemSet',
             'Omeka\Controller\Site\Media',
-        ] as $controller) {
+        ];
+        foreach ($resourceControllers as $controller) {
             $sharedEventManager->attach($controller, 'view.show.after', [$this, 'handleResourceShow']);
             $sharedEventManager->attach($controller, 'view.browse.after', [$this, 'handleBrowse']);
         }

@@ -9,8 +9,11 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       fail-fast: false
+      # 8.2 is the floor declared in composer.json; 8.5 is what islam.zmo.de
+      # actually runs, so leaving it out meant never testing the deployed
+      # version. Both ends of the supported range need to stay covered.
       matrix:
-        php: ['8.2', '8.3', '8.4']
+        php: ['8.2', '8.3', '8.4', '8.5']
     name: PHP ${{ matrix.php }}
     steps:
       - uses: actions/checkout@v7
@@ -42,7 +45,8 @@ jobs:
 
       # 8.2 is the module's declared floor, and phpstan.neon.dist sets no
       # phpVersion — PHPStan reports against the version it runs on, so
-      # analysing here is what would catch a floor violation.
+      # analysing at the floor is what would catch a violation of it. The
+      # matrix above is what covers 8.5, the deployed version.
       - uses: shivammathur/setup-php@v2
         with:
           php-version: '8.2'
@@ -64,3 +68,19 @@ jobs:
       - name: Static analysis (PHPStan level 6)
         if: ${{ !cancelled() }}
         run: composer analyse
+
+      # TEMPORARY. This module is developed on a machine with no PHP, so CI is
+      # the only place PHPStan can run at all — including the initial baseline
+      # of pre-existing findings. Generate it and publish it as an artifact so
+      # it can be committed; delete these two steps once it is in the repo.
+      - name: Generate PHPStan baseline
+        if: ${{ !cancelled() }}
+        run: vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon --allow-empty-baseline
+
+      - name: Upload PHPStan baseline
+        if: ${{ !cancelled() }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: phpstan-baseline
+          path: phpstan-baseline.neon
+          if-no-files-found: error

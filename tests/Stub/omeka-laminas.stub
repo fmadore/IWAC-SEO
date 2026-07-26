@@ -1,0 +1,65 @@
+<?php
+
+/**
+ * Type stubs for the Omeka S and Laminas supertypes this module extends or
+ * implements.
+ *
+ * Omeka is not a Composer dependency (the module ships no vendor/ and is
+ * autoloaded by the application), so when PHPStan analyses the module alone
+ * those supertypes are absent. "Extends unknown class" is the one category
+ * PHPStan refuses to let `ignoreErrors` suppress — it directs you to
+ * `excludePaths`, which would drop Module.php, every controller, both forms,
+ * the job and the view helper out of analysis entirely. Declaring the
+ * supertypes here keeps all of them analysed.
+ *
+ * Deliberately memberless. The point is to make the inheritance resolvable,
+ * not to re-describe Omeka's API — a stub that guessed at signatures would
+ * invent errors rather than remove them. Calls to inherited methods surface
+ * as method.notFound, which phpstan.neon.dist ignores as boundary noise.
+ *
+ * Not a runtime file: unlike tests/Shim/omeka.php (which is executed, and
+ * gives the two classes the suite instantiates real bodies), this is only
+ * ever parsed by PHPStan. Hence the .stub extension.
+ */
+
+namespace Omeka\Module {
+    abstract class AbstractModule
+    {
+    }
+}
+
+namespace Omeka\Job {
+    abstract class AbstractJob
+    {
+    }
+}
+
+namespace Omeka\Site\ResourcePageBlockLayout {
+    interface ResourcePageBlockLayoutInterface
+    {
+    }
+}
+
+namespace Laminas\Mvc\Controller {
+    abstract class AbstractActionController
+    {
+    }
+}
+
+namespace Laminas\Form {
+    class Form
+    {
+    }
+}
+
+namespace Laminas\View\Helper {
+    abstract class AbstractHelper
+    {
+    }
+}
+
+namespace Laminas\ServiceManager\Factory {
+    interface FactoryInterface
+    {
+    }
+}

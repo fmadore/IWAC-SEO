@@ -70,11 +70,12 @@ final class CreatorTest extends TestCase
 
     public function testRoundTripsThroughTheArrayForm(): void
     {
-        foreach ([
+        $creators = [
             Creator::person('Madore', 'Frédérick', 'Frédérick Madore'),
             Creator::person('Sanogo', null, 'Sanogo'),
             Creator::institution('AEEMB'),
-        ] as $creator) {
+        ];
+        foreach ($creators as $creator) {
             $this->assertEquals($creator, Creator::fromArray($creator->toArray()));
         }
     }

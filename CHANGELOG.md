@@ -10,11 +10,28 @@ All notable changes to the IWAC SEO module. Versions follow
   PSR-12 check, PHPStan (level 6) and the translation-template freshness gate,
   which were declared in 0.7.0 but enforced nowhere — a green build previously
   covered only `php -l` and PHPUnit. Its steps run independently of each other's
-  failures, so one push reports every category at once; this is the first time
-  either analyser has run against the codebase, so early builds are a backlog,
-  not a regression. `actions/checkout` moved v4 → v7 (Node runtime; the v7
-  fork-PR restriction applies to `pull_request_target`/`workflow_run`, neither
-  of which this workflow uses).
+  failures, so one push reports every category at once. `actions/checkout` moved
+  v4 → v7 (Node runtime; the v7 fork-PR restriction applies to
+  `pull_request_target`/`workflow_run`, neither of which this workflow uses).
+- **PHP 8.5 added to the test matrix.** It is what islam.zmo.de runs, so the
+  deployed version was the one version never tested. The matrix now spans the
+  declared floor (8.2) to production (8.5).
+- **`phpstan.neon.dist` rewritten for PHPStan 2.x.** The configuration had never
+  been executed and did not work: its ignore patterns matched 1.x message
+  wording, so five of six matched nothing and — with `reportUnmatchedIgnoredErrors`
+  defaulting to true — became errors in their own right. Ignores are now keyed by
+  error identifier, and `tests/Stub/omeka-laminas.stub` declares the seven Omeka
+  and Laminas supertypes the module extends, because "extends unknown class" is
+  the one error PHPStan refuses to let `ignoreErrors` suppress; without it those
+  files would have had to leave analysis entirely via `excludePaths`.
+- **PSR-12 conformance.** `PSR12.Files.FileHeader` is excluded, with a rationale:
+  every file opens `<?php` / `declare(strict_types=1);` / docblock, where the
+  standard wants the docblock first, and the house order is uniform across ~80
+  files. `PSR1.Classes.ClassDeclaration.MultipleClasses` is excluded for
+  `tests/Shim/omeka.php`, which declares its stand-ins in one file on purpose.
+  The remaining 13 findings are fixed: two multi-line conditions reflowed, a
+  wrapped call joined, a stray blank line after a class brace removed, and two
+  `foreach ([…] as $x)` literals hoisted to named arrays.
 
 ### Added
 - `CLAUDE.md`, recording the constraints that are not visible from the tree —

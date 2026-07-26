@@ -105,8 +105,7 @@ class CitationMeta
             $headMeta->appendName('citation_editor', $editor);
         }
 
-        $this->single($headMeta, 'citation_publication_date',
-            $this->firstString($resource, self::DATE_TERMS));
+        $this->single($headMeta, 'citation_publication_date', $this->firstString($resource, self::DATE_TERMS));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 

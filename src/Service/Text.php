@@ -38,7 +38,8 @@ final class Text
         if ($raw === '') {
             return '';
         }
-        if (stripos($raw, '<meta') !== false
+        if (
+            stripos($raw, '<meta') !== false
             && preg_match('/content\s*=\s*"([^"]+)"/i', $raw, $m)
         ) {
             return trim($m[1]);

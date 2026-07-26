@@ -21,5 +21,23 @@
             archive's field conventions.
         -->
         <exclude name="Generic.Files.LineLength"/>
+
+        <!--
+            Every file opens `<?php`, `declare(strict_types=1);`, then the
+            file docblock. PSR-12 wants the docblock first. The house order is
+            uniform across ~80 files and keeps the strict_types line beside
+            the tag it qualifies; the sniff is the only thing that disagrees.
+        -->
+        <exclude name="PSR12.Files.FileHeader"/>
+    </rule>
+
+    <!--
+        tests/Shim/omeka.php deliberately declares several stand-ins in one
+        file, each in its own namespace block and guarded by class_exists().
+        Splitting them per-file would scatter the boundary this file exists
+        to make visible in one place.
+    -->
+    <rule ref="PSR1.Classes.ClassDeclaration.MultipleClasses">
+        <exclude-pattern>tests/Shim/omeka\.php</exclude-pattern>
     </rule>
 </ruleset>

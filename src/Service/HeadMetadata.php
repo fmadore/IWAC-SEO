@@ -106,7 +106,8 @@ class HeadMetadata
         // single-field institutional creators, tags) — unAPI outranks Embedded
         // Metadata, so for these kinds it supersedes the meta tags emitted above.
         // Returns the <abbr class="unapi-id"> element to echo in the page body.
-        if ($canonical !== null
+        if (
+            $canonical !== null
             && $resource instanceof ItemRepresentation
             && $this->settings->isOn('iwac_seo_unapi', true)
             && $this->zoteroRdf->isEligible(ResourceUrl::classId($resource))

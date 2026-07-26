@@ -20,7 +20,6 @@ use Omeka\Api\Representation\SiteRepresentation;
  */
 class SeoController extends AbstractActionController
 {
-
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly PageSeoStore $pageSeoStore,
