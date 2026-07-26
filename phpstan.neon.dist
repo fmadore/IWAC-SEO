@@ -12,12 +12,17 @@ parameters:
     bootstrapFiles:
         - tests/Shim/omeka.php
 
-    # tests/Stub/omeka-laminas.stub is only *parsed*: it declares the Omeka and
+    # tests/Stub/omeka-laminas.stub is only *parsed*, to declare the Omeka and
     # Laminas supertypes the module extends or implements. It exists because
     # "extends unknown class" is the one error PHPStan will not let
     # ignoreErrors suppress — without it those files would have to leave
     # analysis via excludePaths. See the file's own header.
-    stubFiles:
+    #
+    # scanFiles, not stubFiles: stubs only override the PHPDoc of symbols that
+    # already exist, so they cannot introduce a class PHPStan has never seen.
+    # scanFiles is the symbol-discovery mechanism for code that is not a
+    # Composer dependency, which is exactly what Omeka is here.
+    scanFiles:
         - tests/Stub/omeka-laminas.stub
 
     ignoreErrors:

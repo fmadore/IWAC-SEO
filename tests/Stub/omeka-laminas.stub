@@ -19,7 +19,13 @@
  *
  * Not a runtime file: unlike tests/Shim/omeka.php (which is executed, and
  * gives the two classes the suite instantiates real bodies), this is only
- * ever parsed by PHPStan. Hence the .stub extension.
+ * ever parsed by PHPStan. Hence the .stub extension — which also keeps it out
+ * of the CI `php -l` sweep and phpcs, both of which only look at .php.
+ *
+ * Wired in through `scanFiles`, not `stubFiles`, despite the extension:
+ * PHPStan's stub mechanism only overrides the PHPDoc of symbols that already
+ * exist and cannot introduce a class it has never seen. scanFiles is the
+ * symbol-discovery path for code outside Composer's autoloader.
  */
 
 namespace Omeka\Module {

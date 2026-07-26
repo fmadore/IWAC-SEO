@@ -70,17 +70,23 @@ jobs:
         run: composer analyse
 
       # TEMPORARY. This module is developed on a machine with no PHP, so CI is
-      # the only place PHPStan can run at all — including the initial baseline
-      # of pre-existing findings. Generate it and publish it as an artifact so
-      # it can be committed; delete these two steps once it is in the repo.
-      - name: Generate PHPStan baseline
+      # the only place these can be produced at all: the regenerated
+      # translation template (whose `#:` references carry line numbers, so any
+      # edit that shifts a line near a translatable string invalidates it) and
+      # the initial PHPStan baseline. Published for committing back; delete
+      # both steps once they are in the repo.
+      - name: Regenerate what needs PHP
         if: ${{ !cancelled() }}
-        run: vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon --allow-empty-baseline
+        run: |
+          composer i18n
+          vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon --allow-empty-baseline
 
-      - name: Upload PHPStan baseline
+      - name: Upload regenerated files
         if: ${{ !cancelled() }}
         uses: actions/upload-artifact@v7
         with:
-          name: phpstan-baseline
-          path: phpstan-baseline.neon
+          name: needs-php
+          path: |
+            language/
+            phpstan-baseline.neon
           if-no-files-found: error
