@@ -24,6 +24,13 @@ All notable changes to the IWAC SEO module. Versions follow
   and Laminas supertypes the module extends, because "extends unknown class" is
   the one error PHPStan refuses to let `ignoreErrors` suppress; without it those
   files would have had to leave analysis entirely via `excludePaths`.
+- **PHP_CodeSniffer bumped to `^4.0`** (4.0.1), which needed no ruleset changes
+  and found nothing to fix — 75 files, zero errors. 4.0 removes the JS/CSS and
+  MySource standards, splits `PSR12.Files.FileHeader.SpacingAfterBlock` into
+  several error codes, and drops the old array-property and
+  `@codingStandardsIgnore` syntaxes; this ruleset uses none of them, and its two
+  exclusions name whole sniffs rather than error codes, so the split passed
+  straight through.
 - **PSR-12 conformance.** `PSR12.Files.FileHeader` is excluded, with a rationale:
   every file opens `<?php` / `declare(strict_types=1);` / docblock, where the
   standard wants the docblock first, and the house order is uniform across ~80
