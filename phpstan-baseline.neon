@@ -1,0 +1,355 @@
+parameters:
+	ignoreErrors:
+		-
+			message: '#^Method IwacSeo\\Module\:\:getConfig\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: Module.php
+
+		-
+			message: '#^Method IwacSeo\\Module\:\:getConfigForm\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: Module.php
+
+		-
+			message: '#^Method IwacSeo\\Module\:\:handleConfigForm\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: Module.php
+
+		-
+			message: '#^Method IwacSeo\\Module\:\:upgrade\(\) has parameter \$newVersion with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: Module.php
+
+		-
+			message: '#^Method IwacSeo\\Module\:\:upgrade\(\) has parameter \$oldVersion with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: Module.php
+
+		-
+			message: '#^Method IwacSeo\\Controller\\Admin\\SeoController\:\:pagesAction\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: src/Controller/Admin/SeoController.php
+
+		-
+			message: '#^Method IwacSeo\\Controller\\Admin\\SeoController\:\:regenerateAction\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: src/Controller/Admin/SeoController.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationDataFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/CitationDataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationDataFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/CitationDataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationExport\:\:addField\(\) has parameter \$fields with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/CitationExport.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationFormatter\:\:join\(\) has parameter \$parts with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/CitationFormatter.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationKindMapFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/CitationKindMapFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationKindMapFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/CitationKindMapFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationMetaFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/CitationMetaFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\CitationMetaFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/CitationMetaFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\CitationControllerFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/Controller/CitationControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\CitationControllerFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/Controller/CitationControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\SeoControllerFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/Controller/SeoControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\SeoControllerFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/Controller/SeoControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\SitemapControllerFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/Controller/SitemapControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\SitemapControllerFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/Controller/SitemapControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\UnapiControllerFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/Controller/UnapiControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Controller\\UnapiControllerFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/Controller/UnapiControllerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\HeadMetadata\:\:resourceDescription\(\) never returns null so it can be removed from the return type\.$#'
+			identifier: return.unusedType
+			count: 1
+			path: src/Service/HeadMetadata.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\HeadMetadataFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/HeadMetadataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\HeadMetadataFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/HeadMetadataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\HreflangFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/HreflangFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\HreflangFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/HreflangFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PageSeoStoreFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/PageSeoStoreFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PageSeoStoreFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/PageSeoStoreFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PingQueueFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/PingQueueFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PingQueueFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/PingQueueFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PingerFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/PingerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\PingerFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/PingerFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SettingsGateFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/SettingsGateFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SettingsGateFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/SettingsGateFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SiteResolverFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/SiteResolverFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SiteResolverFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/SiteResolverFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\Sitemap\\UrlsetWriter\:\:namespaces\(\) has parameter \$urls with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/Sitemap/UrlsetWriter.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SitemapGeneratorFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/SitemapGeneratorFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\SitemapGeneratorFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/SitemapGeneratorFactory.php
+
+		-
+			message: '#^Unable to resolve the template type T in call to function array_values$#'
+			identifier: argument.templateType
+			count: 1
+			path: src/Service/StructuredData.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\StructuredDataFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/StructuredDataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\StructuredDataFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/StructuredDataFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\ViewHelper\\CitationFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/ViewHelper/CitationFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\ViewHelper\\CitationFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/ViewHelper/CitationFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\ZoteroRdfFactory\:\:__invoke\(\) has parameter \$options with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Service/ZoteroRdfFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Service\\ZoteroRdfFactory\:\:__invoke\(\) has parameter \$requestedName with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: src/Service/ZoteroRdfFactory.php
+
+		-
+			message: '#^Method IwacSeo\\Site\\ResourcePageBlockLayout\\Citation\:\:getCompatibleResourceNames\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: src/Site/ResourcePageBlockLayout/Citation.php
+
+		-
+			message: '#^Offset ''bibtex''\|''csljson''\|''ris'' on array\{bibtex\: ''BibTeX'', ris\: ''RIS'', csljson\: ''CSL JSON''\} on left side of \?\? always exists and is not nullable\.$#'
+			identifier: nullCoalesce.offset
+			count: 1
+			path: src/View/Helper/Citation.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\CitationExportTest\:\:record\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/CitationExportTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\CitationFormatterTest\:\:institution\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/CitationFormatterTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\CitationFormatterTest\:\:person\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/CitationFormatterTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\CitationFormatterTest\:\:record\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/CitationFormatterTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\HreflangTest\:\:config\(\) has parameter \$overrides with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/HreflangTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\HreflangTest\:\:config\(\) return type has no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/HreflangTest.php
+
+		-
+			message: '#^Method IwacSeo\\Test\\Service\\SettingsGateTest\:\:gate\(\) has parameter \$values with no value type specified in iterable type array\.$#'
+			identifier: missingType.iterableValue
+			count: 1
+			path: tests/Service/SettingsGateTest.php
+
+		-
+			message: '#^Method Omeka\\Job\\Dispatcher\:\:dispatch\(\) has no return type specified\.$#'
+			identifier: missingType.return
+			count: 1
+			path: tests/Shim/omeka.php
+
+		-
+			message: '#^Method Omeka\\Settings\\Settings\:\:get\(\) has parameter \$default with no type specified\.$#'
+			identifier: missingType.parameter
+			count: 1
+			path: tests/Shim/omeka.php

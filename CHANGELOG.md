@@ -33,7 +33,24 @@ All notable changes to the IWAC SEO module. Versions follow
   wrapped call joined, a stray blank line after a class brace removed, and two
   `foreach ([…] as $x)` literals hoisted to named arrays.
 
+### Fixed
+- **`CitationFormatter::creators()` documented the wrong parameter type** —
+  `@param array<string,mixed> $record` against a native `CitationRecord`, left
+  behind when 0.7.0 gave the record a type.
+- **`StructuredData::links()` had an unparseable `@return`.** The `@type` key in
+  the array shape needs quoting; unquoted, the whole docblock was discarded, so
+  the method's return type was untyped as well.
+- **`View\Helper\Citation` injected `CitationExport` and never read it.** The
+  helper only ever touches `CitationExport::FORMATS` statically. Dropped from the
+  constructor and the factory.
+
 ### Added
+- `phpstan-baseline.neon`, recording the 59 findings that predate analysis being
+  enforced — 56 missing array value types, plus three deliberate calls: a return
+  type that could be tightened only by also removing a caller's guard, a
+  defensive `??` that is unreachable only because two const tables agree, and an
+  unresolvable template type that follows from an untyped array. Level 6 applies
+  in full to new and changed code; the baseline is a ledger to shrink.
 - `CLAUDE.md`, recording the constraints that are not visible from the tree —
   no PHP or Composer in the development environment, the class-id dispatch rule,
   the `module.config.php` / `instance.config.php` split, and the head-metadata

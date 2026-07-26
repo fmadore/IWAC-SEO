@@ -26,14 +26,19 @@ renamed constant — re-read the call sites instead.
 so one push reports all three categories at once instead of revealing them a
 re-run at a time — worth preserving, since there's no local run to fall back on.
 
-PHPStan and PHP_CodeSniffer were wired in without ever having been run, for the
-reason above. Until that job has gone green once, treat its output as a backlog
-rather than a regression: findings on untouched code predate your change.
+`phpstan-baseline.neon` records 59 findings that predate enforcement — 56
+missing array value types plus three judgement calls. Level 6 applies in full
+to anything new; the baseline is a ledger to shrink, not a suppression list.
+Delete entries as they are fixed. Do not regenerate it to make a new error go
+away, and note that regenerating while it sits in `includes` would emit a
+baseline covering only the *new* errors and silently drop the recorded debt.
 
-The check most likely to trip you: adding a `// @translate` string without
-regenerating `language/template.pot`. `composer i18n` regenerates it — but that
-needs PHP, so in practice CI tells you, and someone with a PHP environment has
-to run it.
+The check most likely to trip you is the translation template, and it is
+stricter than it looks: its `#:` references carry line numbers, so removing a
+blank line anywhere above a `// @translate` string fails the gate with no
+string having changed. `composer i18n` regenerates it — but that needs PHP, so
+in practice the `quality` job does it for you and uploads the result as an
+artefact when the gate fails. Download it, commit it.
 
 ## Gotchas
 

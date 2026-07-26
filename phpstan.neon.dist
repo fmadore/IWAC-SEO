@@ -1,3 +1,16 @@
+# Findings that predate analysis being enforced, recorded rather than fixed:
+# 56 missing array value types, plus three judgement calls documented in the
+# commit that added this file. The point is the ratchet — level 6 applies in
+# full to new and changed code, while the standing debt stays visible and
+# shrinkable. It is a ledger, not a suppression list: delete entries as they
+# are fixed, and never regenerate it wholesale to make a new error disappear.
+#
+# Regenerating needs PHP, which this module is not developed with. Run
+# `vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon`
+# wherever PHP is available, or restore the CI steps removed in this commit.
+includes:
+    - phpstan-baseline.neon
+
 parameters:
     level: 6
 
