@@ -1,7 +1,12 @@
 name: CI
 
+# Branch pushes are covered by the pull_request trigger, so restricting push to
+# main keeps a PR from running the whole matrix twice — once for its branch and
+# once for the PR. Dependabot's branches live in this repo, which is what made
+# the duplication routine rather than occasional.
 on:
   push:
+    branches: [main]
   pull_request:
 
 jobs:
