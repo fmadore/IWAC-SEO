@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Service;
 
 use IwacSeo\Service\Sitemap\SitemapDocument;
-use IwacSeo\Service\Sitemap\SitemapRepository;
+use IwacSeo\Service\Sitemap\SitemapRepositoryInterface;
 use IwacSeo\Service\Sitemap\UrlsetWriter;
 use IwacSeo\Service\Sitemap\XmlCache;
 
@@ -33,7 +33,7 @@ class SitemapGenerator
      *   site URL at build time ({site base}/files)
      */
     public function __construct(
-        private readonly SitemapRepository $repository,
+        private readonly SitemapRepositoryInterface $repository,
         private readonly UrlsetWriter $writer,
         private readonly XmlCache $cache,
         private readonly array $config,

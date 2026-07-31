@@ -5,7 +5,19 @@ All notable changes to the IWAC SEO module. Versions follow
 
 ## Unreleased
 
+## 0.8.0 — 2026-07-31
+
 ### Changed
+- **Sitemap policy now depends on a narrow repository contract.**
+  `SitemapRepositoryInterface` keeps Doctrine behind the production adapter and
+  lets the generator be tested in memory: child-chunk selection, homepage/menu/
+  unlisted-page ordering, URL encoding, image URLs and reciprocal hreflang links
+  now have direct regression coverage.
+- **CI metadata and dependency downloads are hardened.** Composer metadata is
+  validated strictly, its download cache is shared across jobs with
+  `actions/cache@v5`, workflow permissions are read-only, superseded runs are
+  cancelled and both jobs have explicit timeouts. The test matrix remains PHP
+  8.2–8.5, covering both the declared floor and the production runtime.
 - **CI runs the whole of `composer check`.** A second `quality` job adds the
   PSR-12 check, PHPStan (level 6) and the translation-template freshness gate,
   which were declared in 0.7.0 but enforced nowhere — a green build previously
@@ -41,6 +53,9 @@ All notable changes to the IWAC SEO module. Versions follow
   `foreach ([…] as $x)` literals hoisted to named arrays.
 
 ### Fixed
+- **JSON-LD no longer changes escaping for the shared `HeadScript` helper.** The
+  `noescape` exception is attached only to each `application/ld+json` entry;
+  scripts appended later by the theme retain Laminas's normal escaping.
 - **The translation template no longer goes stale when a string merely moves.**
   `#:` references now carry the file path alone; with line numbers, deleting one
   blank line in `SeoController.php` shifted six references and failed
@@ -59,6 +74,11 @@ All notable changes to the IWAC SEO module. Versions follow
   constructor and the factory.
 
 ### Added
+- IWAC configuration-contract tests: the schema.org and citation class maps
+  must stay aligned across all 19 known resource classes (including all nine
+  reference classes), hreflang page pairs must be complete and unique, sitemap
+  chunks must respect the 50,000-URL protocol limit, and runtime Composer
+  dependencies may not duplicate Omeka's Laminas/PSR packages.
 - `phpstan-baseline.neon`, recording the 59 findings that predate analysis being
   enforced — 56 missing array value types, plus three deliberate calls: a return
   type that could be tightened only by also removing a caller's guard, a

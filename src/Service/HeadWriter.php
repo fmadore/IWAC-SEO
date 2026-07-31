@@ -93,12 +93,13 @@ final class HeadWriter
     /** @param array<mixed> $data A JSON-LD document. */
     public function jsonLd(PhpRenderer $view, array $data): void
     {
-        // application/ld+json must not be wrapped in the JS CDATA/comment guard
-        // HeadScript adds for inline scripts; disable it (HTML5 needs no guard).
-        $view->headScript()->setAutoEscape(false);
         $json = json_encode($data, JSON_UNESCAPED_UNICODE | JSON_HEX_TAG | JSON_PRETTY_PRINT);
         if ($json !== false) {
-            $view->headScript()->appendScript($json, 'application/ld+json');
+            // application/ld+json must not be wrapped in HeadScript's JS
+            // CDATA/comment guard. Make that exception local to this entry:
+            // setAutoEscape(false) changes the shared helper and would also
+            // disable escaping for scripts appended later by the theme.
+            $view->headScript()->appendScript($json, 'application/ld+json', ['noescape' => true]);
         }
     }
 

@@ -9,9 +9,8 @@ section before changing behaviour. This file is only the things that bite.
 
 Neither `php` nor `composer` is on PATH, and `vendor/` is never committed — so
 **the test suite cannot be run locally**. The same was true when 0.7.0 was
-refactored, which is why PHPStan and PHP_CodeSniffer are configured and
-runnable but have never actually been run against this codebase (see the status
-block at the top of `ROADMAP.md`).
+refactored. PHPUnit, PHPStan and PHP_CodeSniffer are configured and have passed
+in CI; they simply cannot be executed from this Windows checkout.
 
 Consequence: changes are verified by reading, and CI is the only gate that
 actually executes anything. Don't report a change as tested. For the class of
@@ -21,10 +20,12 @@ renamed constant — re-read the call sites instead.
 ## CI is the only place the checks actually run
 
 `.github/workflows/ci.yml` has two jobs, together covering `composer check`:
-`test` (a `php -l` sweep plus PHPUnit on 8.2–8.4) and `quality` (`i18n:check`,
-`lint`, `analyse`, on 8.2 only). The `quality` steps carry `if: ${{ !cancelled() }}`
-so one push reports all three categories at once instead of revealing them a
-re-run at a time — worth preserving, since there's no local run to fall back on.
+`test` (a `php -l` sweep plus PHPUnit on 8.2–8.5, including production 8.5) and
+`quality` (strict Composer validation, `i18n:check`, `lint`, `analyse`, on 8.2
+only). Composer downloads are cached in both jobs. The `quality` checks carry
+`if: ${{ !cancelled() }}` so one push reports every category at once instead of
+revealing them a re-run at a time — worth preserving, since there's no local
+run to fall back on.
 
 `phpstan-baseline.neon` records 59 findings that predate enforcement — 56
 missing array value types plus three judgement calls. Level 6 applies in full

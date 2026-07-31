@@ -305,7 +305,7 @@ IWAC is the same collection under two Omeka sites — `afrique_ouest` (fr) and `
   - **Resources** (items, item sets, media) are shared across both sites under the same
     `o:id`, so the alternate is just the same path under the other site slug — fully automatic.
   - **Static pages** have different slugs per language (`accueil`/`home`, `a-propos`/`about` …);
-    they are mapped by the `iwac_seo.hreflang.page_pairs` table in `config/module.config.php`.
+    they are mapped by the `iwac_seo.hreflang.page_pairs` table in `config/instance.config.php`.
     A page with no entry simply gets no alternate (never a broken one). Update the table when
     pages are added or renamed.
 - **`og:locale` + `og:locale:alternate`** advertise both languages to social platforms.
@@ -423,7 +423,6 @@ IwacSeo/
 
 * **COinS** (`<span class="Z3988">`) as a complementary reference-embedding signal, and to
   expose references on list pages.
-* unAPI + per-item **BibTeX / RIS** export links ("Cite / Export").
 * Per-URL hreflang in the *pages* sitemap too (static-page alternates are already emitted
   on-page; only the item / item-set sitemaps carry `<xhtml:link>` so far).
 * Optional nginx-level caching of `/sitemap*.xml` (the module already emits
@@ -440,18 +439,21 @@ sitemap cache directory (`files/iwac-seo-cache/`).
 
 ## Development
 
-No production dependencies; `composer install` pulls PHPUnit only. Run the test suite with:
+No production dependencies; `composer install` pulls the PHPUnit, PHPStan and
+PHP_CodeSniffer development tools. Run every local quality gate with:
 
 ```sh
 composer install
-vendor/bin/phpunit
+composer check
 ```
 
 The suite covers the pure logic that regresses most silently — the Chicago/APA/MLA
 formatter, the BibTeX/RIS/CSL-JSON serialisers, hreflang resolution and the text
-utilities. GitHub Actions (`.github/workflows/ci.yml`) runs a syntax check plus the suite
-on PHP 8.2–8.4 for every push and pull request. `ROADMAP.md` documents the refactoring
-plan behind 0.6.0 and what remains deliberately out of scope.
+utilities, plus sitemap policy and IWAC's instance-configuration contracts. GitHub Actions
+(`.github/workflows/ci.yml`) runs syntax checks and PHPUnit on PHP 8.2–8.5, then checks
+Composer metadata, translations, PSR-12 and PHPStan at the declared PHP 8.2 floor.
+`ROADMAP.md` documents the refactoring plan behind 0.6.0 and what remains deliberately
+out of scope.
 
 ---
 

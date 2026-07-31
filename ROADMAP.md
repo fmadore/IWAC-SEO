@@ -12,7 +12,7 @@ Nothing here is a rewrite, and nothing here is urgent. Phases are ordered by
 risk, not by value: each is an independent, reviewable commit, and earlier
 phases never depend on later ones.
 
-> **Status: delivered in 0.7.0**, except for the one item noted below. Each
+> **Status: delivered in 0.7.0 and the subsequent CI follow-up.** Each
 > phase landed as its own commit; see `CHANGELOG.md` for what changed and why.
 > The plan is kept here as the record of what was found and the reasoning
 > behind each decision — including the two things it recommends *not* doing.
@@ -180,13 +180,13 @@ phases never depend on later ones.
   `?? 'item'` divergence — every Phase 1 item, mechanically. Add a PSR-12 check
   (PHP_CodeSniffer or php-cs-fixer) alongside it, and wire both into CI and
   `composer.json` scripts.
-- **Close the test gaps.** 47 tests cover 6 of the 25 non-factory source files,
-  and they cover the *pure* ones. The untested surfaces that regress silently
-  are the sitemap XML writer (once split), `ZoteroRdf::render()` — verified
-  only against Zotero's translator by hand — `CitationMeta` (testable against a
-  `HeadMeta` double), and the ping queue (once extracted from `Module`).
-- **CI polish.** Cache `~/.composer/cache` between runs, and add
-  `composer validate --strict`.
+- **Close the test gaps.** The original 47 tests covered only the pure citation,
+  hreflang and text logic. The writer, cache, ping queue and generator policy
+  now have direct tests. `ZoteroRdf::render()` and `CitationMeta` remain better
+  verified against a real Omeka/Laminas stack than by expanding the local shim.
+- **CI polish.** Delivered after 0.7.0: cache Composer downloads between runs
+  and validate `composer.json` strictly. Workflow permissions, concurrency and
+  timeouts are explicit too.
 - **Add `.editorconfig`** — the codebase is uniformly 4-space / LF, but nothing
   states it.
 

@@ -16,7 +16,7 @@ use Doctrine\DBAL\Connection;
  * a sitemap that is missing a section is recoverable, a 500 on /sitemap.xml is
  * not.
  */
-final class SitemapRepository
+final class SitemapRepository implements SitemapRepositoryInterface
 {
     private const ITEM = 'Omeka\Entity\Item';
     private const ITEM_SET = 'Omeka\Entity\ItemSet';
