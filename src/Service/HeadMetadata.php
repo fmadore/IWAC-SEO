@@ -229,17 +229,21 @@ class HeadMetadata
         }
 
         // Open Graph / Twitter constants.
-        $headMeta->setProperty('og:site_name', $site->title());
+        $this->head->openGraph($view, ['og:site_name' => $site->title()]);
         // Through ogLocale() so a bare site locale ("fr") still emits the
         // language_TERRITORY form Open Graph expects, matching the
         // og:locale:alternate values below.
-        $headMeta->setProperty('og:locale', $this->ogLocale(ViewLocale::resolve($view)));
+        $this->head->openGraph($view, ['og:locale' => $this->ogLocale(ViewLocale::resolve($view))]);
         // Advertise the other-language site(s) as og:locale:alternate.
         if ($this->hreflang->isEnabled()) {
             $currentSlug = $site->slug();
             foreach ($this->hreflang->sites() as $slug => $lang) {
                 if ($slug !== $currentSlug) {
-                    $headMeta->appendProperty('og:locale:alternate', $this->ogLocale((string) $lang));
+                    $this->head->appendOpenGraph(
+                        $view,
+                        'og:locale:alternate',
+                        $this->ogLocale((string) $lang)
+                    );
                 }
             }
         }
@@ -278,7 +282,7 @@ class HeadMetadata
             $this->head->openGraph($view, ['og:description' => $written]);
         }
         if (!$this->head->has('og:url')) {
-            $headMeta->setProperty('og:url', $view->serverUrl(true));
+            $this->head->openGraph($view, ['og:url' => $view->serverUrl(true)]);
         }
     }
 

@@ -81,13 +81,23 @@ final class HeadWriter
             if ($content === null || $content === '') {
                 continue;
             }
-            $headMeta->setProperty($property, $content);
+            $this->writeProperty($headMeta, $property, $content, true);
             // Twitter falls back to og:* for most fields; mirror title only.
             if ($property === 'og:title') {
                 $headMeta->appendName('twitter:title', $content);
             }
             $this->mark($property);
         }
+    }
+
+    /** Append a repeated Open Graph property such as og:locale:alternate. */
+    public function appendOpenGraph(PhpRenderer $view, string $property, string $content): void
+    {
+        if ($content === '') {
+            return;
+        }
+        $this->writeProperty($view->headMeta(), $property, $content, false);
+        $this->mark($property);
     }
 
     /** @param array<mixed> $data A JSON-LD document. */
@@ -155,5 +165,44 @@ final class HeadWriter
     public function mark(string $signal): void
     {
         $this->applied[$signal] = true;
+    }
+
+    /**
+     * Laminas View 2.x rejects property="…" meta entries under Omeka's HTML5
+     * doctype even though Open Graph requires that attribute. Preserve the
+     * public helper path where it works, then fall back to the helper's public
+     * container so Omeka can render standards-compliant Open Graph markup.
+     */
+    private function writeProperty(object $headMeta, string $property, string $content, bool $replace): void
+    {
+        try {
+            if ($replace) {
+                $headMeta->setProperty($property, $content);
+            } else {
+                $headMeta->appendProperty($property, $content);
+            }
+            return;
+        } catch (\Laminas\View\Exception\InvalidArgumentException $e) {
+            // Expected with Laminas View 2.x + Omeka's HTML5 doctype.
+        }
+
+        $container = $headMeta->getContainer();
+        if ($replace) {
+            foreach ($container->getArrayCopy() as $index => $item) {
+                if (
+                    is_object($item)
+                    && ($item->type ?? null) === 'property'
+                    && ($item->property ?? null) === $property
+                ) {
+                    $container->offsetUnset($index);
+                }
+            }
+        }
+        $container->append((object) [
+            'type' => 'property',
+            'property' => $property,
+            'content' => $content,
+            'modifiers' => [],
+        ]);
     }
 }

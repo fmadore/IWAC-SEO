@@ -49,16 +49,16 @@ final class MetadataIntegrationTest extends TestCase
 
         (new CitationMeta($this->kinds))->apply($view, $this->item(), 36, self::CANONICAL);
 
-        $metadata = $view->headMeta()->toString();
+        $metadata = $this->decoded($view->headMeta()->toString());
         self::assertStringContainsString('name="citation_title"', $metadata);
-        self::assertStringContainsString('content="A &amp; B in West Africa"', $metadata);
+        self::assertStringContainsString('content="A & B in West Africa"', $metadata);
         self::assertStringContainsString('name="citation_author"', $metadata);
         self::assertStringContainsString('content="Frédérick Madore"', $metadata);
         self::assertStringContainsString('name="prism.publicationName"', $metadata);
         self::assertStringContainsString('content="Fraternité Matin"', $metadata);
         self::assertStringContainsString('name="DC.type" content="newspaperArticle"', $metadata);
         self::assertStringContainsString('name="DC.subject" content="Islam"', $metadata);
-        self::assertStringContainsString('name="DC.subject" content="Côte d&#039;Ivoire"', $metadata);
+        self::assertStringContainsString('name="DC.subject" content="Côte d\'Ivoire"', $metadata);
     }
 
     public function testZoteroRdfUsesRealOmekaItemAndValueContracts(): void
@@ -96,13 +96,13 @@ final class MetadataIntegrationTest extends TestCase
         $body = $metadata->applyResource($view, $this->item(), $this->site());
 
         self::assertNull($body);
-        $headMeta = $view->headMeta()->toString();
+        $headMeta = $this->decoded($view->headMeta()->toString());
         self::assertStringContainsString('name="description"', $headMeta);
         self::assertStringContainsString('A concise newspaper summary.', $headMeta);
-        self::assertStringContainsString('property="og:title" content="A &amp; B in West Africa"', $headMeta);
+        self::assertStringContainsString('property="og:title" content="A & B in West Africa"', $headMeta);
         self::assertStringContainsString('name="citation_title"', $headMeta);
 
-        $headLink = $view->headLink()->toString();
+        $headLink = $this->decoded($view->headLink()->toString());
         self::assertStringContainsString('rel="canonical"', $headLink);
         self::assertStringContainsString(self::CANONICAL, $headLink);
     }
@@ -114,7 +114,7 @@ final class MetadataIntegrationTest extends TestCase
 
         $writer->jsonLd($view, ['@context' => 'https://schema.org', 'name' => 'A & B']);
         $view->headScript()->appendScript('const label = "A & B";');
-        $scripts = $view->headScript()->toString();
+        $scripts = $this->decoded($view->headScript()->toString());
 
         self::assertStringContainsString('type="application/ld+json"', $scripts);
         self::assertMatchesRegularExpression(
@@ -144,6 +144,11 @@ final class MetadataIntegrationTest extends TestCase
         }
         $view->setHelperPluginManager($helpers);
         return $view;
+    }
+
+    private function decoded(string $html): string
+    {
+        return html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
     }
 
     /** @return ItemRepresentation&MockObject */

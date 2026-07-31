@@ -1,11 +1,6 @@
 <?php
 declare(strict_types=1);
 
-if (defined('IWAC_SEO_INTEGRATION_BOOTSTRAPPED')) {
-    return;
-}
-define('IWAC_SEO_INTEGRATION_BOOTSTRAPPED', true);
-
 $moduleRoot = dirname(__DIR__, 2);
 $omekaRoot = rtrim((string) getenv('OMEKA_PATH'), "\\/");
 $omekaAutoload = $omekaRoot . '/vendor/autoload.php';

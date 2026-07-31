@@ -13,6 +13,13 @@ All notable changes to the IWAC SEO module. Versions follow
   framework classes. The fast unit suite still uses its deliberately narrow
   shims; no Laminas or PSR package is added to the module.
 
+### Fixed
+- **Open Graph metadata now works with Omeka's HTML5 doctype.** Laminas View
+  2.x rejects `HeadMeta::setProperty()` unless the doctype is RDFa, while Omeka
+  configures HTML5 and Open Graph requires `property="…"`. `HeadWriter` now
+  retains the public helper path where supported and uses the helper's public
+  container as the compatibility path, including repeated locale alternates.
+
 ## 0.8.0 — 2026-07-31
 
 ### Changed

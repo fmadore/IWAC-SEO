@@ -17,6 +17,7 @@ use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\ZoteroRdf;
+use Laminas\EventManager\EventManager;
 use Laminas\Http\PhpEnvironment\Request;
 use Laminas\Mvc\Controller\ControllerManager;
 use Laminas\Router\Http\TreeRouteStack;
@@ -70,6 +71,7 @@ final class WiringIntegrationTest extends TestCase
         foreach ($dependencies as $class) {
             $services->setService($class, $this->withoutConstructor($class));
         }
+        $services->setService('EventManager', new EventManager());
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
 
         $controllers = new ControllerManager($services, $this->config['controllers']);
