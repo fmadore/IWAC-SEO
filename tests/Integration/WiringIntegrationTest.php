@@ -20,6 +20,7 @@ use IwacSeo\Service\ZoteroRdf;
 use Laminas\EventManager\EventManager;
 use Laminas\Http\PhpEnvironment\Request;
 use Laminas\Mvc\Controller\ControllerManager;
+use Laminas\Mvc\Controller\PluginManager as ControllerPluginManager;
 use Laminas\Router\Http\TreeRouteStack;
 use Laminas\ServiceManager\ServiceManager;
 use Omeka\Api\Manager as ApiManager;
@@ -72,6 +73,7 @@ final class WiringIntegrationTest extends TestCase
             $services->setService($class, $this->withoutConstructor($class));
         }
         $services->setService('EventManager', new EventManager());
+        $services->setService('ControllerPluginManager', new ControllerPluginManager($services));
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
 
         $controllers = new ControllerManager($services, $this->config['controllers']);
