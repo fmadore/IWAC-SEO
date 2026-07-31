@@ -1,14 +1,15 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <phpunit xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
          xsi:noNamespaceSchemaLocation="vendor/phpunit/phpunit/phpunit.xsd"
-         bootstrap="tests/bootstrap.php"
+         bootstrap="tests/Integration/bootstrap.php"
          colors="true"
          failOnWarning="true"
-         cacheDirectory=".phpunit.cache">
+         cacheDirectory=".phpunit.cache/integration">
     <testsuites>
-        <testsuite name="unit">
-            <directory>tests</directory>
-            <exclude>tests/Integration</exclude>
+        <testsuite name="Omeka integration">
+            <directory>tests/Integration</directory>
+            <exclude>tests/Integration/bootstrap.php</exclude>
+            <exclude>tests/Integration/run.php</exclude>
         </testsuite>
     </testsuites>
     <source>

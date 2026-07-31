@@ -398,7 +398,7 @@ IwacSeo/
 ├── view/iwac-seo/admin/seo/{dashboard,pages}.phtml
 ├── asset/css/admin.css
 ├── language/                        # template.pot + fr.po/fr.mo
-└── tests/                           # PHPUnit; `composer test`
+└── tests/                           # unit + real-Omeka integration suites
 ```
 
 ---
@@ -451,7 +451,20 @@ The suite covers the pure logic that regresses most silently — the Chicago/APA
 formatter, the BibTeX/RIS/CSL-JSON serialisers, hreflang resolution and the text
 utilities, plus sitemap policy and IWAC's instance-configuration contracts. GitHub Actions
 (`.github/workflows/ci.yml`) runs syntax checks and PHPUnit on PHP 8.2–8.5, then checks
-Composer metadata, translations, PSR-12 and PHPStan at the declared PHP 8.2 floor.
+Composer metadata, translations, PSR-12 and PHPStan at the declared PHP 8.2 floor. A
+separate PHP 8.5 job installs Omeka S 4.2.1 and exercises `CitationMeta`, `ZoteroRdf`,
+`HeadMetadata`, the service/controller managers and public routes against the real Omeka
+and Laminas classes. It intentionally does not add framework dependencies to this module
+or expand the narrow unit-test shims.
+
+To run that boundary locally, install Omeka separately and point `OMEKA_PATH` at its root:
+
+```sh
+OMEKA_PATH=/path/to/omeka-s composer test:integration
+```
+
+Omeka's `vendor/autoload.php` is loaded before the module's development vendor, matching
+the production ownership of Laminas and PSR classes.
 `ROADMAP.md` documents the refactoring plan behind 0.6.0 and what remains deliberately
 out of scope.
 

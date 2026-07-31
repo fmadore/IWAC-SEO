@@ -1,6 +1,7 @@
 # Composer (this module ships no third-party dependencies; vendor/ is never committed)
 /vendor/
 composer.lock
+/.integration/
 
 # OS / editor cruft
 .DS_Store

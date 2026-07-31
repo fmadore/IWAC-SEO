@@ -182,8 +182,9 @@ phases never depend on later ones.
   `composer.json` scripts.
 - **Close the test gaps.** The original 47 tests covered only the pure citation,
   hreflang and text logic. The writer, cache, ping queue and generator policy
-  now have direct tests. `ZoteroRdf::render()` and `CitationMeta` remain better
-  verified against a real Omeka/Laminas stack than by expanding the local shim.
+  now have direct tests. `ZoteroRdf::render()`, `CitationMeta`, `HeadMetadata`
+  and controller wiring are now covered by a separate PHP 8.5 integration job
+  that installs Omeka S 4.2.1. The local shim remains deliberately narrow.
 - **CI polish.** Delivered after 0.7.0: cache Composer downloads between runs
   and validate `composer.json` strictly. Workflow permissions, concurrency and
   timeouts are explicit too.

@@ -5,6 +5,14 @@ All notable changes to the IWAC SEO module. Versions follow
 
 ## Unreleased
 
+### Added
+- **Real Omeka/Laminas integration coverage.** A dedicated PHP 8.5 CI job
+  installs Omeka S 4.2.1, loads the application vendor before the module's
+  development vendor, and exercises `CitationMeta`, `ZoteroRdf`, `HeadMetadata`,
+  service/controller manager wiring and public-route matching against the real
+  framework classes. The fast unit suite still uses its deliberately narrow
+  shims; no Laminas or PSR package is added to the module.
+
 ## 0.8.0 — 2026-07-31
 
 ### Changed

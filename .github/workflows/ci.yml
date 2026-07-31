@@ -133,3 +133,51 @@ jobs:
           name: language
           path: language/
           if-no-files-found: error
+
+  # This is deliberately separate from the fast unit matrix. Omeka owns the
+  # Laminas/PSR runtime, so install the real application and load its vendor
+  # tree before the module's development-only vendor. The integration suite
+  # checks framework contracts and wiring without growing tests/Shim/omeka.php.
+  integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    name: Omeka S 4.2.1 / PHP 8.5
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Check out Omeka S
+        uses: actions/checkout@v7
+        with:
+          repository: omeka/omeka-s
+          ref: v4.2.1
+          path: .integration/omeka-s
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.5'
+          coverage: none
+          extensions: mbstring, pdo_mysql
+
+      - name: Locate Composer cache
+        id: composer-cache
+        run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
+
+      - name: Cache Composer downloads
+        uses: actions/cache@v5
+        with:
+          path: ${{ steps.composer-cache.outputs.dir }}
+          key: ${{ runner.os }}-composer-integration-${{ hashFiles('composer.json', '.integration/omeka-s/composer.json') }}
+          restore-keys: |
+            ${{ runner.os }}-composer-integration-
+            ${{ runner.os }}-composer-
+
+      - name: Install module development tools
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      - name: Install Omeka runtime
+        run: composer install --working-dir=.integration/omeka-s --no-dev --prefer-dist --no-interaction --no-progress
+
+      - name: Run real-framework integration tests
+        env:
+          OMEKA_PATH: ${{ github.workspace }}/.integration/omeka-s
+        run: composer test:integration

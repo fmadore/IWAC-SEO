@@ -32,6 +32,7 @@
   },
   "scripts": {
     "test": "phpunit",
+    "test:integration": "@php tests/Integration/run.php --configuration phpunit.integration.xml.dist",
     "lint": "phpcs",
     "lint:fix": "phpcbf",
     "analyse": "phpstan analyse",
@@ -49,6 +50,7 @@
   },
   "scripts-descriptions": {
     "test": "Run the PHPUnit suite.",
+    "test:integration": "Run the separate suite against the Omeka installation in OMEKA_PATH.",
     "lint": "Check PSR-12 compliance.",
     "analyse": "Run PHPStan. Omeka S is not a dependency, so the application boundary is opaque — see phpstan.neon.dist.",
     "i18n": "Regenerate language/template.pot and compile the .po catalogues.",
