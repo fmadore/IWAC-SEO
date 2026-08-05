@@ -1,0 +1,132 @@
+name: Release
+
+# GitHub's automatic "Source code (zip)" asset is not installable for an Omeka
+# module: it unpacks to `IWAC-SEO-0.8.0/`, but the folder must be named
+# `IwacSeo` for the namespace to resolve. So the release carries a zip built
+# here instead. `git archive --prefix=IwacSeo/` solves both halves at once — it
+# honours the export-ignore rules in .gitattributes *and* names the top-level
+# directory correctly, with no copy-and-prune step to drift out of step.
+#
+# Push a tag to publish:  git tag v0.9.0 && git push origin v0.9.0
+# Run manually to rehearse: builds and uploads the zip as an artefact, publishes
+# nothing. Worth using — this module is developed without PHP, so a packaging
+# mistake would otherwise surface only once a tag is already public.
+
+on:
+  push:
+    tags: ['v*']
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v7
+
+      # The version lives in three files that nothing else keeps in step.
+      # A tag is not retractable once pushed, so disagreement fails the build
+      # rather than shipping a zip whose module.ini contradicts its filename.
+      - name: Resolve and cross-check the version
+        id: version
+        run: |
+          set -euo pipefail
+          ini=$(sed -n 's/^version *= *"\(.*\)"/\1/p' config/module.ini)
+          cff=$(sed -n 's/^version: *"\(.*\)"/\1/p' CITATION.cff)
+
+          if [ "${GITHUB_REF_TYPE}" = tag ]; then
+            version="${GITHUB_REF_NAME#v}"
+          else
+            version="$ini"
+            echo "::notice::Rehearsal for $version — nothing will be published."
+          fi
+
+          fail=
+          [ "$ini" = "$version" ] || fail="config/module.ini says '$ini'"
+          [ "$cff" = "$version" ] || fail="${fail:+$fail; }CITATION.cff says '$cff'"
+          if [ -n "$fail" ]; then
+            echo "::error::Version mismatch — expected '$version' but $fail."
+            exit 1
+          fi
+
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+
+      - name: Build the module zip
+        run: |
+          set -euo pipefail
+          git archive --prefix=IwacSeo/ --format=zip \
+            -o "IwacSeo-${{ steps.version.outputs.version }}.zip" HEAD
+
+      # export-ignore is silent when it is wrong: a rule that stops matching
+      # (a renamed dev file, a new tool config) leaks without any error. These
+      # assertions are what turns that into a failed build.
+      - name: Verify the zip contains the module and nothing else
+        run: |
+          set -euo pipefail
+          zip="IwacSeo-${{ steps.version.outputs.version }}.zip"
+          contents=$(unzip -Z1 "$zip")
+          echo "$contents"
+
+          for unwanted in tests/ .github/ CLAUDE.md ROADMAP.md phpunit phpstan phpcs .editorconfig .gitignore .gitattributes; do
+            if echo "$contents" | grep -qF "IwacSeo/$unwanted"; then
+              echo "::error::Development file leaked into the release zip: $unwanted"
+              exit 1
+            fi
+          done
+
+          for required in Module.php config/module.ini src/ view/ asset/ language/ README.md CHANGELOG.md LICENSE CITATION.cff; do
+            if ! echo "$contents" | grep -qF "IwacSeo/$required"; then
+              echo "::error::Missing from the release zip: $required"
+              exit 1
+            fi
+          done
+
+      - name: Upload the rehearsal build
+        if: ${{ github.ref_type != 'tag' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: module-zip
+          path: IwacSeo-*.zip
+          if-no-files-found: error
+
+      # Notes come from the matching CHANGELOG section, so the release page and
+      # the file in the repository cannot tell different stories.
+      - name: Publish the release
+        if: ${{ github.ref_type == 'tag' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ steps.version.outputs.version }}
+        run: |
+          set -euo pipefail
+          awk -v v="$VERSION" '
+            $0 ~ "^## " v "($| )" { found = 1; next }
+            /^## / && found { exit }
+            found { print }
+          ' CHANGELOG.md > notes.md
+
+          if [ ! -s notes.md ]; then
+            echo "::error::CHANGELOG.md has no '## $VERSION' section."
+            exit 1
+          fi
+
+          cat >> notes.md <<'EOF'
+
+          ## Installing
+
+          Download `IwacSeo-*.zip` below and unzip it into your Omeka S
+          `modules/` directory — it already unpacks to a correctly named
+          `IwacSeo/` folder. Then **Admin → Modules → IWAC SEO → Install**.
+
+          Do not use the "Source code" archives: they unpack to a folder named
+          after the repository, which the namespace will not resolve.
+          EOF
+
+          gh release create "$GITHUB_REF_NAME" \
+            --title "$VERSION" \
+            --notes-file notes.md \
+            "IwacSeo-$VERSION.zip"

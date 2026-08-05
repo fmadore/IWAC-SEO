@@ -3,7 +3,7 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
-## Unreleased
+## 0.9.0 — 2026-08-05
 
 ### Added
 - **Real Omeka/Laminas integration coverage.** A dedicated PHP 8.5 CI job
@@ -13,7 +13,27 @@ All notable changes to the IWAC SEO module. Versions follow
   framework classes. The fast unit suite still uses its deliberately narrow
   shims; no Laminas or PSR package is added to the module.
 
+- **The licence is now actually distributed.** `composer.json` and the README
+  had declared GPL-3.0-or-later since the beginning, but no `LICENSE` file was
+  ever committed, so GitHub reported the repository as unlicensed and no copy
+  carried its terms. Adds the full GPL-3.0 text.
+- **`CITATION.cff`.** Citation File Format 1.2.0 metadata with ORCID and
+  affiliation, so GitHub renders a "Cite this repository" button and emits APA
+  and BibTeX. Fitting for a module whose subject is citation metadata.
+- **Releases ship an installable zip.** `.github/workflows/release.yml` builds
+  `IwacSeo-<version>.zip` with `git archive --prefix=IwacSeo/` on a `v*` tag,
+  which both honours the export-ignore rules and gives the top-level folder the
+  name the namespace requires — GitHub's own source archives name it after the
+  repository and are therefore not installable. The job cross-checks the tag
+  against `config/module.ini` and `CITATION.cff`, asserts that no development
+  file leaked into the zip, draws release notes from this changelog, and can be
+  run manually to rehearse the packaging without publishing anything.
+
 ### Fixed
+- **Development files no longer leak into distributed archives.** `CLAUDE.md`
+  and `phpunit.integration.xml.dist` were both missing from the export-ignore
+  list — the latter because it was added after the list was last reviewed —
+  and appeared in the output of `git archive` and `composer archive`.
 - **Open Graph metadata now works with Omeka's HTML5 doctype.** Laminas View
   2.x rejects `HeadMeta::setProperty()` unless the doctype is RDFa, while Omeka
   configures HTML5 and Open Graph requires `property="…"`. `HeadWriter` now

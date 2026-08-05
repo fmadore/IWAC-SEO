@@ -1,0 +1,43 @@
+# Citation metadata for this repository, in Citation File Format 1.2.0.
+# https://citation-file-format.github.io/
+#
+# GitHub reads this file to render the "Cite this repository" button and to
+# generate APA and BibTeX strings. Keep `version` and `date-released` in step
+# with config/module.ini and the top released section of CHANGELOG.md.
+cff-version: 1.2.0
+message: "If you use this software, please cite it using the metadata below."
+title: "IWAC SEO: an Omeka S module for search-engine optimisation, citation metadata and XML sitemaps"
+abstract: >-
+  IWAC SEO supplies the search-engine optimisation, citation and sitemap layer
+  for the Islam West Africa Collection (IWAC), a bilingual Omeka S digital
+  archive of Islam in West Africa. It injects per-page meta descriptions, Open
+  Graph and Twitter cards, canonical links, reciprocal hreflang alternates and
+  schema.org JSON-LD typed from each resource's RDF class; emits Highwire Press
+  and Dublin Core citation tags plus a Zotero RDF unAPI endpoint so reference
+  managers capture correctly typed records; drives a public "How to cite" panel
+  with Chicago, APA and MLA renderings and BibTeX, RIS and CSL-JSON downloads;
+  and serves a chunked XML sitemap index and robots.txt.
+type: software
+authors:
+  - family-names: Madore
+    given-names: Frédérick
+    orcid: "https://orcid.org/0000-0003-0959-2092"
+    affiliation: "University of Bayreuth"
+version: "0.9.0"
+date-released: "2026-08-05"
+license: GPL-3.0-or-later
+repository-code: "https://github.com/fmadore/IWAC-SEO"
+url: "https://islam.zmo.de/s/afrique_ouest/page/accueil"
+keywords:
+  - Omeka S
+  - digital humanities
+  - search engine optimisation
+  - schema.org
+  - JSON-LD
+  - structured data
+  - citation metadata
+  - Zotero
+  - unAPI
+  - XML sitemap
+  - Islam West Africa Collection
+  - West Africa

@@ -62,7 +62,19 @@ skill (`omeka-structure.md`) for the full class catalogue.
 ## Installation
 
 The module folder **must be named `IwacSeo`** inside Omeka's `modules/` directory (the
-folder name has to match the namespace). Then:
+folder name has to match the namespace).
+
+Download `IwacSeo-<version>.zip` from the
+[latest release](https://github.com/fmadore/IWAC-SEO/releases/latest) and unzip it into
+`modules/` — it already unpacks to a correctly named folder and contains only the runtime.
+**Do not use GitHub's "Source code" archives:** they unpack to `IWAC-SEO-<version>/`, which
+the namespace will not resolve. Cloning works too, provided you name the target directory:
+
+```sh
+git clone https://github.com/fmadore/IWAC-SEO.git modules/IwacSeo
+```
+
+Then:
 
 1. **Admin → Modules → IWAC SEO → Install.**
 2. **Configure** (see below) — at minimum paste your Google Search Console snippet and pick
@@ -472,4 +484,13 @@ out of scope.
 
 ## Licence
 
-GPL-3.0-or-later. © Frédérick Madore.
+[GPL-3.0-or-later](LICENSE). © Frédérick Madore.
+
+---
+
+## Citing
+
+Use the **Cite this repository** button on GitHub, or [`CITATION.cff`](CITATION.cff)
+directly — it carries the ORCID and the released version, and GitHub renders it as APA or
+BibTeX. Keep its `version` and `date-released` in step with `config/module.ini` when
+releasing; the release workflow fails the build if they disagree.
