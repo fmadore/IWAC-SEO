@@ -41,6 +41,8 @@
       "@php .github/scripts/compile-po.php"
     ],
     "i18n:check": "@php .github/scripts/extract-strings.php --check",
+    "hreflang:check": "@php .github/scripts/check-hreflang-pairs.php",
+    "hreflang:fix": "@php .github/scripts/check-hreflang-pairs.php --write",
     "check": [
       "@i18n:check",
       "@lint",

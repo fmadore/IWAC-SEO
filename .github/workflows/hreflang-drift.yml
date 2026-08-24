@@ -1,0 +1,146 @@
+name: hreflang drift
+
+# The pair table in config/instance.config.php is generated, not authored: the
+# Internationalisation module records each page's counterpart and the REST API
+# exposes it, so that module is the only place a pairing is written down. The
+# committed table is a build product, which keeps `Hreflang` pure config and the
+# render path free of any lookup — the reason the table exists in the repo at
+# all rather than being read at request time.
+#
+# A generated file that only a human can regenerate is still hand-maintained,
+# and this module is developed without PHP available. So the schedule does the
+# regenerating and opens a pull request; nobody has to run anything locally.
+#
+# Renaming or adding a *page* on islam.zmo.de is what invalidates the table, and
+# nothing in this repo changes when that happens — a push-triggered job would
+# never fire at the moment the damage is done. Hence the cron.
+#
+# Kept out of ci.yml on purpose: this is the only check that needs the network,
+# and a live-site dependency should not be able to fail an unrelated code PR.
+# `composer check` stays hermetic.
+on:
+  schedule:
+    # Mondays, 06:17 UTC. Off the hour because GitHub queues the top of every
+    # hour heavily, which delays scheduled runs.
+    - cron: '17 6 * * 1'
+  workflow_dispatch:
+    inputs:
+      base_url:
+        description: Installation to check
+        required: false
+        default: https://islam.zmo.de
+  # A PR that edits the table itself is verified but never rewritten — pushing
+  # to a contributor's branch is not this workflow's business.
+  pull_request:
+    paths:
+      - config/instance.config.php
+      - .github/scripts/check-hreflang-pairs.php
+      - .github/workflows/hreflang-drift.yml
+
+permissions:
+  contents: read
+
+concurrency:
+  group: hreflang-${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  # On a PR: report only. Fails if the table disagrees with the live site.
+  verify:
+    if: ${{ github.event_name == 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: page_pairs matches Internationalisation
+    steps:
+      - uses: actions/checkout@v7
+
+      # No Composer dependencies: the script reads the config and the REST API
+      # and nothing else, so there is nothing to install or cache.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Check page_pairs against the live installation
+        run: php .github/scripts/check-hreflang-pairs.php
+
+  # On a schedule or by hand: regenerate, and raise a PR if that changed
+  # anything. Deliberately a PR and not a push to main — the table drives what
+  # search engines are told about every page, so a human still sees the diff.
+  regenerate:
+    if: ${{ github.event_name != 'pull_request' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    name: Regenerate page_pairs
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.2'
+          coverage: none
+
+      - name: Regenerate the table from the module's mapping
+        id: regen
+        run: |
+          set -euo pipefail
+          php .github/scripts/check-hreflang-pairs.php --write \
+            --base-url=${{ inputs.base_url || 'https://islam.zmo.de' }} | tee regen.log
+          if git diff --quiet -- config/instance.config.php; then
+            echo "changed=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "changed=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Confirm the rewritten config is still valid PHP
+        if: ${{ steps.regen.outputs.changed == 'true' }}
+        run: php -l config/instance.config.php
+
+      # One fixed branch, force-pushed: a weekly cron must not accumulate a new
+      # pull request every Monday for the same drift.
+      - name: Open or update the pull request
+        if: ${{ steps.regen.outputs.changed == 'true' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          set -euo pipefail
+          branch=chore/hreflang-drift
+          git config user.name 'github-actions[bot]'
+          git config user.email '41898282+github-actions[bot]@users.noreply.github.com'
+          git switch -c "$branch"
+          git add config/instance.config.php
+          git commit -m 'Regenerate hreflang page_pairs from Internationalisation'
+          git push --force origin "$branch"
+
+          if [ -n "$(gh pr list --head "$branch" --state open --json number --jq '.[].number')" ]; then
+            echo "::notice::Updated the existing pull request on $branch."
+            exit 0
+          fi
+
+          cat > pr-body.md <<'BODY'
+          The `page_pairs` table had drifted from the Internationalisation module,
+          which is the source of truth for page pairings. Regenerated by
+          `.github/scripts/check-hreflang-pairs.php --write`.
+
+          BODY
+          cat regen.log >> pr-body.md
+
+          gh pr create --head "$branch" --base "${{ github.event.repository.default_branch }}" \
+            --title 'Regenerate hreflang page_pairs' --body-file pr-body.md
+
+      # If the repository forbids Actions from opening pull requests, the diff
+      # still has to reach a human rather than being silently discarded.
+      - name: Upload the regenerated config if the pull request failed
+        if: ${{ failure() && steps.regen.outputs.changed == 'true' }}
+        uses: actions/upload-artifact@v7
+        with:
+          name: instance-config-regenerated
+          path: config/instance.config.php
+          if-no-files-found: error
+
+      - name: Report when nothing drifted
+        if: ${{ steps.regen.outputs.changed == 'false' }}
+        run: echo '::notice::page_pairs already matches the Internationalisation module.'

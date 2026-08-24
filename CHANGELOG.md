@@ -3,6 +3,60 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 0.10.0 — 2026-08-24
+
+### Fixed
+- **`hreflang` alternates were missing on 20 pages and broken on one.** The
+  `page_pairs` table had drifted from the site: `collection-overview`,
+  `explore`, `browse`, `references`, `secularism`, the six country pages and
+  every visualisation page had no entry, so they emitted no cross-language
+  alternate at all. Worse, `sentiment-analysis` was mapped to a French
+  `sentiment-analysis` page that does not exist — the real slug is
+  `analyse-sentiment` — so that page advertised an alternate that 404s, which
+  is worse for SEO than advertising none. All 37 page pairs on both sites are
+  now covered and verified against the Internationalisation module's own
+  mapping.
+
+### Removed
+- **16 dead `page_pairs` rows.** `news`/`nouvelles`, `map-browse`/`carte`,
+  `article`, `book`/`livre`, `iwac-chatbot`, `sub-collections`,
+  `submit-a-reference`, `digital-humanities-ai`, `iwac-keyword-explorer`,
+  `spatial-network-visualisation` and the six `visualisations-XX` country
+  pages named pages that no longer exist on either site. They were inert —
+  `pairFor()` only matches slugs that actually render — but they made the
+  table half fiction, which is how the wrong `sentiment-analysis` row stayed
+  hidden in it.
+
+### Added
+- **`page_pairs` is now generated rather than hand-maintained.** The
+  Internationalisation module already records each page's counterpart and the
+  REST API exposes it as `o-module-internationalisation:related_page`, so that
+  module is the only place a pairing is authored and the committed table is a
+  build product. `composer hreflang:fix` regenerates it;
+  `composer hreflang:check` audits it and fails on three kinds of drift —
+  pairs the module records that the table omits, rows that contradict it, and
+  rows naming pages that no longer exist. Output is sorted and aligned
+  deterministically, so regenerating an already-correct table rewrites
+  nothing.
+
+  `Hreflang` itself deliberately does not read the module at request time: it
+  stays pure config, with no API or database access on a page render. Making
+  the table a generated file gets the single source of truth without paying
+  for a lookup on every page.
+
+- **The `hreflang drift` workflow keeps it current by itself.** Adding or
+  renaming a page invalidates the table, and nothing in this repository
+  changes when that happens, so a push-triggered job would never fire when the
+  damage is done. The workflow regenerates the table weekly and opens a pull
+  request if anything moved — a pull request rather than a push to main,
+  because the table drives what search engines are told about every page, and
+  onto one fixed branch so a weekly cron cannot accumulate a pull request per
+  Monday for the same drift. It also audits, without rewriting, any PR that
+  touches the table. Since the module is developed without PHP available, the
+  regeneration has to happen in CI to be useful at all. Kept out of
+  `composer check` and `ci.yml` so a live-site dependency can never fail an
+  unrelated code PR.
+
 ## 0.9.0 — 2026-08-05
 
 ### Added

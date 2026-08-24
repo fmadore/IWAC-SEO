@@ -320,6 +320,23 @@ IWAC is the same collection under two Omeka sites — `afrique_ouest` (fr) and `
     they are mapped by the `iwac_seo.hreflang.page_pairs` table in `config/instance.config.php`.
     A page with no entry simply gets no alternate (never a broken one). Update the table when
     pages are added or renamed.
+
+    The table is **generated, not authored**. The Internationalisation module records each
+    page's counterpart and exposes it on the REST API as
+    `o-module-internationalisation:related_page`, so that module is the only place a pairing is
+    written down; the committed table is a build product, which is what keeps a page render free
+    of any lookup. `composer hreflang:fix` regenerates it, and `composer hreflang:check` audits
+    it — reporting pairs the module records but the table omits, rows that contradict the module
+    (which emit a 404 alternate — worse than emitting none), and rows naming pages that no
+    longer exist. Rows are sorted and aligned deterministically, so regenerating an
+    already-correct table rewrites nothing.
+
+    Adding or renaming a *page* is what invalidates the table, and nothing in this repository
+    changes when that happens — so the `hreflang drift` workflow regenerates it weekly and
+    opens a pull request if anything moved (a pull request, not a push: the table drives what
+    search engines are told about every page). The same workflow audits, without rewriting, any
+    PR that touches the table. It needs the network, so it is deliberately outside
+    `composer check`.
 - **`og:locale` + `og:locale:alternate`** advertise both languages to social platforms.
 - The **item / item-set sitemaps** carry `<xhtml:link rel="alternate" hreflang>` for each
   language, so both versions are discoverable from the single (default-site) `<loc>` entries.
