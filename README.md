@@ -130,9 +130,11 @@ switches between them — overrides are stored per site, so the English pages
 ### Admin dashboard
 
 **Admin → SEO** shows what is configured, the sitemap/robots URLs with public-resource counts,
-a **bilingual (hreflang) coverage** report listing public pages that are missing from the
-`page_pairs` map, and a **Regenerate** button that clears the sitemap cache so it rebuilds on
-the next request. It also warns when the stored IndexNow key cannot match the `/{key}.txt`
+a **bilingual (hreflang) coverage** report, and a **Regenerate** button that clears the sitemap
+cache so it rebuilds on the next request. The coverage report separates the two ways a page can
+be wrong about its translations: **broken alternate links** — a `page_pairs` row naming a
+counterpart that is not a public page, so the alternate 404s — and **pages with no pair**, which
+simply emit none. Broken is listed first because it is the worse of the two. It also warns when the stored IndexNow key cannot match the `/{key}.txt`
 route (non-hex) and would fail verification.
 
 ---

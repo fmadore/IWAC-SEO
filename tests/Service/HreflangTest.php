@@ -49,11 +49,38 @@ final class HreflangTest extends TestCase
         $this->assertSame([], $hreflang->coveredSlugs('unknown-site'));
     }
 
+    public function testPartnersForNamesTheOtherSiteOnly(): void
+    {
+        $hreflang = new Hreflang($this->config());
+        $this->assertSame(['westafrica' => 'home'], $hreflang->partnersFor('afrique_ouest', 'accueil'));
+        $this->assertSame(['afrique_ouest' => 'accueil'], $hreflang->partnersFor('westafrica', 'home'));
+    }
+
+    public function testPartnersForIsEmptyWithoutARow(): void
+    {
+        $hreflang = new Hreflang($this->config());
+        $this->assertSame([], $hreflang->partnersFor('afrique_ouest', 'no-such-page'));
+        $this->assertSame([], $hreflang->partnersFor('unknown-site', 'accueil'));
+    }
+
+    public function testPartnersForSkipsSitesARowDoesNotCover(): void
+    {
+        // A one-sided or blank row pairs nothing: the dashboard must not report
+        // a counterpart as broken when none was ever configured.
+        $hreflang = new Hreflang($this->config(['page_pairs' => [
+            ['afrique_ouest' => 'accueil'],
+            ['afrique_ouest' => 'a-propos', 'westafrica' => ''],
+        ]]));
+        $this->assertSame([], $hreflang->partnersFor('afrique_ouest', 'accueil'));
+        $this->assertSame([], $hreflang->partnersFor('afrique_ouest', 'a-propos'));
+    }
+
     public function testMalformedConfigDegradesSafely(): void
     {
         $hreflang = new Hreflang(['sites' => 'not-an-array', 'page_pairs' => 'nope']);
         $this->assertFalse($hreflang->isEnabled());
         $this->assertSame([], $hreflang->sites());
         $this->assertSame([], $hreflang->coveredSlugs('afrique_ouest'));
+        $this->assertSame([], $hreflang->partnersFor('afrique_ouest', 'accueil'));
     }
 }

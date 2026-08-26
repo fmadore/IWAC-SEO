@@ -48,11 +48,14 @@ gate fails. Download it, commit it.
   so both the schema.org and the citation maps key off class id. README, "Why
   dispatch on resource class, not template".
 - **`config/module.config.php` is wiring; `config/instance.config.php` is IWAC
-  data** — the class→`@type` map, the class→citation-kind map, and the 33
+  data** — the class→`@type` map, the class→citation-kind map, and the 38
   hreflang `page_pairs`. They're combined with `+`, not `array_merge_recursive`,
-  so the top-level keys must stay disjoint. Adding or renaming a static page
-  needs a `page_pairs` entry; the dashboard's coverage report exists precisely
-  because that drifts.
+  so the top-level keys must stay disjoint. `page_pairs` is *generated* from the
+  Internationalisation module, not authored: adding or renaming a static page
+  invalidates it, and the fix is the `hreflang drift` workflow (weekly, or
+  `gh workflow run "hreflang drift"`), never a hand-edit — a hand-edit is
+  reverted by the next regeneration. The dashboard's coverage report exists
+  precisely because that drifts.
 - **`view.show.after` discards listener return values.** `Module::handleResourceShow()`
   therefore `echo`s the unAPI `<abbr>` markup straight into the show template's
   output buffer. It isn't an oversight — don't convert it to a return.
