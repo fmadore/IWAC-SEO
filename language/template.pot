@@ -42,6 +42,10 @@ msgid "Bing Webmaster verification"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Broken alternate links"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Citation tags (Zotero / Scholar)"
 msgstr ""
 
@@ -182,6 +186,10 @@ msgstr ""
 msgid "Page"
 msgstr ""
 
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Pages with no pair"
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "Paste the HTML-tag snippet Google gives you (the whole <meta name=\"google-site-verification\" …> tag) or just the token. It is injected into the <head> of every public page so Google can verify ownership. Then add the site at search.google.com/search-console and submit /sitemap.xml."
 msgstr ""
@@ -274,6 +282,10 @@ msgid "The sitemap is cached. Clear the cache to rebuild it immediately after a 
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "These public pages are paired with a counterpart that is not a public page, so they advertise an alternate link that leads nowhere — worse for search engines than advertising none. Correct the row in iwac_seo.hreflang.page_pairs."
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "These public pages have no entry in the hreflang page map (iwac_seo.hreflang.page_pairs), so they are published without cross-language alternate links. Add a pair when a translation exists."
 msgstr ""
 
@@ -307,6 +319,10 @@ msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "paste your snippet in Configure"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "points to %s, which is not a public page"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml

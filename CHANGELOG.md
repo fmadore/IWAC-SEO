@@ -3,6 +3,47 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.0 — 2026-08-26
+
+First stable release. The module has run islam.zmo.de's SEO, citation and
+sitemap layer since 0.1.0; 1.0.0 records that its settings,
+its `iwac_seo.*` configuration keys and its public routes (`/sitemap.xml`,
+`/robots.txt`, `/unapi`, the citation endpoints) are now a compatibility
+promise rather than a moving target. Changing any of them incompatibly needs a
+major bump from here on. Nothing else about the module changes at 1.0.0 beyond
+what is listed below.
+
+### Fixed
+- **Two pages emitted no `hreflang` alternates and a third advertised one that
+  404s.** `audiovisuel` / `audiovisual` (Vidéos et enregistrements / Video and
+  recordings) had no row in `page_pairs`, so neither side linked to the other;
+  and the row for `press-language` named a French page `language-presse` that
+  does not exist — the live slug is `langue-presse` — so the English page
+  advertised an alternate that leads nowhere while the French one advertised
+  nothing. Regenerated from the Internationalisation module, which had all
+  three pairings recorded correctly: the table was wrong, not the site.
+
+  Worth noting for how the table is maintained: 0.10.0 verified all 37 pairs
+  against that module on 24 August, and this drift was present two days later.
+  A generated table with a weekly job behind it is the right shape for
+  something that goes stale on a timescale like that.
+
+- **The coverage report marked as covered the one page it should have flagged
+  loudest.** `hreflangGaps()` asked only whether a page's slug appeared
+  somewhere in `page_pairs`, so a row naming a counterpart that no longer
+  exists counted as coverage — the stale row concealed the page it broke.
+  `press-language` was therefore absent from the dashboard's list precisely
+  because it had a row, while the two genuinely unpaired pages were reported.
+
+  The report now distinguishes the two failures and lists the worse one first:
+  **broken alternate links** (paired with something that is not a public page,
+  so the alternate 404s — worse for search engines than emitting none) and
+  **pages with no pair** (which correctly emit nothing). Deciding this needs
+  both sites' pages in hand, since whether a counterpart resolves is a question
+  about the *other* site, so the dashboard now loads them before judging
+  either. `Hreflang::partnersFor()` exposes what to check; `Hreflang` itself
+  stays pure config, with no lookup added to any page render.
+
 ## 0.10.0 — 2026-08-24
 
 ### Fixed

@@ -159,6 +159,40 @@ class Hreflang
     }
 
     /**
+     * The counterpart slugs $pageSlug is paired with on the *other* configured
+     * sites — the alternates `forPage()` would advertise. Empty when the page
+     * has no row at all.
+     *
+     * This answers the question `coveredSlugs()` cannot. A row naming a page
+     * that no longer exists still counts the page as covered, while the
+     * alternate it emits 404s — worse for search engines than emitting none.
+     * Only a caller that can see the other site's pages can tell the two
+     * apart, so the check lives in the dashboard and this exposes what to
+     * check.
+     *
+     * @return array<string,string> other site slug => page slug
+     */
+    public function partnersFor(string $siteSlug, string $pageSlug): array
+    {
+        $pair = $this->pairFor($siteSlug, $pageSlug);
+        if ($pair === null) {
+            return [];
+        }
+        $partners = [];
+        foreach (array_keys($this->sites) as $slug) {
+            $slug = (string) $slug;
+            if ($slug === $siteSlug) {
+                continue; // the self-referential alternate is not a counterpart
+            }
+            $partnerSlug = (string) ($pair[$slug] ?? '');
+            if ($partnerSlug !== '') {
+                $partners[$slug] = $partnerSlug;
+            }
+        }
+        return $partners;
+    }
+
+    /**
      * The page_pairs row that maps the current site's slug to $pageSlug, if any.
      *
      * @return array<string,string>|null

@@ -53,7 +53,7 @@ class SeoController extends AbstractActionController
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],
             'hreflangEnabled' => $this->hreflang->isEnabled(),
-            'hreflangGaps'   => $this->hreflangGaps(),
+            'hreflangCoverage' => $this->hreflangCoverage(),
             'confirmForm'    => $this->getForm(\Omeka\Form\ConfirmForm::class)
                 ->setAttribute('action', $this->url()->fromRoute('admin/iwac-seo/regenerate')),
         ]);
@@ -61,19 +61,35 @@ class SeoController extends AbstractActionController
     }
 
     /**
-     * Public pages with no entry in the hreflang page map — they emit no
-     * cross-language alternate links until config page_pairs is updated.
-     * Surfacing them here catches drift as soon as a page is added/renamed.
+     * The two ways a public page can be wrong about its translations, so drift
+     * surfaces as soon as a page is added, renamed or unpublished.
      *
-     * @return array<int,array{site:SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}>
+     * `unpaired` — no `page_pairs` row, so no alternate is emitted. Correct for
+     * a page that genuinely has no translation; a gap once one exists.
+     *
+     * `broken` — a row exists, but the counterpart it names is not a public
+     * page, so the alternate points at a 404. Worse for search engines than
+     * emitting none, and invisible to a per-site check: the stale row is what
+     * marks the page it breaks as covered.
+     *
+     * Both sites' pages are therefore loaded before either is judged — whether
+     * a counterpart resolves is a question about the *other* site.
+     *
+     * @return array{
+     *     unpaired:array<int,array{site:SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}>,
+     *     broken:array<int,array{site:SiteRepresentation,page:\Omeka\Api\Representation\SitePageRepresentation,targetSite:string,targetSlug:string}>
+     * }
      */
-    private function hreflangGaps(): array
+    private function hreflangCoverage(): array
     {
         if (!$this->hreflang->isEnabled()) {
-            return [];
+            return ['unpaired' => [], 'broken' => []];
         }
-        $gaps = [];
+
+        /** @var array<string,array{site:SiteRepresentation,lang:string,pages:array<string,\Omeka\Api\Representation\SitePageRepresentation>}> */
+        $loaded = [];
         foreach ($this->hreflang->sites() as $slug => $lang) {
+            $slug = (string) $slug;
             try {
                 $sites = $this->api->search('sites', ['slug' => $slug])->getContent();
                 $site = $sites[0] ?? null;
@@ -84,21 +100,48 @@ class SeoController extends AbstractActionController
             } catch (\Throwable $e) {
                 continue;
             }
-            $covered = $this->hreflang->coveredSlugs((string) $slug);
-            $missing = [];
+            $public = [];
             foreach ($pages as $page) {
-                if (!$page->isPublic()) {
+                if ($page->isPublic()) {
+                    $public[(string) $page->slug()] = $page;
+                }
+            }
+            $loaded[$slug] = ['site' => $site, 'lang' => (string) $lang, 'pages' => $public];
+        }
+
+        $unpaired = [];
+        $broken = [];
+        foreach ($loaded as $slug => $info) {
+            $missing = [];
+            foreach ($info['pages'] as $pageSlug => $page) {
+                // Both cast: array keys narrow a numeric slug to int, and
+                // strict_types would make that a TypeError, not a coercion.
+                $partners = $this->hreflang->partnersFor((string) $slug, (string) $pageSlug);
+                if ($partners === []) {
+                    $missing[] = $page;
                     continue;
                 }
-                if (!in_array($page->slug(), $covered, true)) {
-                    $missing[] = $page;
+                foreach ($partners as $targetSite => $targetSlug) {
+                    // A site whose pages could not be loaded cannot be judged;
+                    // reporting its counterparts as broken would be a guess.
+                    if (!isset($loaded[$targetSite])) {
+                        continue;
+                    }
+                    if (!isset($loaded[$targetSite]['pages'][$targetSlug])) {
+                        $broken[] = [
+                            'site'       => $info['site'],
+                            'page'       => $page,
+                            'targetSite' => (string) $targetSite,
+                            'targetSlug' => $targetSlug,
+                        ];
+                    }
                 }
             }
             if ($missing) {
-                $gaps[] = ['site' => $site, 'lang' => (string) $lang, 'pages' => $missing];
+                $unpaired[] = ['site' => $info['site'], 'lang' => $info['lang'], 'pages' => $missing];
             }
         }
-        return $gaps;
+        return ['unpaired' => $unpaired, 'broken' => $broken];
     }
 
     public function regenerateAction()

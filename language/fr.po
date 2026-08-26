@@ -34,6 +34,9 @@ msgstr "Couverture bilingue (hreflang)"
 msgid "Bing Webmaster verification"
 msgstr "Vérification Bing Webmaster"
 
+msgid "Broken alternate links"
+msgstr "Liens alternatifs rompus"
+
 msgid "Citation tags (Zotero / Scholar)"
 msgstr "Balises de citation (Zotero / Scholar)"
 
@@ -139,6 +142,9 @@ msgstr "Personnalisez le titre, la description, l’image de partage et l’inde
 msgid "Page"
 msgstr "Page"
 
+msgid "Pages with no pair"
+msgstr "Pages sans équivalent"
+
 msgid "Paste the HTML-tag snippet Google gives you (the whole <meta name=\"google-site-verification\" …> tag) or just the token. It is injected into the <head> of every public page so Google can verify ownership. Then add the site at search.google.com/search-console and submit /sitemap.xml."
 msgstr "Collez l’extrait HTML fourni par Google (la balise <meta name=\"google-site-verification\" …> complète) ou uniquement le jeton. Il est inséré dans le <head> de chaque page publique afin que Google puisse vérifier que vous êtes propriétaire du site. Ajoutez ensuite le site sur search.google.com/search-console et soumettez /sitemap.xml."
 
@@ -205,6 +211,9 @@ msgstr "L’image og:image / Twitter Card utilisée lorsqu’une page (ou un con
 msgid "The sitemap is cached. Clear the cache to rebuild it immediately after a large content change."
 msgstr "Le sitemap est mis en cache. Videz le cache pour le reconstruire immédiatement après une modification importante du contenu."
 
+msgid "These public pages are paired with a counterpart that is not a public page, so they advertise an alternate link that leads nowhere — worse for search engines than advertising none. Correct the row in iwac_seo.hreflang.page_pairs."
+msgstr "Ces pages publiques sont appariées à une page qui n’est pas publique : elles annoncent donc un lien alternatif qui ne mène nulle part, ce qui est pire pour les moteurs de recherche que de n’en annoncer aucun. Corrigez la ligne dans iwac_seo.hreflang.page_pairs."
+
 msgid "These public pages have no entry in the hreflang page map (iwac_seo.hreflang.page_pairs), so they are published without cross-language alternate links. Add a pair when a translation exists."
 msgstr "Ces pages publiques ne figurent pas dans la table de correspondance hreflang (iwac_seo.hreflang.page_pairs) : elles sont publiées sans lien alternatif vers l’autre langue. Ajoutez une correspondance lorsqu’une traduction existe."
 
@@ -231,6 +240,9 @@ msgstr "aucune clé définie"
 
 msgid "paste your snippet in Configure"
 msgstr "collez votre extrait dans Configurer"
+
+msgid "points to %s, which is not a public page"
+msgstr "pointe vers %s, qui n’est pas une page publique"
 
 msgid "schema.org JSON-LD"
 msgstr "JSON-LD schema.org"
