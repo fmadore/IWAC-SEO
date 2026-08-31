@@ -39,6 +39,38 @@ final class TextTest extends TestCase
         $this->assertStringEndsWith('…', $out);
     }
 
+    public function testWithoutQueryLeavesACleanUrlUntouched(): void
+    {
+        $url = 'https://islam.zmo.de/s/afrique_ouest/search';
+        $this->assertSame($url, Text::withoutQuery($url));
+    }
+
+    public function testWithoutQueryStripsTheQueryString(): void
+    {
+        $this->assertSame(
+            'https://islam.zmo.de/s/afrique_ouest/search',
+            Text::withoutQuery('https://islam.zmo.de/s/afrique_ouest/search?page=3&sort_by=title')
+        );
+    }
+
+    public function testWithoutQueryHandlesTheLegacyFacetUrls(): void
+    {
+        // As Google actually crawls them: raw spaces, square brackets and an
+        // apostrophe in the query.
+        $this->assertSame(
+            'https://islam.zmo.de/s/afrique_ouest/search',
+            Text::withoutQuery(
+                "https://islam.zmo.de/s/afrique_ouest/search"
+                . "?facet[dcterms_type_ss][9]=Article d'encyclopédie&page=2"
+            )
+        );
+    }
+
+    public function testWithoutQueryKeepsAnEmptyQueryMarkerOut(): void
+    {
+        $this->assertSame('https://islam.zmo.de/search', Text::withoutQuery('https://islam.zmo.de/search?'));
+    }
+
     public function testExtractTokenFromFullMetaSnippet(): void
     {
         $snippet = '<meta name="google-site-verification" content="AbC123xyz" />';

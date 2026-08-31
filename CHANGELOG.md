@@ -3,6 +3,68 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.1 — 2026-08-31
+
+### Fixed
+- **The layout gap-fill made every query permutation its own canonical page.**
+  `applyGlobals()` filled a missing canonical with `serverUrl(true)` — the URL
+  *including* its query string — for any route no phase-1 listener claimed.
+  `/s/{site}/search` is IwacSearch's controller, so that is exactly what
+  happened there: each facet combination emitted a self-referential canonical
+  declaring itself a distinct page worth indexing, and, because `applyBrowse()`
+  never ran, none of them carried the `noindex, follow` that the browse routes
+  pair with a self-canonical. Search Console has 1,306 URLs from that crawl
+  space in its structured-data report, all of them variants of one page.
+
+  Unclaimed routes now canonicalise to the query-less URL and mark a
+  query-carrying variant `noindex, follow`. The browse listener keeps its
+  self-referential canonical — page 2 of a listing is a real page in a series
+  and must not collapse onto page 1 — so the two rules now sit side by side,
+  each with the reason it differs from the other. `og:url`, previously re-derived
+  from `serverUrl(true)`, now mirrors whatever canonical was written, so a share
+  of a filtered page can no longer claim an identity the canonical disowns.
+
+  The query test moved to `Text::withoutQuery()`, which both call sites share.
+
+### Not a code change, but the release this belongs with
+
+The Search Console report that prompted this release had a second, larger cause
+with no code in it. Every public resource page also carried a
+`<script type="application/ld+json">` in the page body holding Omeka's full API
+representation of the resource (`@context: /api-context`). Omeka S core puts it
+there — `application/Module.php` attaches
+`AbstractResourceRepresentation::embeddedJsonLd()` to `view.show.after` and
+`view.browse.after` on the Item/ItemSet/Media controllers, "for the purpose of
+machine-readable metadata discovery".
+
+At IWAC's scale that block is 157 KB on an ordinary item (it carries the whole
+OCR text), 25 blocks / 507 KB on a browse page, and **2.2–3.9 MB on an authority
+record**, where the representation's `@reverse` enumerates all ~13,000 items
+that link to it. Google truncates it, and the cut landing at a different byte
+offset per `?page=N` is exactly why one URL family produces four different
+"unparsable structured data" messages in Search Console (48 × missing `}`,
+4 × missing `:`, 2 × missing `,` or `}`, 1 × missing `,` or `]`).
+validator.schema.org, which has no size cap, parses the same page cleanly:
+13,398 objects, zero errors, one `UNKNOWN_JSONLD_CONTEXT` warning.
+
+Core gates it on one per-site checkbox — **Admin → Sites → … → Settings →
+General → "Disable JSON-LD embed"** (`disable_jsonld_embed`) — **ticked on both
+`afrique_ouest` and `westafrica` on 2026-08-31**. Nothing on the site consumed
+the embed (no theme or module JS reads `ld+json`), the same data is still served
+at `/api/items/{id}`, and Zotero import here goes through unAPI and the citation
+meta tags this module emits. Measured on the live site immediately after:
+
+| page | before | after |
+|---|---|---|
+| `item/67396` (authority record) | 2,313,338 B | 103,622 B |
+| `item/10563` (publication issue) | 362,588 B | 205,100 B |
+| `/item` (browse, 25 results) | 564,994 B | 57,258 B |
+
+What remains on a resource page is this module's own JSON-LD — the schema.org
+`@type` for the resource class plus a `BreadcrumbList`, ~350 and ~500 bytes in
+`<head>` — which is the only structured data Google could ever have used for a
+rich result anyway.
+
 ## 1.0.0 — 2026-08-26
 
 First stable release. The module has run islam.zmo.de's SEO, citation and

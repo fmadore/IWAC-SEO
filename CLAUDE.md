@@ -5,27 +5,42 @@ Africa Collection (islam.zmo.de). `README.md` covers the architecture, every
 setting, and the schema.org / Zotero field conventions — read the relevant
 section before changing behaviour. This file is only the things that bite.
 
-## There is no PHP on this machine
+## PHP yes, Composer no
 
-Neither `php` nor `composer` is on PATH, and `vendor/` is never committed — so
-**the test suite cannot be run locally**. The same was true when 0.7.0 was
-refactored. PHPUnit, PHPStan and PHP_CodeSniffer are configured and have passed
-in CI; they simply cannot be executed from this Windows checkout.
+`php` **is** on PATH (8.5.8, winget), so `php -l` works and the unit suite can
+be run. `composer` is not, and `vendor/` is never committed, so the dev tools
+have to be borrowed from a sibling checkout that has them installed —
+`../IwacSearch/vendor` carries PHPUnit 11 and PHPStan 2, both matching this
+module's constraints. PHP_CodeSniffer is in neither, so PSR-12 is still
+read-checked and gated in CI.
 
-Consequence: changes are verified by reading, and CI is the only gate that
-actually executes anything. Don't report a change as tested. For the class of
-mistake PHP would have caught for free — a typo'd method, a wrong arity, a
-renamed constant — re-read the call sites instead.
+The winget build loads no `php.ini`, so `mbstring` (which PHPUnit requires) and
+`fileinfo` have to be switched on per invocation:
 
-## CI is the only place the checks actually run
+```bash
+php -d extension_dir="$LOCALAPPDATA/Microsoft/WinGet/Packages/PHP.PHP.8.5_Microsoft.Winget.Source_8wekyb3d8bbwe/ext" -d extension=mbstring -d extension=fileinfo ../IwacSearch/vendor/phpstan/phpstan/phpstan.phar analyse -c phpstan.neon.dist --no-progress
+```
+
+PHPUnit needs a bootstrap that stands in for the missing Composer autoloader:
+require `../IwacSearch/vendor/autoload.php`, `spl_autoload_register` the two
+PSR-4 roots (`IwacSeo\` → `src/`, `IwacSeo\Test\` → `tests/`), then
+`tests/Shim/omeka.php`. Keep that runner in a scratch directory — it is a local
+convenience, not part of the module.
+
+**`tests/Integration` still cannot run here**: it needs a real Omeka S install
+(its CI job downloads and boots one), so those tests remain CI-verified only.
+Say which suite you actually ran; don't call a change tested on the strength of
+the unit suite when the assertion lives in the integration one.
+
+## CI is still the gate
 
 `.github/workflows/ci.yml` has two jobs, together covering `composer check`:
 `test` (a `php -l` sweep plus PHPUnit on 8.2–8.5, including production 8.5) and
 `quality` (strict Composer validation, `i18n:check`, `lint`, `analyse`, on 8.2
 only). Composer downloads are cached in both jobs. The `quality` checks carry
 `if: ${{ !cancelled() }}` so one push reports every category at once instead of
-revealing them a re-run at a time — worth preserving, since there's no local
-run to fall back on.
+revealing them a re-run at a time — worth preserving: the local runs above
+cover neither PSR-12 nor the integration suite, and only CI sees 8.2.
 
 `phpstan-baseline.neon` records 59 findings that predate enforcement — 56
 missing array value types plus three judgement calls. Level 6 applies in full

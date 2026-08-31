@@ -29,6 +29,9 @@ final class HeadWriter
     /** The description as written, so the layout pass can mirror it to og/twitter. */
     private ?string $description = null;
 
+    /** The canonical as written, so the layout pass can mirror it to og:url. */
+    private ?string $canonical = null;
+
     public function description(PhpRenderer $view, string $description): void
     {
         $view->headMeta()->setName('description', $description);
@@ -50,7 +53,14 @@ final class HeadWriter
             return;
         }
         $view->headLink(['rel' => 'canonical', 'href' => $url]);
+        $this->canonical = $url;
         $this->mark('canonical');
+    }
+
+    /** The canonical written this request, if any. */
+    public function writtenCanonical(): ?string
+    {
+        return $this->canonical;
     }
 
     public function image(PhpRenderer $view, string $url): void

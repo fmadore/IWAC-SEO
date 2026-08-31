@@ -201,8 +201,7 @@ class HeadMetadata
         // query string). Clean landing pages stay indexable — crucially the
         // item-set pages (/item-set/{id}), which are listed in the sitemap;
         // marking them noindex made Search Console reject that sitemap.
-        $hasQuery = ((string) (parse_url($current, PHP_URL_QUERY) ?? '')) !== '';
-        if ($hasQuery && $this->settings->isOn('iwac_seo_noindex_browse')) {
+        if ($this->isVariant($current) && $this->settings->isOn('iwac_seo_noindex_browse')) {
             $this->head->robots($view, 'noindex, follow');
         }
     }
@@ -266,8 +265,22 @@ class HeadMetadata
                 $this->head->image($view, $img);
             }
         }
+        // Gap-fill the canonical for routes no phase-1 listener claimed — the
+        // IwacSearch /search app, and any other module's controller. Filling it
+        // with the *current* URL made every query permutation self-canonical:
+        // each facet combination declared itself a distinct page worth
+        // indexing, with no noindex to counterbalance it, which is how ~1,300
+        // legacy /search?facet[…] URLs entered the index. Point them at the
+        // query-less URL and mark the variant noindex instead — the same
+        // pairing applyBrowse() applies to the routes this module does own,
+        // minus the self-referential canonical, because nothing here is known
+        // to be a genuine paginated series.
         if (!$this->head->has('canonical')) {
-            $this->head->canonical($view, $view->serverUrl(true));
+            $current = $view->serverUrl(true);
+            $this->head->canonical($view, Text::withoutQuery($current));
+            if ($this->isVariant($current) && $this->settings->isOn('iwac_seo_noindex_browse')) {
+                $this->head->robots($view, 'noindex, follow');
+            }
         }
         if (!$this->head->has('og:title')) {
             // Mirror the rendered <title>'s leading segment as og/twitter title.
@@ -281,8 +294,12 @@ class HeadMetadata
         if ($written !== null && !$this->head->has('og:description')) {
             $this->head->openGraph($view, ['og:description' => $written]);
         }
+        // og:url is a page's identity to anything that shares it, so mirror
+        // whatever canonical was written rather than re-deriving it — the two
+        // disagreeing is how a share of /search?facet[…] gets its own card.
         if (!$this->head->has('og:url')) {
-            $this->head->openGraph($view, ['og:url' => $view->serverUrl(true)]);
+            $url = $this->head->writtenCanonical() ?? $view->serverUrl(true);
+            $this->head->openGraph($view, ['og:url' => $url]);
         }
     }
 
@@ -400,6 +417,15 @@ class HeadMetadata
             return $map[$lang];
         }
         return str_contains($lang, '-') ? str_replace('-', '_', $lang) : $lang;
+    }
+
+    /**
+     * Is this URL a filtered / paginated / sorted variant of a page rather than
+     * the page itself? Carrying a query string is the whole test.
+     */
+    private function isVariant(string $url): bool
+    {
+        return Text::withoutQuery($url) !== $url;
     }
 
     private function jsonLdEnabled(): bool

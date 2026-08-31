@@ -127,7 +127,81 @@ final class MetadataIntegrationTest extends TestCase
         );
     }
 
-    private function renderer(): PhpRenderer
+    public function testLayoutGapFillCanonicalisesQueryVariantsToTheBarePage(): void
+    {
+        // /s/{site}/search is IwacSearch's controller, so no phase-1 listener
+        // claims it and only the layout pass runs. Every facet permutation used
+        // to emit a self-referential canonical and no robots directive, which
+        // is what let ~1,300 legacy facet URLs into the index.
+        $search = 'https://example.test/s/afrique_ouest/search';
+        $view = $this->renderer($search . "?facet%5Bdcterms_type_ss%5D%5B9%5D=Article d'encyclopédie&page=2");
+
+        $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyGlobals($view, $this->site());
+
+        $headLink = $this->decoded($view->headLink()->toString());
+        self::assertStringContainsString('rel="canonical"', $headLink);
+        self::assertStringContainsString('href="' . $search . '"', $headLink);
+        self::assertStringNotContainsString('facet', $headLink);
+
+        $headMeta = $this->decoded($view->headMeta()->toString());
+        self::assertStringContainsString('name="robots" content="noindex, follow"', $headMeta);
+        // og:url is the page's identity when shared; it must not disagree.
+        self::assertStringContainsString('property="og:url" content="' . $search . '"', $headMeta);
+    }
+
+    public function testLayoutGapFillLeavesAQuerylessPageIndexable(): void
+    {
+        $search = 'https://example.test/s/afrique_ouest/search';
+        $view = $this->renderer($search);
+
+        $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyGlobals($view, $this->site());
+
+        self::assertStringContainsString(
+            'href="' . $search . '"',
+            $this->decoded($view->headLink()->toString())
+        );
+        self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
+    }
+
+    public function testBrowseKeepsTheSelfReferentialCanonicalAndNoindexesTheVariant(): void
+    {
+        // Browse pagination is a genuine series: page 2 must not collapse onto
+        // page 1, so the canonical here stays self-referential — noindex, not
+        // the canonical, is what keeps the variant out of the index.
+        $paged = 'https://example.test/s/afrique_ouest/item?page=2';
+        $view = $this->renderer($paged);
+
+        $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyBrowse($view, $this->site());
+
+        self::assertStringContainsString('href="' . $paged . '"', $this->decoded($view->headLink()->toString()));
+        self::assertStringContainsString(
+            'name="robots" content="noindex, follow"',
+            $this->decoded($view->headMeta()->toString())
+        );
+    }
+
+    public function testResourceCanonicalSurvivesTheLayoutGapFill(): void
+    {
+        // A paginated resource page (?page=N on the linked-resources table)
+        // canonicalises to the resource itself, and phase 2 must not touch it.
+        $view = $this->renderer(self::CANONICAL . '?page=380');
+        $metadata = $this->metadata([
+            'iwac_seo_jsonld_enabled' => '0',
+            'iwac_seo_citation_meta'  => '0',
+            'iwac_seo_unapi'          => '0',
+            'iwac_seo_noindex_browse' => '1',
+        ]);
+
+        $metadata->applyResource($view, $this->item(), $this->site());
+        $metadata->applyGlobals($view, $this->site());
+
+        $headLink = $this->decoded($view->headLink()->toString());
+        self::assertStringContainsString('href="' . self::CANONICAL . '"', $headLink);
+        self::assertStringNotContainsString('page=380', $headLink);
+        self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
+    }
+
+    private function renderer(string $currentUrl = self::CANONICAL): PhpRenderer
     {
         $view = new PhpRenderer();
         $helpers = new HelperPluginManager(new ServiceManager());
@@ -142,8 +216,29 @@ final class MetadataIntegrationTest extends TestCase
             $helper->setView($view);
             $helpers->setService($name, $helper);
         }
+        // Laminas's real ServerUrl helper reads $_SERVER; the contract the
+        // module depends on is just serverUrl(true) === "the URL being served",
+        // and serverUrl('/path') === that path made absolute.
+        $origin = (string) preg_replace('#^(https?://[^/]+).*$#', '$1', $currentUrl);
+        $helpers->setService(
+            'serverUrl',
+            static fn (bool|string|null $arg = null): string => is_string($arg) ? $origin . $arg : $currentUrl
+        );
         $view->setHelperPluginManager($helpers);
         return $view;
+    }
+
+    /** @param array<string,mixed> $settings */
+    private function metadata(array $settings): HeadMetadata
+    {
+        return new HeadMetadata(
+            new SettingsGate($this->settings($settings)),
+            new HeadWriter(),
+            new StructuredData([], 'CreativeWork'),
+            new CitationMeta($this->kinds),
+            new Hreflang(['enabled' => false]),
+            new ZoteroRdf($this->kinds),
+        );
     }
 
     private function decoded(string $html): string

@@ -29,6 +29,21 @@ final class Text
     }
 
     /**
+     * The URL with any query string removed; unchanged when it has none.
+     *
+     * Cuts at the first '?' rather than going through parse_url(), which
+     * answers "what is the query" but would need the URL reassembled from its
+     * parts to answer "what is the URL without one" — and reassembly is where
+     * a malformed URL (parse_url returns false on some) turns into a wrong
+     * canonical rather than a no-op.
+     */
+    public static function withoutQuery(string $url): string
+    {
+        $mark = strpos($url, '?');
+        return $mark === false ? $url : substr($url, 0, $mark);
+    }
+
+    /**
      * Accept either a full <meta …> snippet pasted from a search console or a
      * bare token, and return just the token (verification tags).
      */

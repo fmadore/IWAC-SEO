@@ -158,6 +158,22 @@ The head signals are written into Omeka's request-global head placeholder helper
   `twitter:card`, verification tags) and gap-fills for anything not already set. Resource
   values always win because the resource listeners run before the layout listener.
 
+The two canonicals differ deliberately. On the browse routes this module owns, page 2 of a
+listing is a real page in a series, so its canonical is **self-referential** and `noindex`
+is what keeps it out of the index. On a route no phase-1 listener claimed — the IwacSearch
+`/search` app, any other module's controller — the layout gap-fill has no such knowledge, so
+it canonicalises to the **query-less** URL and marks any query-carrying variant `noindex,
+follow`. `og:url` mirrors whichever canonical was written, so a share never disagrees with it.
+
+> **Turn off Omeka's own JSON-LD embed.** Independently of this module, Omeka S core echoes
+> `AbstractResourceRepresentation::embeddedJsonLd()` — the resource's *entire* API
+> representation — into the body of every resource show and browse page. On IWAC that is
+> 157 KB per item (it includes the OCR text) and 2.2–3.9 MB on an authority record, whose
+> `@reverse` lists all ~13,000 items linking to it; Google truncates it and reports
+> unparsable structured data. Disable it per site under **Admin → Sites → … → Settings →
+> General → "Disable JSON-LD embed"**. The data stays available at `/api/items/{id}`, and
+> Zotero import here uses unAPI and the citation meta tags above, not the embed.
+
 ### schema.org `@type` map
 
 Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (overridable via
