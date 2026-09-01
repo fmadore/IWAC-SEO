@@ -201,6 +201,187 @@ final class MetadataIntegrationTest extends TestCase
         self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
     }
 
+    public function testEventIntervalBecomesStartDateAndEndDate(): void
+    {
+        // 55 of the 243 event records hold an interval; Google rejects one
+        // handed whole to startDate as "not in ISO 8601 format".
+        $data = $this->structuredData()->forResource(
+            $this->resource(54, ['dcterms:date' => '1979-11-04/1981-01-20', 'dcterms:spatial' => 'Burkina Faso']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('Event', $data['@type']);
+        self::assertSame('1979-11-04', $data['startDate']);
+        self::assertSame('1981-01-20', $data['endDate']);
+        self::assertSame([['@type' => 'Place', 'name' => 'Burkina Faso']], $data['location']);
+    }
+
+    public function testEventWithASingleDateGetsNoEndDate(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(54, ['dcterms:date' => '1997']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('1997', $data['startDate']);
+        self::assertArrayNotHasKey('endDate', $data);
+    }
+
+    public function testEventDropsADateNoValidatorCouldRead(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(54, ['dcterms:date' => 'vers 1997']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('startDate', $data);
+        self::assertArrayNotHasKey('endDate', $data);
+    }
+
+    public function testBookReviewIsAScholarlyArticleAboutTheBook(): void
+    {
+        // Not a schema.org Review: Google's review snippet requires a
+        // reviewRating that an academic book review does not have, so the type
+        // would only ever be reported invalid.
+        $data = $this->structuredData()->forResource(
+            $this->resource(178, [
+                'dcterms:title' => 'Brégand, Denise. -- Commerce caravanier…',
+                'bibo:reviewOf' => 'Commerce caravanier et relations sociales au Bénin',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('ScholarlyArticle', $data['@type']);
+        self::assertArrayNotHasKey('itemReviewed', $data);
+        self::assertSame(
+            ['@type' => 'Book', 'name' => 'Commerce caravanier et relations sociales au Bénin'],
+            $data['about']
+        );
+    }
+
+    public function testAnOrdinaryArticleGetsNoAboutNode(): void
+    {
+        // about is keyed on bibo:reviewOf, not on the type, because book
+        // reviews now share ScholarlyArticle with ordinary journal articles.
+        $data = $this->structuredData()->forResource(
+            $this->resource(35, ['dcterms:title' => 'An ordinary journal article']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('about', $data);
+    }
+
+    public function testVideoThumbnailComesFromTheItemNotTheSiteDefault(): void
+    {
+        $own = 'https://example.test/files/large/abc.jpg';
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2022-07-01']),
+            $this->site(),
+            self::CANONICAL,
+            $own,
+            $own
+        );
+
+        self::assertSame($own, $data['thumbnailUrl']);
+        self::assertSame('2022-07-01', $data['uploadDate']);
+    }
+
+    public function testVideoWithoutItsOwnThumbnailClaimsNone(): void
+    {
+        // image may fall back to the site's default share graphic; thumbnailUrl
+        // may not — it would tell Google the logo is a still from the video.
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2022-07-01']),
+            $this->site(),
+            self::CANONICAL,
+            'https://example.test/files/asset/site-default.webp',
+            null
+        );
+
+        self::assertArrayNotHasKey('thumbnailUrl', $data);
+        self::assertSame('https://example.test/files/asset/site-default.webp', $data['image']);
+    }
+
+    public function testConferencePaperCompletesTheEventItWasGivenAt(): void
+    {
+        // The nested node is a full Event to a validator, so it needs an
+        // Event's required fields — both of which the talk itself knows.
+        $data = $this->structuredData()->forResource(
+            $this->resource(77, [
+                'dcterms:date'        => '2022-09-16',
+                'dcterms:isPartOf'    => 'Leibniz-Zentrum Moderner Orient Open Day',
+                'dcterms:provenance'  => 'Berlin',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame([
+            '@type'     => 'Event',
+            'name'      => 'Leibniz-Zentrum Moderner Orient Open Day',
+            'startDate' => '2022-09-16',
+            'location'  => ['@type' => 'Place', 'name' => 'Berlin'],
+        ], $data['isPartOf']);
+    }
+
+    private function structuredData(): StructuredData
+    {
+        return new StructuredData(
+            [54 => 'Event', 77 => 'CreativeWork', 38 => 'VideoObject',
+                178 => 'ScholarlyArticle', 35 => 'ScholarlyArticle'],
+            'CreativeWork'
+        );
+    }
+
+    /**
+     * A resource mock carrying exactly $values, for the JSON-LD shape tests.
+     *
+     * @param array<string,string> $values term => single literal value
+     * @return ItemRepresentation&MockObject
+     */
+    private function resource(int $classId, array $values): ItemRepresentation
+    {
+        $class = $this->getMockBuilder(ResourceClassRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['id', 'label'])
+            ->getMock();
+        $class->method('id')->willReturn($classId);
+        $class->method('label')->willReturn('Test class');
+
+        $wrapped = [];
+        foreach ($values as $term => $text) {
+            $wrapped[$term] = [$this->value($text)];
+        }
+
+        $item = $this->getMockBuilder(ItemRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia'])
+            ->getMock();
+        $item->method('value')->willReturnCallback(
+            static function (string $term, array $options = []) use ($wrapped) {
+                $matches = $wrapped[$term] ?? [];
+                return !empty($options['all']) ? $matches : ($matches[0] ?? null);
+            }
+        );
+        $item->method('media')->willReturn([]);
+        $item->method('resourceClass')->willReturn($class);
+        $item->method('displayTitle')->willReturn($values['dcterms:title'] ?? 'Untitled');
+        $item->method('siteUrl')->willReturn(self::CANONICAL);
+        $item->method('primaryMedia')->willReturn(null);
+        return $item;
+    }
+
     private function renderer(string $currentUrl = self::CANONICAL): PhpRenderer
     {
         $view = new PhpRenderer();

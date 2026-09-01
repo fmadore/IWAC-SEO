@@ -184,20 +184,38 @@ Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (o
 | `foaf:Person` (94) | `Person` (+ `givenName`/`familyName`, `affiliation`) |
 | `dcterms:Location` (9) | `Place` (+ `geo` from `curation:coordinates`) |
 | `foaf:Organization` (96) | `Organization` (+ `parentOrganization`) |
-| `bibo:Event` (54) | `Event` (+ `startDate`, `location`) |
+| `bibo:Event` (54) | `Event` (+ `startDate`/`endDate`, `location`) |
 | `fabio:AuthorityFile` (244) | `DefinedTerm` (subjects / authority files) |
 | `bibo:Article` (36) | `NewsArticle` (newspaper article) |
 | `bibo:Issue` (60) | `PublicationIssue` (Islamic-publication issue) |
-| `bibo:AudioVisualDocument` (38) | `VideoObject` (+ `duration`, `uploadDate`) |
+| `bibo:AudioVisualDocument` (38) | `VideoObject` (+ `duration`, `uploadDate`, `thumbnailUrl`) |
 | `bibo:Document` (49) | `DigitalDocument` |
 | `bibo:AcademicArticle` (35) | `ScholarlyArticle` |
-| `fabio:BookReview` (178) | `Review` |
+| `fabio:BookReview` (178) | `ScholarlyArticle` (+ `about` = the reviewed book) † |
 | `bibo:Chapter` (43) | `Chapter` |
 | `bibo:Book` (40) / `bibo:EditedBook` (52) | `Book` |
 | `bibo:Thesis` (88) | `Thesis` |
 | `bibo:Report` (82) | `Report` |
-| `bibo:PersonalCommunication` (77) | `CreativeWork` |
+| `bibo:PersonalCommunication` (77) | `CreativeWork` (+ `isPartOf` the event, with its date and place) |
 | `fabio:BlogPost` (305) | `BlogPosting` |
+
+† Book reviews are **not** typed `Review`. Google's review snippet requires
+`reviewRating.ratingValue`, and an academic book review awards no score, so a `Review` node
+is reported invalid in perpetuity — an error bought for a feature that can never appear. As a
+scholarly article *about* a book, the relationship survives in a form that validates; the
+Zotero/Highwire side is unaffected and still declares the `review` citation kind.
+
+Two shapes exist because a validator reads nested nodes as full objects, not references. A
+conference paper's `isPartOf` **Event** therefore carries the event's own required fields,
+taken from the paper: its `dcterms:date` is when the event happened, and its
+`dcterms:provenance` is where. And an `Event`'s `dcterms:date` may be an ISO 8601 *interval*
+(`1979-11-04/1981-01-20`, on 55 of 243 records), which becomes `startDate` + `endDate`;
+either side that is not a plain ISO date is dropped rather than emitted, since a date a
+validator cannot read invalidates the node around it.
+
+`thumbnailUrl` is taken only from the item's own media, never from the site's default share
+image — unlike `image`, which may fall back to it. A share card needs some picture; a claim
+that the site logo depicts the video is a different kind of statement.
 
 Creative works also carry `author`/`editor`/`contributor` (from `bibo:authorList`,
 `dcterms:creator`, `bibo:editorList`, `dcterms:contributor`), `datePublished`, `inLanguage`,

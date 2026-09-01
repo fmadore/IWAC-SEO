@@ -3,6 +3,71 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.2 — 2026-09-01
+
+### Fixed
+
+Six rich-result errors in Search Console, all of them in this module's own
+JSON-LD, covering **1,091 flagged URLs**. Verified by running `StructuredData`
+against the live archive record behind every one of them.
+
+- **`thumbnailUrl` was missing from all 1,790 videos** (989 flagged so far, and
+  climbing daily — it is the largest of the six). `image` was being emitted and
+  is not a substitute: schema.org requires `thumbnailUrl` on a `VideoObject`.
+  It is now taken from the item's own media and **only** from there. `image`
+  may honestly fall back to the site's default share graphic, because a share
+  card needs some picture; `thumbnailUrl` may not, because it asserts that the
+  picture depicts the video. `HeadMetadata::resourceImage()` therefore splits
+  into `resourceThumbnail()` (own media, or null) plus that fallback at the one
+  call site that wants it. 1,788 of 1,790 videos now carry one.
+
+- **An `Event`'s `startDate` was rejected as "not ISO 8601" whenever the record
+  held an interval.** 55 of the 243 event records do — `2000/2001`,
+  `1979-11-04/1981-01-20` — which schema.org expresses as `startDate` +
+  `endDate`, not as one value. `Text::dateRange()` splits them, and drops
+  either side that is not a plain ISO date instead of passing it through: a
+  date a validator cannot read invalidates the node around it, so none is
+  better than one. Only one such URL had been flagged; the other 54 were
+  waiting to be crawled.
+
+- **A conference paper's `isPartOf` event had neither `startDate` nor
+  `location`.** A validator reads a nested node as a full `Event`, not as a
+  reference to one, so it wants an Event's required fields — and the paper
+  knows both: its `dcterms:date` is when the event happened and its
+  `dcterms:provenance` is where (Berlin, for a talk at the ZMO Open Day). This
+  was most of the "missing startDate" and "missing location" reports, which
+  named communication records that contain no `Event` of their own.
+
+- **Book reviews are no longer typed `Review`.** Google's review snippet
+  requires `reviewRating.ratingValue`, and an academic book review awards no
+  score — so `Review` could only ever be reported invalid, and supplying the
+  missing `itemReviewed` would have traded "missing itemReviewed" for "missing
+  reviewRating" on the same 12 URLs. `fabio:BookReview` (class 178) now maps to
+  `ScholarlyArticle`, which is what a book review in a journal is, with the
+  reviewed book in `schema:about` from `bibo:reviewOf` — present on all 19
+  review records. The citation side is untouched: the Zotero/Highwire kind
+  stays `review`, since Zotero has an item type for it and Google does not.
+
+Net: **1,051 of the 1,091 flagged URLs** now satisfy every required property.
+
+### Known data gaps
+
+The remaining 40 are missing metadata in the archive, not markup this module
+can generate, so they are listed rather than papered over. Filling any of them
+makes the record valid on the next crawl with no code change:
+
+| gap | items |
+|---|---|
+| Event with no `dcterms:date` (13) | 126, 147, 199, 200, 203, 204, 206, 15616, 23519, 23536, 23585, 23651, 67433 |
+| Event with no `dcterms:spatial` (2) | 186, 15773 |
+| Audiovisual with no date at all (23) | 15852–15893, a single accession of DVD recordings |
+| Audiovisual with no media, so no thumbnail (2) | 78275, 78278 |
+
+`Event` and `VideoObject` are kept on these records even so — 230 of 243 events
+and 1,760 of 1,790 videos do satisfy the requirements, so the types earn their
+place. That is the same test `Review` failed and the reason it was dropped: not
+"is this record complete?" but "can this type ever be satisfied?".
+
 ## 1.0.1 — 2026-08-31
 
 ### Fixed

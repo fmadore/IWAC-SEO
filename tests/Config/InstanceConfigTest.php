@@ -52,6 +52,12 @@ final class InstanceConfigTest extends TestCase
         $this->assertSame('event', $classKinds[54]);
         $this->assertSame('ImageObject', $classTypes[58]);
         $this->assertSame('photo', $classKinds[58]);
+        // Book reviews are ScholarlyArticle, not Review: Google's review
+        // snippet requires a reviewRating an academic review never awards, so
+        // the type would be reported invalid forever. The citation kind stays
+        // 'review' — that one drives Zotero, which has a review item type.
+        $this->assertSame('ScholarlyArticle', $classTypes[178]);
+        $this->assertSame('review', $classKinds[178]);
     }
 
     public function testAllNineReferenceClassesAreMapped(): void

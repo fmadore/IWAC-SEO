@@ -62,7 +62,10 @@ return [
                 58  => 'ImageObject',     // bibo:Image           — photographs (public since IwacSearch 3.3.0)
                 // Bibliographic references
                 35  => 'ScholarlyArticle',// bibo:AcademicArticle — Article de revue
-                178 => 'Review',          // fabio:BookReview     — Compte rendu
+                // fabio:BookReview — Compte rendu. Not 'Review': Google's review
+                // snippet requires a reviewRating an academic review never has.
+                // The reviewed book is emitted as schema:about instead.
+                178 => 'ScholarlyArticle',
                 43  => 'Chapter',         // bibo:Chapter         — Chapitre
                 40  => 'Book',            // bibo:Book            — Livre
                 52  => 'Book',            // bibo:EditedBook      — Ouvrage collectif

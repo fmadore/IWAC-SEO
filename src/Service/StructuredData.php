@@ -41,12 +41,20 @@ class StructuredData
     ) {
     }
 
-    /** @return array<mixed>|null */
+    /**
+     * @param ?string $image     the share image, which falls back to the site default
+     * @param ?string $thumbnail the resource's *own* media thumbnail, or null. Kept
+     *   apart from $image because schema.org's thumbnailUrl must depict the
+     *   resource: the site's default share graphic is an honest og:image and a
+     *   dishonest video thumbnail.
+     * @return array<mixed>|null
+     */
     public function forResource(
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site,
         ?string $canonical,
-        ?string $image
+        ?string $image,
+        ?string $thumbnail = null
     ): ?array {
         $type = $this->classTypes[ResourceUrl::classId($resource)] ?? $this->defaultType;
 
@@ -76,7 +84,7 @@ class StructuredData
         if (in_array($type, self::ENTITY_TYPES, true)) {
             $this->decorateEntity($data, $type, $resource, $site);
         } else {
-            $this->decorateWork($data, $type, $resource, $site);
+            $this->decorateWork($data, $type, $resource, $site, $thumbnail);
         }
 
         return $data;
@@ -179,9 +187,15 @@ class StructuredData
                 $data['parentOrganization'] = $parents;
             }
         } elseif ($type === 'Event') {
-            $date = $this->firstString($resource, ['dcterms:date']);
-            if ($date !== null) {
-                $data['startDate'] = $date;
+            $raw = $this->firstString($resource, ['dcterms:date']);
+            if ($raw !== null) {
+                [$start, $end] = Text::dateRange($raw);
+                if ($start !== null) {
+                    $data['startDate'] = $start;
+                }
+                if ($end !== null) {
+                    $data['endDate'] = $end;
+                }
             }
             $places = $this->labels($resource, 'dcterms:spatial');
             if ($places) {
@@ -200,7 +214,8 @@ class StructuredData
         array &$data,
         string $type,
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site
+        SiteRepresentation $site,
+        ?string $thumbnail = null
     ): void {
         $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator'], $site, 'Person');
         if ($authors) {
@@ -248,9 +263,28 @@ class StructuredData
             if ($date !== null) {
                 $data['uploadDate'] = $date;
             }
+            // thumbnailUrl is required of a VideoObject and is not satisfied by
+            // image: only the item's own media depicts the video, whereas image
+            // falls back to the site's default share graphic.
+            if ($thumbnail !== null) {
+                $data['thumbnailUrl'] = $thumbnail;
+            }
         }
 
-        $this->decorateContainer($data, $type, $resource, $site);
+        // fabio:BookReview records name the book they review in bibo:reviewOf.
+        // They are typed ScholarlyArticle, not Review: Google's review snippet
+        // requires reviewRating.ratingValue, and an academic book review awards
+        // no score — a Review without one is reported invalid in perpetuity, so
+        // claiming the type buys an error and no feature. As a scholarly
+        // article *about* a book the relationship survives in a form that
+        // validates. Keyed on the property rather than the type because the
+        // class shares its @type with ordinary journal articles.
+        $reviewed = $this->firstString($resource, ['bibo:reviewOf']);
+        if ($reviewed !== null) {
+            $data['about'] = ['@type' => 'Book', 'name' => $reviewed];
+        }
+
+        $this->decorateContainer($data, $type, $resource, $site, $date);
 
         $publisher = $this->publisherFor($type, $resource);
         if ($publisher !== null) {
@@ -268,12 +302,15 @@ class StructuredData
      *   - communication / talk → dcterms:isPartOf (the event)
      *
      * @param array<mixed> $data
+     * @param ?string $date the work's own date, which for a conference paper is
+     *   also the date of the event it was given at
      */
     private function decorateContainer(
         array &$data,
         string $type,
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site
+        SiteRepresentation $site,
+        ?string $date = null
     ): void {
         if (in_array($type, ['ScholarlyArticle', 'Review', 'NewsArticle', 'PublicationIssue'], true)) {
             $periodical = $this->firstLink($resource, 'dcterms:publisher', $site);
@@ -300,17 +337,36 @@ class StructuredData
             return;
         }
         if ($type === 'CreativeWork') {
-            // Personal communication / conference talk → part of an event.
+            // Personal communication / conference talk → part of an event. The
+            // nested node is a full Event to a validator, not a mere reference,
+            // so it has to carry an Event's own required fields — and the talk
+            // knows both: it was given on its own date, at the place recorded in
+            // dcterms:provenance (Berlin, for a talk at the ZMO Open Day).
             $event = $this->firstLink($resource, 'dcterms:isPartOf', $site);
             if ($event) {
-                $data['isPartOf'] = array_filter([
+                $node = array_filter([
                     '@type' => 'Event',
                     'name'  => $event['name'],
                     'url'   => $event['url'],
                 ]);
+                if ($date !== null) {
+                    [$start, $end] = Text::dateRange($date);
+                    if ($start !== null) {
+                        $node['startDate'] = $start;
+                    }
+                    if ($end !== null) {
+                        $node['endDate'] = $end;
+                    }
+                }
+                $where = $this->firstString($resource, ['dcterms:provenance']);
+                if ($where !== null) {
+                    $node['location'] = ['@type' => 'Place', 'name' => $where];
+                }
+                $data['isPartOf'] = $node;
             }
         }
     }
+
 
     /**
      * dcterms:publisher used as the actual publisher/institution (not as the

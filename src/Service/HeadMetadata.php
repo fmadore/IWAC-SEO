@@ -61,7 +61,8 @@ class HeadMetadata
         $title = (string) $resource->displayTitle();
         $description = $this->resourceDescription($resource, $site);
         $canonical = ResourceUrl::forSite($resource, $site->slug());
-        $image = $this->resourceImage($view, $resource);
+        $thumbnail = $this->resourceThumbnail($view, $resource);
+        $image = $thumbnail ?? $this->resolveDefaultImage($view);
 
         $this->head->openGraph($view, [
             'og:type'  => 'article',
@@ -81,7 +82,7 @@ class HeadMetadata
         $this->head->mark('og:title');
 
         if ($this->jsonLdEnabled()) {
-            $data = $this->structuredData->forResource($resource, $site, $canonical, $image);
+            $data = $this->structuredData->forResource($resource, $site, $canonical, $image, $thumbnail);
             if ($data !== null) {
                 $this->head->jsonLd($view, $data);
             }
@@ -336,8 +337,19 @@ class HeadMetadata
         return $this->truncate(sprintf('%s — %s', $title, $site->title()));
     }
 
-    private function resourceImage(PhpRenderer $view, AbstractResourceEntityRepresentation $resource): ?string
-    {
+    /**
+     * The resource's *own* thumbnail, with no site-default fallback.
+     *
+     * Kept separate from the share image because the two answer different
+     * questions. og:image may honestly fall back to the site's default graphic —
+     * a share card needs some picture. schema.org's thumbnailUrl claims to
+     * depict the resource, so falling back there would tell Google the site
+     * logo is a still from the video.
+     */
+    private function resourceThumbnail(
+        PhpRenderer $view,
+        AbstractResourceEntityRepresentation $resource
+    ): ?string {
         $media = null;
         if ($resource instanceof ItemRepresentation) {
             $media = $resource->primaryMedia();
@@ -350,8 +362,8 @@ class HeadMetadata
                 return $this->absolutize($view, $thumb);
             }
         }
-        // Item sets and media without a thumbnail fall through to the default.
-        return $this->resolveDefaultImage($view);
+        // Item sets, and media without a thumbnail, simply have none.
+        return null;
     }
 
     /**
