@@ -52,7 +52,15 @@ return [
                 94  => 'Person',          // foaf:Person          — Personnes
                 9   => 'Place',           // dcterms:Location     — Lieux
                 96  => 'Organization',    // foaf:Organization    — Organisations
-                54  => 'Event',           // bibo:Event           — Événements
+                // bibo:Event — Événements. Not 'Event': all 243 of these records
+                // are "Notice d'autorité", and Google's Event feature is for
+                // events "bookable to the general public", requiring offers,
+                // performer, organizer and a PostalAddress. A 1997 congress is
+                // ineligible by that guideline however complete its metadata,
+                // so the type buys 97 errors and ~500 warnings for a rich
+                // result that can never appear. DefinedTerm is what the archive
+                // itself calls them, and what class 244 already uses.
+                54  => 'DefinedTerm',
                 244 => 'DefinedTerm',     // fabio:AuthorityFile  — Sujets / Notices d'autorité
                 // Primary sources
                 36  => 'NewsArticle',     // bibo:Article         — newspaper article

@@ -187,6 +187,9 @@ class StructuredData
                 $data['parentOrganization'] = $parents;
             }
         } elseif ($type === 'Event') {
+            // Unreachable on IWAC, whose events are DefinedTerm — kept because
+            // class_types is overridable in local.config.php, and an
+            // installation whose events *are* bookable wants this shape.
             $raw = $this->firstString($resource, ['dcterms:date']);
             if ($raw !== null) {
                 [$start, $end] = Text::dateRange($raw);
@@ -284,7 +287,7 @@ class StructuredData
             $data['about'] = ['@type' => 'Book', 'name' => $reviewed];
         }
 
-        $this->decorateContainer($data, $type, $resource, $site, $date);
+        $this->decorateContainer($data, $type, $resource, $site);
 
         $publisher = $this->publisherFor($type, $resource);
         if ($publisher !== null) {
@@ -302,15 +305,12 @@ class StructuredData
      *   - communication / talk → dcterms:isPartOf (the event)
      *
      * @param array<mixed> $data
-     * @param ?string $date the work's own date, which for a conference paper is
-     *   also the date of the event it was given at
      */
     private function decorateContainer(
         array &$data,
         string $type,
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site,
-        ?string $date = null
+        SiteRepresentation $site
     ): void {
         if (in_array($type, ['ScholarlyArticle', 'Review', 'NewsArticle', 'PublicationIssue'], true)) {
             $periodical = $this->firstLink($resource, 'dcterms:publisher', $site);
@@ -337,32 +337,17 @@ class StructuredData
             return;
         }
         if ($type === 'CreativeWork') {
-            // Personal communication / conference talk → part of an event. The
-            // nested node is a full Event to a validator, not a mere reference,
-            // so it has to carry an Event's own required fields — and the talk
-            // knows both: it was given on its own date, at the place recorded in
-            // dcterms:provenance (Berlin, for a talk at the ZMO Open Day).
+            // Personal communication / conference talk → the event it was given
+            // at, emitted as a bare URL. isPartOf ranges over CreativeWork or
+            // URL, so the Event node this used to build was out of range twice
+            // over: wrong for the property, and an Event that IWAC's events can
+            // never satisfy (see the class map's note on class 54). Six of the
+            // nineteen name a linked event record and keep their cross-link;
+            // the ten that hold only a literal title have no in-range form, and
+            // a name Google cannot dereference is not worth a range violation.
             $event = $this->firstLink($resource, 'dcterms:isPartOf', $site);
-            if ($event) {
-                $node = array_filter([
-                    '@type' => 'Event',
-                    'name'  => $event['name'],
-                    'url'   => $event['url'],
-                ]);
-                if ($date !== null) {
-                    [$start, $end] = Text::dateRange($date);
-                    if ($start !== null) {
-                        $node['startDate'] = $start;
-                    }
-                    if ($end !== null) {
-                        $node['endDate'] = $end;
-                    }
-                }
-                $where = $this->firstString($resource, ['dcterms:provenance']);
-                if ($where !== null) {
-                    $node['location'] = ['@type' => 'Place', 'name' => $where];
-                }
-                $data['isPartOf'] = $node;
+            if ($event && $event['url'] !== null) {
+                $data['isPartOf'] = $event['url'];
             }
         }
     }

@@ -3,6 +3,54 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.3 — 2026-09-01
+
+### Changed
+
+- **Event authority records are typed `DefinedTerm`, not `Event`.** Search
+  Console reported eight further issues against them — `endDate`, `offers`,
+  `eventStatus`, `performer` and `organizer` missing on 104 items each,
+  `location.address` on 97, `description` on 95, `image` on 6. Only the address
+  is an error; the rest are warnings. But the decisive line is Google's
+  eligibility rule, not the field list: the feature is for events *"bookable to
+  the general public"*, and *"events that require a membership, or invitation
+  prior to purchasing the ticket or attending the event are ineligible"*.
+
+  All 243 of these records carry `dcterms:type: "Notice d'autorité"`. They are
+  historical congresses and conferences — a 1997 OJEMAO congress, a 2000–2001
+  conference of Muslim intellectuals in Burkina Faso — that nobody can book,
+  attend or buy a ticket for. They are ineligible by the guideline however
+  complete their metadata becomes, so the type could only ever cost 97 errors
+  and some 500 warnings in exchange for a rich result that cannot appear.
+
+  This is the test 1.0.2 applied to `Review` — not "is this record complete?"
+  but "can this type ever be satisfied?" — and events fail it for a stronger
+  reason: not missing data, but a feature meant for something else. What they
+  are is what the archive already calls them and what class 244 (subject
+  authority files) already uses. `name`, `description`, `url` and the 115
+  Wikidata `sameAs` links that do the actual entity-resolution work are
+  untouched.
+
+- **A conference paper's `isPartOf` is now the event's URL, or nothing.** The
+  `Event` node 1.0.2 completed here was out of range twice over: schema.org's
+  `isPartOf` ranges over **CreativeWork or URL**, so an `Event` never belonged
+  in it, and the event was ineligible besides. Six of the nineteen papers name
+  a linked event record and keep the cross-link as its URL; the ten holding
+  only a literal title now emit nothing, a name Google cannot dereference not
+  being worth a range violation.
+
+  1.0.2 completing that node was what would have exposed those nineteen pages
+  to the Event validator in the first place, so this closes a door that release
+  had opened.
+
+`StructuredData`'s `Event` branch is kept, including the interval handling
+added in 1.0.2: `class_types` is overridable in `config/local.config.php`, and
+an installation whose events genuinely are bookable wants that shape.
+`Text::dateRange()` and its tests stay for the same reason.
+
+Swept across all 262 records of both classes: **no `Event` node is emitted
+anywhere.**
+
 ## 1.0.2 — 2026-09-01
 
 ### Fixed

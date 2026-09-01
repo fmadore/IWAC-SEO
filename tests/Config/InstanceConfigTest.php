@@ -48,7 +48,10 @@ final class InstanceConfigTest extends TestCase
         $this->assertSame('newspaper', $classKinds[36]);
         $this->assertSame('PublicationIssue', $classTypes[60]);
         $this->assertSame('magazine', $classKinds[60]);
-        $this->assertSame('Event', $classTypes[54]);
+        // Not 'Event': Google's Event feature is for events bookable by the
+        // public, which a historical congress can never be. The citation kind
+        // stays 'event' — that side has no such eligibility rule.
+        $this->assertSame('DefinedTerm', $classTypes[54]);
         $this->assertSame('event', $classKinds[54]);
         $this->assertSame('ImageObject', $classTypes[58]);
         $this->assertSame('photo', $classKinds[58]);

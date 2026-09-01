@@ -312,34 +312,62 @@ final class MetadataIntegrationTest extends TestCase
         self::assertSame('https://example.test/files/asset/site-default.webp', $data['image']);
     }
 
-    public function testConferencePaperCompletesTheEventItWasGivenAt(): void
+    public function testConferencePaperNamesItsEventByUrlWhenTheEventIsARecord(): void
     {
-        // The nested node is a full Event to a validator, so it needs an
-        // Event's required fields — both of which the talk itself knows.
+        // isPartOf ranges over CreativeWork or URL. A linked event record has a
+        // URL, so the cross-link survives without claiming a type.
         $data = $this->structuredData()->forResource(
-            $this->resource(77, [
-                'dcterms:date'        => '2022-09-16',
-                'dcterms:isPartOf'    => 'Leibniz-Zentrum Moderner Orient Open Day',
-                'dcterms:provenance'  => 'Berlin',
+            $this->resource(77, ['dcterms:date' => '2022-09-16'], [
+                'dcterms:isPartOf' => ['Leibniz-Zentrum Moderner Orient Open Day', 186],
             ]),
             $this->site(),
             self::CANONICAL,
             null
         );
 
-        self::assertSame([
-            '@type'     => 'Event',
-            'name'      => 'Leibniz-Zentrum Moderner Orient Open Day',
-            'startDate' => '2022-09-16',
-            'location'  => ['@type' => 'Place', 'name' => 'Berlin'],
-        ], $data['isPartOf']);
+        self::assertSame('https://example.test/s/afrique_ouest/item/186', $data['isPartOf']);
+    }
+
+    public function testConferencePaperOmitsAnEventThatIsOnlyALiteralTitle(): void
+    {
+        // Ten of the nineteen hold the event as a bare string. There is no
+        // in-range way to say that, and a name Google cannot dereference is not
+        // worth a range violation.
+        $data = $this->structuredData()->forResource(
+            $this->resource(77, [
+                'dcterms:date'       => '2022-09-16',
+                'dcterms:isPartOf'   => 'Leibniz-Zentrum Moderner Orient Open Day',
+                'dcterms:provenance' => 'Berlin',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('isPartOf', $data);
+    }
+
+    public function testEventAuthorityRecordIsADefinedTermNotAnEvent(): void
+    {
+        // Google's Event feature is for events bookable by the public; a 1997
+        // congress is ineligible by that guideline however complete its record.
+        $data = $this->structuredData()->forResource(
+            $this->resource(54, ['dcterms:title' => 'Congrès OJEMAO (1997)', 'dcterms:date' => '1997']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('DefinedTerm', $data['@type']);
+        self::assertArrayNotHasKey('startDate', $data);
+        self::assertArrayNotHasKey('location', $data);
     }
 
     private function structuredData(): StructuredData
     {
         return new StructuredData(
-            [54 => 'Event', 77 => 'CreativeWork', 38 => 'VideoObject',
-                178 => 'ScholarlyArticle', 35 => 'ScholarlyArticle'],
+            [54 => 'DefinedTerm', 77 => 'CreativeWork', 38 => 'VideoObject',
+                178 => 'ScholarlyArticle', 35 => 'ScholarlyArticle', 99 => 'Event'],
             'CreativeWork'
         );
     }
@@ -348,9 +376,11 @@ final class MetadataIntegrationTest extends TestCase
      * A resource mock carrying exactly $values, for the JSON-LD shape tests.
      *
      * @param array<string,string> $values term => single literal value
+     * @param array<string,array{0:string,1:int}> $links term => [title, item id]
+     *   for values that point at another record rather than holding a literal
      * @return ItemRepresentation&MockObject
      */
-    private function resource(int $classId, array $values): ItemRepresentation
+    private function resource(int $classId, array $values, array $links = []): ItemRepresentation
     {
         $class = $this->getMockBuilder(ResourceClassRepresentation::class)
             ->disableOriginalConstructor()
@@ -362,6 +392,9 @@ final class MetadataIntegrationTest extends TestCase
         $wrapped = [];
         foreach ($values as $term => $text) {
             $wrapped[$term] = [$this->value($text)];
+        }
+        foreach ($links as $term => [$title, $linkedId]) {
+            $wrapped[$term] = [$this->linkedValue($title, $linkedId)];
         }
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
@@ -473,6 +506,33 @@ final class MetadataIntegrationTest extends TestCase
         );
         $item->method('primaryMedia')->willReturn(null);
         return $item;
+    }
+
+    /**
+     * A value pointing at another record, so firstLink() resolves a URL.
+     *
+     * @return ValueRepresentation&MockObject
+     */
+    private function linkedValue(string $title, int $linkedId): ValueRepresentation
+    {
+        $linked = $this->getMockBuilder(ItemRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['displayTitle', 'siteUrl'])
+            ->getMock();
+        $linked->method('displayTitle')->willReturn($title);
+        $linked->method('siteUrl')->willReturnCallback(
+            static fn (string $slug, bool $canonical = false): string
+                => 'https://example.test/s/' . $slug . '/item/' . $linkedId
+        );
+
+        $value = $this->getMockBuilder(ValueRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['__toString', 'valueResource', 'uri'])
+            ->getMock();
+        $value->method('__toString')->willReturn($title);
+        $value->method('valueResource')->willReturn($linked);
+        $value->method('uri')->willReturn(null);
+        return $value;
     }
 
     /** @return ValueRepresentation&MockObject */

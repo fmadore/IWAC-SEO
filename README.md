@@ -184,7 +184,7 @@ Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (o
 | `foaf:Person` (94) | `Person` (+ `givenName`/`familyName`, `affiliation`) |
 | `dcterms:Location` (9) | `Place` (+ `geo` from `curation:coordinates`) |
 | `foaf:Organization` (96) | `Organization` (+ `parentOrganization`) |
-| `bibo:Event` (54) | `Event` (+ `startDate`/`endDate`, `location`) |
+| `bibo:Event` (54) | `DefinedTerm` ‡ |
 | `fabio:AuthorityFile` (244) | `DefinedTerm` (subjects / authority files) |
 | `bibo:Article` (36) | `NewsArticle` (newspaper article) |
 | `bibo:Issue` (60) | `PublicationIssue` (Islamic-publication issue) |
@@ -196,7 +196,7 @@ Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (o
 | `bibo:Book` (40) / `bibo:EditedBook` (52) | `Book` |
 | `bibo:Thesis` (88) | `Thesis` |
 | `bibo:Report` (82) | `Report` |
-| `bibo:PersonalCommunication` (77) | `CreativeWork` (+ `isPartOf` the event, with its date and place) |
+| `bibo:PersonalCommunication` (77) | `CreativeWork` (+ `isPartOf` = the event's URL, when it is a record) |
 | `fabio:BlogPost` (305) | `BlogPosting` |
 
 † Book reviews are **not** typed `Review`. Google's review snippet requires
@@ -205,12 +205,26 @@ is reported invalid in perpetuity — an error bought for a feature that can nev
 scholarly article *about* a book, the relationship survives in a form that validates; the
 Zotero/Highwire side is unaffected and still declares the `review` citation kind.
 
-Two shapes exist because a validator reads nested nodes as full objects, not references. A
-conference paper's `isPartOf` **Event** therefore carries the event's own required fields,
-taken from the paper: its `dcterms:date` is when the event happened, and its
-`dcterms:provenance` is where. And an `Event`'s `dcterms:date` may be an ISO 8601 *interval*
-(`1979-11-04/1981-01-20`, on 55 of 243 records), which becomes `startDate` + `endDate`;
-either side that is not a plain ISO date is dropped rather than emitted, since a date a
+‡ Events are **not** typed `Event`, for the same reason book reviews are not typed `Review`.
+Google's Event feature is for events *"bookable to the general public"* and asks for `offers`,
+`performer`, `organizer`, `eventStatus` and a `PostalAddress`. All 243 of IWAC's event records
+are `Notice d'autorité` — historical congresses and conferences, none of them attendable — so
+they are ineligible by that guideline however complete their metadata, and the type buys 97
+errors and some 500 warnings for a rich result that can never appear. `DefinedTerm` is what
+the archive calls them and what class 244 already uses; the 115 Wikidata `sameAs` links that
+do the entity-resolution work are unaffected.
+
+For the same reason a conference paper's `isPartOf` no longer builds an `Event` node. That
+node was out of range twice over: `isPartOf` ranges over **CreativeWork or URL**, and the
+event was ineligible anyway. Six of the nineteen papers name a linked event record and keep
+the cross-link as its URL; the ten holding only a literal title emit nothing, a name Google
+cannot dereference not being worth a range violation.
+
+The `Event` branch itself is kept in `StructuredData` because `class_types` is overridable in
+`config/local.config.php` — an installation whose events *are* bookable wants that shape, and
+it handles the interval case: a `dcterms:date` may be an ISO 8601 *interval*
+(`1979-11-04/1981-01-20`, on 55 of the 243 records), which becomes `startDate` + `endDate`,
+with either side that is not a plain ISO date dropped rather than emitted, since a date a
 validator cannot read invalidates the node around it.
 
 `thumbnailUrl` is taken only from the item's own media, never from the site's default share
