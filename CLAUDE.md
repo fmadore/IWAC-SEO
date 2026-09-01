@@ -27,10 +27,19 @@ PSR-4 roots (`IwacSeo\` → `src/`, `IwacSeo\Test\` → `tests/`), then
 `tests/Shim/omeka.php`. Keep that runner in a scratch directory — it is a local
 convenience, not part of the module.
 
-**`tests/Integration` still cannot run here**: it needs a real Omeka S install
-(its CI job downloads and boots one), so those tests remain CI-verified only.
-Say which suite you actually ran; don't call a change tested on the strength of
-the unit suite when the assertion lives in the integration one.
+**`tests/Integration` mostly cannot run here**: it needs a real Omeka S install
+(its CI job downloads and boots one). The exception is the JSON-LD *shape*
+tests, which need nothing from Omeka but a few representation classes for
+PHPUnit to mock — declare `AbstractResourceRepresentation`,
+`AbstractResourceEntityRepresentation`, `ItemRepresentation`,
+`MediaRepresentation`, `ValueRepresentation`, `ResourceClassRepresentation` and
+`SiteRepresentation` in a scratch bootstrap, point PHPUnit at the file and
+`--filter` to those tests. The head-placeholder tests still need real Laminas.
+
+Worth the trouble: v1.0.3 shipped with two stale expectations in exactly those
+tests because they were only ever checked in CI, and the tag had published
+before CI went red. Say which suite you actually ran, and when a change touches
+the class→`@type` map, run the shape tests before pushing a tag.
 
 ## CI is still the gate
 

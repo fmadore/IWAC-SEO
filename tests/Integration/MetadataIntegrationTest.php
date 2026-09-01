@@ -203,10 +203,13 @@ final class MetadataIntegrationTest extends TestCase
 
     public function testEventIntervalBecomesStartDateAndEndDate(): void
     {
-        // 55 of the 243 event records hold an interval; Google rejects one
-        // handed whole to startDate as "not in ISO 8601 format".
+        // Class 99 stands for an installation that has remapped a class to
+        // Event in local.config.php — the only way the Event branch is now
+        // reached, IWAC's own events being DefinedTerm. 55 of IWAC's 243 event
+        // records hold an interval, and Google rejects one handed whole to
+        // startDate as "not in ISO 8601 format".
         $data = $this->structuredData()->forResource(
-            $this->resource(54, ['dcterms:date' => '1979-11-04/1981-01-20', 'dcterms:spatial' => 'Burkina Faso']),
+            $this->resource(99, ['dcterms:date' => '1979-11-04/1981-01-20', 'dcterms:spatial' => 'Burkina Faso']),
             $this->site(),
             self::CANONICAL,
             null
@@ -221,7 +224,7 @@ final class MetadataIntegrationTest extends TestCase
     public function testEventWithASingleDateGetsNoEndDate(): void
     {
         $data = $this->structuredData()->forResource(
-            $this->resource(54, ['dcterms:date' => '1997']),
+            $this->resource(99, ['dcterms:date' => '1997']),
             $this->site(),
             self::CANONICAL,
             null
@@ -234,12 +237,16 @@ final class MetadataIntegrationTest extends TestCase
     public function testEventDropsADateNoValidatorCouldRead(): void
     {
         $data = $this->structuredData()->forResource(
-            $this->resource(54, ['dcterms:date' => 'vers 1997']),
+            $this->resource(99, ['dcterms:date' => 'vers 1997', 'dcterms:spatial' => 'Burkina Faso']),
             $this->site(),
             self::CANONICAL,
             null
         );
 
+        // Asserted against a node that is genuinely an Event, so the absence
+        // means the date was rejected rather than the branch never running.
+        self::assertSame('Event', $data['@type']);
+        self::assertArrayHasKey('location', $data);
         self::assertArrayNotHasKey('startDate', $data);
         self::assertArrayNotHasKey('endDate', $data);
     }
