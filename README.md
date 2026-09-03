@@ -188,7 +188,7 @@ Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (o
 | `fabio:AuthorityFile` (244) | `DefinedTerm` (subjects / authority files) |
 | `bibo:Article` (36) | `NewsArticle` (newspaper article) |
 | `bibo:Issue` (60) | `PublicationIssue` (Islamic-publication issue) |
-| `bibo:AudioVisualDocument` (38) | `VideoObject` (+ `duration`, `uploadDate`, `thumbnailUrl`) |
+| `bibo:AudioVisualDocument` (38) | `VideoObject` (+ `duration`, `uploadDate`, `thumbnailUrl`, `embedUrl`/`contentUrl`) |
 | `bibo:Document` (49) | `DigitalDocument` |
 | `bibo:AcademicArticle` (35) | `ScholarlyArticle` |
 | `fabio:BookReview` (178) | `ScholarlyArticle` (+ `about` = the reviewed book) † |
@@ -230,6 +230,24 @@ validator cannot read invalidates the node around it.
 `thumbnailUrl` is taken only from the item's own media, never from the site's default share
 image — unlike `image`, which may fall back to it. A share card needs some picture; a claim
 that the site logo depicts the video is a different kind of statement.
+
+A video's `uploadDate` is normalised to an ISO 8601 **date-time with an offset**
+(`2021-08-21` → `2021-08-21T00:00:00+00:00`). A NumericDataTypes timestamp is a date, which
+Search Console rejects twice over — as an incorrect date-time value, and as one missing a
+time zone. UTC is used because the offset is a formality here: the archive does not record
+what time of day a video went up, so any wall-clock time is invented, and UTC invents the
+least. A `YYYY` or `YYYY-MM` value is completed to the first of the period, `uploadDate`
+being required where `datePublished` alongside it still carries the archive's own precision.
+A value that is not a date is dropped rather than passed on.
+
+`embedUrl` and `contentUrl` say where the video can be played, and come from disjoint
+sources: 1,745 records name a source in `fabio:hasURL` — all but two a YouTube watch page,
+which becomes the `/embed/` form — and the 44 digitised from DVD hold the file itself as an
+item media, whose original URL is the `contentUrl`. Only a media Omeka serves as `video/*`
+qualifies: `contentUrl` must point at content bytes, so a cover image is not a candidate and
+neither is a private media. A source URL that resolves to no player (the collection holds one
+SoundCloud track and one Wayback capture) yields nothing rather than a link Google cannot
+play.
 
 Creative works also carry `author`/`editor`/`contributor` (from `bibo:authorList`,
 `dcterms:creator`, `bibo:editorList`, `dcterms:contributor`), `datePublished`, `inLanguage`,

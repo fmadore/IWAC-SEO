@@ -3,6 +3,53 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.4 — 2026-09-03
+
+### Fixed
+
+- **`uploadDate` is now a date-time with a time zone.** Search Console rejected
+  every video the module has published — 1,242 URLs crawled so far — twice over
+  for the same value: *"incorrect date-time value"* (an error) and *"missing
+  time zone"* (a warning). A NumericDataTypes timestamp is a date, and
+  `uploadDate` is validated as a date-time, so `2021-08-21` becomes
+  `2021-08-21T00:00:00+00:00`. UTC because the offset is a formality: the
+  archive does not record what time of day a video went up, so any wall-clock
+  time it names is invented, and UTC invents the least. The six records held to
+  the year or the month are completed to the first of the period — `uploadDate`
+  is required, and `datePublished` beside it still carries the precision the
+  archive actually has. `Text::uploadDate()` runs the whole archive without a
+  single unusable value.
+
+- **Videos now say where they can be played.** Neither `contentUrl` nor
+  `embedUrl` was ever emitted, which Search Console reports against every video
+  page — 1,263 URLs so far, and the largest of the five outstanding issues. The
+  two sources are disjoint and between them cover 1,789 of the 1,790 records:
+  1,745 name their source in `fabio:hasURL`, all but two a YouTube watch page
+  that becomes the `/embed/` player URL; the 44 digitised from DVD hold the
+  video itself as an item media, whose file URL is the `contentUrl`. Only a
+  media Omeka serves as `video/*` counts — `contentUrl` must point at content
+  bytes, so a cover image is not a candidate and neither is a private media —
+  and a source that resolves to no player (the collection's one SoundCloud
+  track, one Wayback capture) yields nothing rather than a link Google cannot
+  play.
+
+Two issues in the same report are **not** code defects and are left alone. 30
+records carry no date in any property, so there is no `uploadDate` to normalise;
+310 carry no description, abstract or short description, and the only other text
+they hold is a timecoded machine transcript — thin auto-generated boilerplate is
+what the guidelines warn against, so the module does not invent one. Both are
+metadata gaps to fill in Omeka.
+
+### Changed
+
+- **The string extractor emits portable references and skips `.integration`.**
+  `#:` paths were written with the OS's own separator, so `composer i18n:check`
+  could never pass on Windows: the template differed on every line without a
+  single string having changed. They are now always forward slashes. The
+  extractor also walked `.integration/` — the gitignored Omeka S checkout that
+  CI's integration job creates and that a local integration run needs — and
+  swept several thousand of Omeka's own strings into the module's template.
+
 ## 1.0.3 — 2026-09-01
 
 ### Changed

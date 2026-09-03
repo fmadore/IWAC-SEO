@@ -20,6 +20,7 @@ use Laminas\View\Helper\HeadTitle;
 use Laminas\View\HelperPluginManager;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\ItemRepresentation;
+use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\ResourceClassRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -300,7 +301,7 @@ final class MetadataIntegrationTest extends TestCase
         );
 
         self::assertSame($own, $data['thumbnailUrl']);
-        self::assertSame('2022-07-01', $data['uploadDate']);
+        self::assertSame('2022-07-01T00:00:00+00:00', $data['uploadDate']);
     }
 
     public function testVideoWithoutItsOwnThumbnailClaimsNone(): void
@@ -317,6 +318,113 @@ final class MetadataIntegrationTest extends TestCase
 
         self::assertArrayNotHasKey('thumbnailUrl', $data);
         self::assertSame('https://example.test/files/asset/site-default.webp', $data['image']);
+    }
+
+    public function testHostedVideoIsEmbeddableFromItsSourceUrl(): void
+    {
+        // 1,743 of the 1,790 videos: fabio:hasURL names the YouTube watch page,
+        // and embedUrl wants the player behind it.
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2021-08-21'], [], [], [
+                'fabio:hasURL' => 'https://www.youtube.com/watch?v=UENBMWutb-w',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertSame('https://www.youtube.com/embed/UENBMWutb-w', $data['embedUrl']);
+        self::assertArrayNotHasKey('contentUrl', $data);
+    }
+
+    public function testVideoSourceThatIsNotAPlayerYieldsNoEmbedUrl(): void
+    {
+        // The archive's SoundCloud track and Wayback capture: a URL that does
+        // not resolve to a player is worse than no embedUrl at all.
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2021-08-21'], [], [], [
+                'fabio:hasURL' => 'https://soundcloud.com/radio-omega/libertes-religieuses',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertArrayNotHasKey('embedUrl', $data);
+    }
+
+    public function testVideoWithNoSourceAtAllClaimsNoPlaybackUrl(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2021-08-21']),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertArrayNotHasKey('embedUrl', $data);
+        self::assertArrayNotHasKey('contentUrl', $data);
+    }
+
+    public function testDigitisedVideoNamesTheFileItServes(): void
+    {
+        // The 44 DVD transfers hold no source URL; the video file is the item's
+        // own media, which is what contentUrl asks for.
+        $file = 'https://example.test/files/original/626a1e.mp4';
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2019'], [], [
+                $this->media('image/jpeg', 'https://example.test/files/original/cover.jpg'),
+                $this->media('video/mp4', $file),
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertSame($file, $data['contentUrl']);
+        self::assertArrayNotHasKey('embedUrl', $data);
+        // A year is all the archive holds; uploadDate is required all the same.
+        self::assertSame('2019-01-01T00:00:00+00:00', $data['uploadDate']);
+    }
+
+    public function testVideoIgnoresMediaThatAreNotThePlayableFile(): void
+    {
+        // contentUrl must point at content bytes: a cover image is not the
+        // video, and a private media is not servable to the crawler at all.
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:date' => '2019-08-11'], [], [
+                $this->media('image/jpeg', 'https://example.test/files/original/cover.jpg'),
+                $this->media('video/mp4', 'https://example.test/files/original/private.mp4', false),
+                $this->media('video/mp4', null),
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertArrayNotHasKey('contentUrl', $data);
+    }
+
+    public function testNonVideoTypesGetNoPlaybackUrls(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(178, ['dcterms:date' => '2019-08-11'], [], [
+                $this->media('video/mp4', 'https://example.test/files/original/x.mp4'),
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null
+        );
+
+        self::assertSame('ScholarlyArticle', $data['@type']);
+        self::assertArrayNotHasKey('contentUrl', $data);
+        self::assertArrayNotHasKey('uploadDate', $data);
     }
 
     public function testConferencePaperNamesItsEventByUrlWhenTheEventIsARecord(): void
@@ -385,10 +493,19 @@ final class MetadataIntegrationTest extends TestCase
      * @param array<string,string> $values term => single literal value
      * @param array<string,array{0:string,1:int}> $links term => [title, item id]
      *   for values that point at another record rather than holding a literal
+     * @param array<MediaRepresentation&MockObject> $media the item's media, in order
+     * @param array<string,string> $uris term => URI, for the uri-typed values
+     *   (fabio:hasURL, the Wikidata dcterms:identifier) whose payload is the
+     *   link rather than the text
      * @return ItemRepresentation&MockObject
      */
-    private function resource(int $classId, array $values, array $links = []): ItemRepresentation
-    {
+    private function resource(
+        int $classId,
+        array $values,
+        array $links = [],
+        array $media = [],
+        array $uris = []
+    ): ItemRepresentation {
         $class = $this->getMockBuilder(ResourceClassRepresentation::class)
             ->disableOriginalConstructor()
             ->onlyMethods(['id', 'label'])
@@ -403,6 +520,9 @@ final class MetadataIntegrationTest extends TestCase
         foreach ($links as $term => [$title, $linkedId]) {
             $wrapped[$term] = [$this->linkedValue($title, $linkedId)];
         }
+        foreach ($uris as $term => $uri) {
+            $wrapped[$term] = [$this->value($uri, $uri)];
+        }
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
@@ -414,7 +534,7 @@ final class MetadataIntegrationTest extends TestCase
                 return !empty($options['all']) ? $matches : ($matches[0] ?? null);
             }
         );
-        $item->method('media')->willReturn([]);
+        $item->method('media')->willReturn($media);
         $item->method('resourceClass')->willReturn($class);
         $item->method('displayTitle')->willReturn($values['dcterms:title'] ?? 'Untitled');
         $item->method('siteUrl')->willReturn(self::CANONICAL);
@@ -543,6 +663,24 @@ final class MetadataIntegrationTest extends TestCase
     }
 
     /** @return ValueRepresentation&MockObject */
+    /**
+     * A media mock for the contentUrl tests: the 44 DVD-digitised videos hold
+     * the file itself, so what matters is its type, its visibility and its URL.
+     *
+     * @return MediaRepresentation&MockObject
+     */
+    private function media(string $mediaType, ?string $originalUrl, bool $public = true): MediaRepresentation
+    {
+        $media = $this->getMockBuilder(MediaRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['isPublic', 'mediaType', 'originalUrl'])
+            ->getMock();
+        $media->method('isPublic')->willReturn($public);
+        $media->method('mediaType')->willReturn($mediaType);
+        $media->method('originalUrl')->willReturn($originalUrl);
+        return $media;
+    }
+
     private function value(string $text, ?string $uri = null): ValueRepresentation
     {
         $value = $this->getMockBuilder(ValueRepresentation::class)

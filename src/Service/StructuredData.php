@@ -6,6 +6,7 @@ namespace IwacSeo\Service;
 use IwacSeo\Service\Concern\ResourceValueReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
+use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
 
@@ -264,7 +265,13 @@ class StructuredData
                 $data['duration'] = $duration;
             }
             if ($date !== null) {
-                $data['uploadDate'] = $date;
+                // uploadDate is validated as a date-time with an offset, which
+                // a NumericDataTypes timestamp is not; datePublished above
+                // keeps the archive's own precision. Text::uploadDate().
+                $upload = Text::uploadDate($date);
+                if ($upload !== null) {
+                    $data['uploadDate'] = $upload;
+                }
             }
             // thumbnailUrl is required of a VideoObject and is not satisfied by
             // image: only the item's own media depicts the video, whereas image
@@ -272,6 +279,7 @@ class StructuredData
             if ($thumbnail !== null) {
                 $data['thumbnailUrl'] = $thumbnail;
             }
+            $data += $this->videoUrls($resource);
         }
 
         // fabio:BookReview records name the book they review in bibo:reviewOf.
@@ -369,6 +377,56 @@ class StructuredData
     // ─── Value readers ──────────────────────────────────────────────────────
     // firstString(), firstLabel() and labels() live in the shared
     // ResourceValueReader trait; only the JSON-LD-specific readers remain here.
+
+    /**
+     * Where the video can actually be played: schema.org's contentUrl (the
+     * file's own bytes) and embedUrl (a player), whichever the record supports.
+     *
+     * Neither was emitted before, which Search Console reports against every
+     * video page in the archive. The two sources are disjoint in IWAC and
+     * between them cover 1,789 of the 1,790 records:
+     *
+     *   - 1,745 name their source in fabio:hasURL, all but two of them a
+     *     YouTube watch page → embedUrl, via {@see Text::youtubeEmbedUrl()}.
+     *   - the 44 digitised from DVD hold the video itself as an item media
+     *     → contentUrl, the media's original file URL.
+     *
+     * contentUrl is taken only from a media Omeka serves as video/*: it must
+     * point at content bytes, so an item's cover image or a PDF programme is
+     * not a candidate, and a private media is not one either.
+     *
+     * @return array{contentUrl?: string, embedUrl?: string}
+     */
+    private function videoUrls(AbstractResourceEntityRepresentation $resource): array
+    {
+        $out = [];
+
+        foreach ($resource->value('fabio:hasURL', ['all' => true]) as $value) {
+            if (!$value instanceof ValueRepresentation) {
+                continue;
+            }
+            $embed = Text::youtubeEmbedUrl($value->uri() ?: trim((string) $value));
+            if ($embed !== null) {
+                $out['embedUrl'] = $embed;
+                break;
+            }
+        }
+
+        if ($resource instanceof ItemRepresentation) {
+            foreach ($resource->media() as $media) {
+                if (!$media->isPublic() || !str_starts_with((string) $media->mediaType(), 'video/')) {
+                    continue;
+                }
+                $url = $media->originalUrl();
+                if ($url) {
+                    $out['contentUrl'] = $url;
+                    break;
+                }
+            }
+        }
+
+        return $out;
+    }
 
     /**
      * Linked (or literal) resources for the first of $terms that has values.

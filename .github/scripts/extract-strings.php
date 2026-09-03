@@ -31,10 +31,13 @@ $strings = [];
 $iterator = new RecursiveIteratorIterator(
     new RecursiveCallbackFilterIterator(
         new RecursiveDirectoryIterator($root, FilesystemIterator::SKIP_DOTS),
+        // .integration holds the Omeka S checkout the integration suite runs
+        // against — gitignored, and created by CI's own integration job. Its
+        // several thousand translatable strings are Omeka's, not this module's.
         static function (SplFileInfo $file): bool {
             $name = $file->getFilename();
             if ($file->isDir()) {
-                return !in_array($name, ['vendor', '.git', 'node_modules', '.github', 'tests'], true);
+                return !in_array($name, ['vendor', '.git', 'node_modules', '.github', 'tests', '.integration'], true);
             }
             return in_array($file->getExtension(), ['php', 'phtml'], true);
         }
@@ -44,7 +47,10 @@ $iterator = new RecursiveIteratorIterator(
 foreach ($iterator as $file) {
     /** @var SplFileInfo $file */
     $path = $file->getPathname();
-    $relative = ltrim(str_replace($root, '', $path), '/\\');
+    // Forward slashes whatever the OS: the reference is a portable file
+    // identity, and a Windows-flavoured template would otherwise differ
+    // from a Linux one on every line without a single string changing.
+    $relative = str_replace('\\', '/', ltrim(str_replace($root, '', $path), '/\\'));
     $lines = file($path, FILE_IGNORE_NEW_LINES);
     if ($lines === false) {
         continue;
