@@ -5,51 +5,68 @@ Africa Collection (islam.zmo.de). `README.md` covers the architecture, every
 setting, and the schema.org / Zotero field conventions — read the relevant
 section before changing behaviour. This file is only the things that bite.
 
-## PHP yes, Composer no
+## The whole suite runs locally
 
-`php` **is** on PATH (8.5.8, winget), so `php -l` works and the unit suite can
-be run. `composer` is not, and `vendor/` is never committed, so the dev tools
-have to be borrowed from a sibling checkout that has them installed —
-`../IwacSearch/vendor` carries PHPUnit 11 and PHPStan 2, both matching this
-module's constraints. PHP_CodeSniffer is in neither, so PSR-12 is still
-read-checked and gated in CI.
-
-The winget build loads no `php.ini`, so `mbstring` (which PHPUnit requires) and
-`fileinfo` have to be switched on per invocation:
+`php` and `composer` are both available, `vendor/` is installed, and **every
+check CI runs can be run here** — including PSR-12 and the real-Omeka
+integration suite, which earlier revisions of this file said could not be.
 
 ```bash
-php -d extension_dir="$LOCALAPPDATA/Microsoft/WinGet/Packages/PHP.PHP.8.5_Microsoft.Winget.Source_8wekyb3d8bbwe/ext" -d extension=mbstring -d extension=fileinfo ../IwacSearch/vendor/phpstan/phpstan/phpstan.phar analyse -c phpstan.neon.dist --no-progress
+composer check            # i18n:check + lint + analyse + test, what CI's two jobs cover
+composer test:integration # needs OMEKA_PATH; see below
 ```
 
-PHPUnit needs a bootstrap that stands in for the missing Composer autoloader:
-require `../IwacSearch/vendor/autoload.php`, `spl_autoload_register` the two
-PSR-4 roots (`IwacSeo\` → `src/`, `IwacSeo\Test\` → `tests/`), then
-`tests/Shim/omeka.php`. Keep that runner in a scratch directory — it is a local
-convenience, not part of the module.
+Both are on PATH in any newly started shell: PHP 8.2.33 lives in the winget
+package directory (`$LOCALAPPDATA/Microsoft/WinGet/Packages/PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe`,
+added to the user PATH by the install), and `composer` is a one-line `.bat` in
+`$LOCALAPPDATA/Microsoft/WindowsApps` forwarding to the `composer.phar` beside
+`php.exe`. A shell started *before* the install will not see either — that
+looks exactly like "PHP is not installed", so open a new one before concluding
+anything.
 
-**`tests/Integration` mostly cannot run here**: it needs a real Omeka S install
-(its CI job downloads and boots one). The exception is the JSON-LD *shape*
-tests, which need nothing from Omeka but a few representation classes for
-PHPUnit to mock — declare `AbstractResourceRepresentation`,
-`AbstractResourceEntityRepresentation`, `ItemRepresentation`,
-`MediaRepresentation`, `ValueRepresentation`, `ResourceClassRepresentation` and
-`SiteRepresentation` in a scratch bootstrap, point PHPUnit at the file and
-`--filter` to those tests. The head-placeholder tests still need real Laminas.
+The `php.ini` was written from `php.ini-development`, and three settings in it
+are load-bearing. If a tool fails oddly, check these before anything else:
 
-Worth the trouble: v1.0.3 shipped with two stale expectations in exactly those
-tests because they were only ever checked in CI, and the tag had published
-before CI went red. Say which suite you actually ran, and when a change touches
-the class→`@type` map, run the shape tests before pushing a tag.
+- `extension_dir` uncommented, plus `mbstring`, `openssl`, `curl`, `zip`,
+  `fileinfo`, `intl`, `sqlite3`, `pdo_sqlite` and `pdo_mysql` (Omeka's own
+  `composer install` refuses to resolve without the last one).
+- `memory_limit = 1G`. PHPStan's parallel workers OOM at the stock 128M and
+  report it as a crash, not as an analysis failure.
+- `curl.cainfo` / `openssl.cafile` pointing at a downloaded `cacert.pem`.
+  Without them `composer hreflang:check` cannot verify islam.zmo.de's
+  certificate and dies on a TLS error that looks like a site outage.
 
-## CI is still the gate
+`vendor/bin` needs the Windows `.bat` shims, and Composer only writes those
+when `composer install` runs *on Windows*. A `vendor/` restored from elsewhere
+gives `'phpcs' is not recognised`; delete it and reinstall.
+
+`tests/Integration` needs `OMEKA_PATH` set to a real Omeka S tree. A v4.2.1
+checkout lives in the gitignored `.integration/omeka-s` — the same path CI's
+integration job uses:
+
+```bash
+git clone --depth 1 --branch v4.2.1 https://github.com/omeka/omeka-s.git .integration/omeka-s
+composer install --working-dir=.integration/omeka-s --no-dev
+```
+
+Consequence: **run the checks before pushing, and say which ones you ran.**
+v1.0.3 shipped with two stale test expectations because they were only ever
+checked in CI, and the tag published before CI went red. There is no longer any
+excuse for that, and none for reporting a change as verified by reading.
+
+## CI still sees things a local run cannot
 
 `.github/workflows/ci.yml` has two jobs, together covering `composer check`:
 `test` (a `php -l` sweep plus PHPUnit on 8.2–8.5, including production 8.5) and
 `quality` (strict Composer validation, `i18n:check`, `lint`, `analyse`, on 8.2
 only). Composer downloads are cached in both jobs. The `quality` checks carry
 `if: ${{ !cancelled() }}` so one push reports every category at once instead of
-revealing them a re-run at a time — worth preserving: the local runs above
-cover neither PSR-12 nor the integration suite, and only CI sees 8.2.
+revealing them a re-run at a time.
+
+A local run is now a genuine gate rather than a rehearsal, but it is one PHP
+version. CI is what covers 8.3, 8.4 and production 8.5, and it boots Omeka on
+8.5 where the local integration tree runs 8.2. Watch it before tagging: a tag
+is not retractable, and the release workflow builds straight from it.
 
 `phpstan-baseline.neon` records 59 findings that predate enforcement — 56
 missing array value types plus three judgement calls. Level 6 applies in full
@@ -61,9 +78,11 @@ baseline covering only the *new* errors and silently drop the recorded debt.
 The translation template tracks *strings*, not layout: its `#:` references
 carry file paths without line numbers, precisely so that moving a string does
 not invalidate it. Adding or removing a `// @translate` string still does, and
-`composer i18n` regenerates it — but that needs PHP, so in practice the
-`quality` job does it for you and uploads the result as an artefact when the
-gate fails. Download it, commit it.
+`composer i18n` regenerates it — locally now, so regenerate and commit rather
+than waiting for the `quality` job to upload one as an artefact. References are
+written with forward slashes whatever the OS, and `.integration/` is skipped;
+both were fixed in 1.0.4, without which the check could not pass on Windows and
+the template filled with Omeka's own strings.
 
 ## Gotchas
 
