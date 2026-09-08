@@ -82,7 +82,14 @@ class HeadMetadata
         $this->head->mark('og:title');
 
         if ($this->jsonLdEnabled()) {
-            $data = $this->structuredData->forResource($resource, $site, $canonical, $image, $thumbnail);
+            $data = $this->structuredData->forResource(
+                $resource,
+                $site,
+                $canonical,
+                $image,
+                $thumbnail,
+                ViewLocale::forCitation($view)
+            );
             if ($data !== null) {
                 $this->head->jsonLd($view, $data);
             }
@@ -350,13 +357,29 @@ class HeadMetadata
         PhpRenderer $view,
         AbstractResourceEntityRepresentation $resource
     ): ?string {
+        // An asset assigned to the resource itself comes first: it is the
+        // editor's explicit choice of picture, and the one way to give a video
+        // whose file yielded no still a thumbnail that is actually of it.
+        $asset = $resource->thumbnail();
+        if ($asset !== null) {
+            $url = (string) $asset->assetUrl();
+            if ($url !== '') {
+                return $this->absolutize($view, $url);
+            }
+        }
+
         $media = null;
         if ($resource instanceof ItemRepresentation) {
             $media = $resource->primaryMedia();
         } elseif ($resource instanceof MediaRepresentation) {
             $media = $resource;
         }
-        if ($media instanceof MediaRepresentation) {
+        // thumbnailUrl() never returns null: a media with no derivatives — a
+        // video the server could not extract a frame from — gets Omeka's
+        // generic file-type icon instead. That icon is not a picture of the
+        // resource, so it is not a thumbnail here any more than the site's
+        // share graphic is; only a media that has its own derivatives counts.
+        if ($media instanceof MediaRepresentation && $media->hasThumbnails()) {
             $thumb = $media->thumbnailUrl('large');
             if ($thumb) {
                 return $this->absolutize($view, $thumb);

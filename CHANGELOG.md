@@ -3,6 +3,62 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.0.5 — 2026-09-08
+
+### Fixed
+
+- **A video with no description of its own gets one composed from its
+  record.** `description` is required of a `VideoObject`, and 310 of the
+  1,790 videos hold no `dcterms:description`, `dcterms:abstract`,
+  `bibo:abstract` or `bibo:shortDescription` — Search Console had flagged 199
+  of them as *"missing field description"* and was adding more with every
+  crawl, since the number only tracks how many it has visited. 1.0.4 declined
+  to fill the field from the timecoded machine transcript, and still does.
+  What it now emits instead is the record's own facts read out as one
+  catalogue sentence in the page's language:
+
+  > Enregistrement vidéo (2 min 49 s) publié par RTB - Radiodiffusion
+  > Télévision du Burkina le 15 avril 2022, en français. Lieux : Burkina Faso.
+  > Collection Islam Afrique de l'Ouest.
+
+  Who made it, who published it, when (to the archive's own precision — a
+  year stays "en 2022", not an invented day), how long it runs, in what
+  language, where and about what, then the collection. Nothing is inferred.
+  A record with any descriptive text keeps it verbatim, and one with no fact
+  beyond its title gets no sentence rather than an empty one.
+  `VideoDescription::compose()` was run against all 310 undescribed live
+  records: every one yields a sentence, 142–238 characters long. Wording
+  lives in an EN/FR string table like `CitationFormatter`'s, because the
+  module's services have no translator; `StructuredData::forResource()`
+  takes the page locale as a new trailing argument for it.
+
+- **Omeka's generic file icon is no longer offered as a video's
+  `thumbnailUrl`.** `MediaRepresentation::thumbnailUrl()` never returns
+  null: a media whose file yielded no derivative — one of the DVD-digitised
+  mp4s, item 15883 — is answered with `application/asset/thumbnails/video.png`,
+  which 1.0.2's "only the item's own media" rule then published as a still
+  from the video. It is a picture of nothing in particular, so a media
+  without derivatives now yields no thumbnail (and `image` falls back to the
+  site's share graphic, as it does for any resource without one). An asset
+  assigned as the item's own thumbnail is honoured first, ahead of the primary
+  media: it is the editor's explicit choice, and the one way to give such a
+  record a thumbnail that is actually of it.
+
+### Search Console, for the record
+
+Of the six reports exported on 2026-09-08, three need no code: *Events*
+"missing location" (4 URLs) and "missing startDate" (5) were last crawled in
+June–July, before 1.0.3 retyped every event record `DefinedTerm`; *Videos*
+"missing thumbnailUrl" (840) was crawled 17–22 August, before 1.0.2 added the
+field, and has been falling since the 1 September recrawl. All three are a
+"validate fix" away. "Missing uploadDate" (24) is the 30 DVD records with no
+date in any property — a metadata gap, listed in 1.0.2. The 1,625 "server
+error (5xx)" URLs are Bulk Export's retired `/s/{site}/resource/{id}.csv`
+downloads: the module is uninstalled and Omeka 404s them, but the nginx rule
+that once protected them still answered crawlers with `429` and
+`Retry-After: 3600`, which is how a 404 shows up as a 5xx. That rule now
+returns `410 Gone` (IWAC-docker), which is what makes a crawler drop a URL.
+
 ## 1.0.4 — 2026-09-03
 
 ### Fixed

@@ -19,6 +19,7 @@ use Laminas\View\Helper\HeadScript;
 use Laminas\View\Helper\HeadTitle;
 use Laminas\View\HelperPluginManager;
 use Laminas\View\Renderer\PhpRenderer;
+use Omeka\Api\Representation\AssetRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\ResourceClassRepresentation;
@@ -320,6 +321,159 @@ final class MetadataIntegrationTest extends TestCase
         self::assertSame('https://example.test/files/asset/site-default.webp', $data['image']);
     }
 
+    public function testAVideoWithoutADescriptionIsDescribedFromItsOwnFacts(): void
+    {
+        // item 108664: no abstract, summary or description anywhere, which
+        // Search Console reports as a missing required field. The record's
+        // own facts are read out in the page's language instead.
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, [
+                'dcterms:title'    => 'La communauté musulmane a prié pour la paix',
+                'dcterms:date'     => '2022-04-15',
+                'dcterms:extent'   => 'PT2M49S',
+                'dcterms:language' => 'Français',
+                'dcterms:spatial'  => 'Burkina Faso',
+            ], ['dcterms:publisher' => ['RTB - Radiodiffusion Télévision du Burkina', 108405]]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null,
+            'fr'
+        );
+
+        self::assertSame(
+            'Enregistrement vidéo (2 min 49 s) publié par RTB - Radiodiffusion Télévision du Burkina '
+            . "le 15 avril 2022, en français. Lieux : Burkina Faso. Collection Islam Afrique de l'Ouest.",
+            $data['description']
+        );
+        // The same facts feed the structured properties as before.
+        self::assertSame('2022-04-15', $data['datePublished']);
+        self::assertSame(['@type' => 'Organization', 'name' => 'RTB - Radiodiffusion Télévision du Burkina'], $data['publisher']);
+    }
+
+    public function testAVideoWithItsOwnDescriptionKeepsIt(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, [
+                'dcterms:description' => 'Reportage sur la Tabaski à Ouagadougou.',
+                'dcterms:date'        => '2022-04-15',
+                'dcterms:extent'      => 'PT2M49S',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null,
+            'fr'
+        );
+
+        self::assertSame('Reportage sur la Tabaski à Ouagadougou.', $data['description']);
+    }
+
+    public function testOnlyVideosGetAComposedDescription(): void
+    {
+        // A journal article without an abstract is not a required-field
+        // error, so nothing is composed for it.
+        $data = $this->structuredData()->forResource(
+            $this->resource(35, ['dcterms:title' => 'An article', 'dcterms:date' => '2020']),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null,
+            'en'
+        );
+
+        self::assertArrayNotHasKey('description', $data);
+    }
+
+    public function testAVideoWithNoFactsBeyondItsTitleGetsNoDescription(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:title' => 'Untitled tape']),
+            $this->site(),
+            self::CANONICAL,
+            null,
+            null,
+            'en'
+        );
+
+        self::assertArrayNotHasKey('description', $data);
+    }
+
+    public function testAGenericFileIconIsNotAVideoThumbnail(): void
+    {
+        // item 15883: the mp4 yielded no still, so thumbnailUrl('large')
+        // answers with Omeka's video.png icon. That is not a picture of the
+        // video, so the VideoObject claims no thumbnail and og:image is left
+        // to the site default (none configured here).
+        $media = $this->getMockBuilder(MediaRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['hasThumbnails', 'thumbnailUrl', 'isPublic', 'mediaType', 'originalUrl'])
+            ->getMock();
+        $media->method('hasThumbnails')->willReturn(false);
+        $media->method('thumbnailUrl')->willReturn('https://example.test/application/asset/thumbnails/video.png');
+        $media->method('isPublic')->willReturn(true);
+        $media->method('mediaType')->willReturn('video/mp4');
+        $media->method('originalUrl')->willReturn('https://example.test/files/original/tape.mp4');
+        $item = $this->videoItem($media, null);
+
+        $view = $this->renderer();
+        $this->videoMetadata()->applyResource($view, $item, $this->site());
+
+        $data = $this->jsonLd($view);
+        self::assertSame('VideoObject', $data['@type']);
+        self::assertArrayNotHasKey('thumbnailUrl', $data);
+        self::assertArrayNotHasKey('image', $data);
+        self::assertSame('https://example.test/files/original/tape.mp4', $data['contentUrl']);
+        self::assertStringNotContainsString('video.png', $this->decoded($view->headMeta()->toString()));
+    }
+
+    public function testAnAssignedAssetIsTheVideoThumbnail(): void
+    {
+        // The editor's fix for such a record: assign an asset as the item's
+        // thumbnail. It outranks the media's own derivative.
+        $media = $this->getMockBuilder(MediaRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['hasThumbnails', 'thumbnailUrl', 'isPublic', 'mediaType', 'originalUrl'])
+            ->getMock();
+        $media->method('hasThumbnails')->willReturn(true);
+        $media->method('thumbnailUrl')->willReturn('https://example.test/files/large/frame.jpg');
+        $media->method('isPublic')->willReturn(true);
+        $media->method('mediaType')->willReturn('video/mp4');
+        $media->method('originalUrl')->willReturn('https://example.test/files/original/tape.mp4');
+        $asset = $this->getMockBuilder(AssetRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['assetUrl'])
+            ->getMock();
+        $asset->method('assetUrl')->willReturn('https://example.test/files/asset/still.jpg');
+        $item = $this->videoItem($media, $asset);
+
+        $view = $this->renderer();
+        $this->videoMetadata()->applyResource($view, $item, $this->site());
+
+        $data = $this->jsonLd($view);
+        self::assertSame('https://example.test/files/asset/still.jpg', $data['thumbnailUrl']);
+        self::assertSame('https://example.test/files/asset/still.jpg', $data['image']);
+    }
+
+    public function testAMediaWithItsOwnDerivativeIsTheVideoThumbnail(): void
+    {
+        $media = $this->getMockBuilder(MediaRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['hasThumbnails', 'thumbnailUrl', 'isPublic', 'mediaType', 'originalUrl'])
+            ->getMock();
+        $media->method('hasThumbnails')->willReturn(true);
+        $media->method('thumbnailUrl')->willReturn('https://example.test/files/large/frame.jpg');
+        $media->method('isPublic')->willReturn(true);
+        $media->method('mediaType')->willReturn('image/jpeg');
+        $media->method('originalUrl')->willReturn('https://example.test/files/original/frame.jpg');
+        $item = $this->videoItem($media, null);
+
+        $view = $this->renderer();
+        $this->videoMetadata()->applyResource($view, $item, $this->site());
+
+        self::assertSame('https://example.test/files/large/frame.jpg', $this->jsonLd($view)['thumbnailUrl']);
+    }
+
     public function testHostedVideoIsEmbeddableFromItsSourceUrl(): void
     {
         // 1,743 of the 1,790 videos: fabio:hasURL names the YouTube watch page,
@@ -487,6 +641,72 @@ final class MetadataIntegrationTest extends TestCase
         );
     }
 
+    /** The head pipeline with JSON-LD on and the class map above, for the thumbnail tests. */
+    private function videoMetadata(): HeadMetadata
+    {
+        return new HeadMetadata(
+            new SettingsGate($this->settings(['iwac_seo_jsonld_enabled' => '1', 'iwac_seo_citation_meta' => '0', 'iwac_seo_unapi' => '0'])),
+            new HeadWriter(),
+            $this->structuredData(),
+            new CitationMeta($this->kinds),
+            new Hreflang(['enabled' => false]),
+            new ZoteroRdf($this->kinds),
+        );
+    }
+
+    /**
+     * A video item whose thumbnail sources are the test's to set: the primary
+     * media (with or without derivatives) and an optional assigned asset.
+     *
+     * @return ItemRepresentation&MockObject
+     */
+    private function videoItem(?MediaRepresentation $primary, ?AssetRepresentation $asset): ItemRepresentation
+    {
+        $class = $this->getMockBuilder(ResourceClassRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['id', 'label'])
+            ->getMock();
+        $class->method('id')->willReturn(38);
+        $class->method('label')->willReturn('Audiovisual document');
+
+        $values = ['dcterms:title' => [$this->value('A tape')], 'dcterms:date' => [$this->value('2022-07-01')]];
+        $item = $this->getMockBuilder(ItemRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
+            ->getMock();
+        $item->method('value')->willReturnCallback(
+            static function (string $term, array $options = []) use ($values) {
+                $matches = $values[$term] ?? [];
+                return !empty($options['all']) ? $matches : ($matches[0] ?? null);
+            }
+        );
+        $item->method('media')->willReturn($primary ? [$primary] : []);
+        $item->method('resourceClass')->willReturn($class);
+        $item->method('displayTitle')->willReturn('A tape');
+        $item->method('siteUrl')->willReturn(self::CANONICAL);
+        $item->method('primaryMedia')->willReturn($primary);
+        $item->method('thumbnail')->willReturn($asset);
+        return $item;
+    }
+
+    /**
+     * The first non-breadcrumb JSON-LD document the view was given.
+     *
+     * @return array<mixed>
+     */
+    private function jsonLd(PhpRenderer $view): array
+    {
+        $scripts = $this->decoded($view->headScript()->toString());
+        preg_match_all('#<script type="application/ld\+json">\s*(\{.*?\})\s*</script>#s', $scripts, $matches);
+        foreach ($matches[1] as $json) {
+            $data = json_decode($json, true);
+            if (is_array($data) && ($data['@type'] ?? null) !== 'BreadcrumbList') {
+                return $data;
+            }
+        }
+        self::fail('No JSON-LD document was written.');
+    }
+
     /**
      * A resource mock carrying exactly $values, for the JSON-LD shape tests.
      *
@@ -526,7 +746,7 @@ final class MetadataIntegrationTest extends TestCase
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia'])
+            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
             ->getMock();
         $item->method('value')->willReturnCallback(
             static function (string $term, array $options = []) use ($wrapped) {
@@ -539,6 +759,7 @@ final class MetadataIntegrationTest extends TestCase
         $item->method('displayTitle')->willReturn($values['dcterms:title'] ?? 'Untitled');
         $item->method('siteUrl')->willReturn(self::CANONICAL);
         $item->method('primaryMedia')->willReturn(null);
+        $item->method('thumbnail')->willReturn(null);
         return $item;
     }
 
@@ -564,6 +785,13 @@ final class MetadataIntegrationTest extends TestCase
         $helpers->setService(
             'serverUrl',
             static fn (bool|string|null $arg = null): string => is_string($arg) ? $origin . $arg : $currentUrl
+        );
+        // Laminas's real Url helper needs a router; the one route the JSON-LD
+        // breadcrumb asks for is the site home.
+        $helpers->setService(
+            'url',
+            static fn (string $route, array $params = [], array $options = []): string
+                => $origin . '/s/' . ($params['site-slug'] ?? 'afrique_ouest') . '/'
         );
         $view->setHelperPluginManager($helpers);
         return $view;
@@ -615,7 +843,7 @@ final class MetadataIntegrationTest extends TestCase
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia'])
+            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
             ->getMock();
         $item->method('value')->willReturnCallback(
             static function (string $term, array $options = []) use ($values) {
@@ -632,6 +860,7 @@ final class MetadataIntegrationTest extends TestCase
             }
         );
         $item->method('primaryMedia')->willReturn(null);
+        $item->method('thumbnail')->willReturn(null);
         return $item;
     }
 

@@ -227,9 +227,31 @@ it handles the interval case: a `dcterms:date` may be an ISO 8601 *interval*
 with either side that is not a plain ISO date dropped rather than emitted, since a date a
 validator cannot read invalidates the node around it.
 
-`thumbnailUrl` is taken only from the item's own media, never from the site's default share
-image — unlike `image`, which may fall back to it. A share card needs some picture; a claim
-that the site logo depicts the video is a different kind of statement.
+`thumbnailUrl` is taken only from a picture of the resource itself, never from the site's
+default share image — unlike `image`, which may fall back to it. A share card needs some
+picture; a claim that the site logo depicts the video is a different kind of statement. Two
+sources qualify, in this order: an asset assigned as the item's own thumbnail (the editor's
+explicit choice, and the way to give a video whose file yielded no still one that is actually
+of it), then the primary media's derivative. A media *without* derivatives is skipped, because
+Omeka answers for it with its generic file-type icon (`video.png`), which is a picture of
+nothing in particular.
+
+A video with no description of its own — no `dcterms:description`, `dcterms:abstract`,
+`bibo:abstract` or `bibo:shortDescription`, which is 310 of the 1,790 — gets one composed
+from the record's own facts, in the page's language, since `description` is required of a
+`VideoObject` and Search Console reports every omission as an error:
+
+> Enregistrement vidéo (2 min 49 s) publié par RTB - Radiodiffusion Télévision du Burkina le
+> 15 avril 2022, en français. Lieux : Burkina Faso. Collection Islam Afrique de l'Ouest.
+
+That is a catalogue entry, not prose: who made it (`bibo:authorList` / `dcterms:creator`), who
+published it, when (to the archive's own precision — a year stays a year), how long it runs,
+in what language, where and about what, then the collection. Nothing in it is inferred, which
+is the line 1.0.4 drew against summarising the machine transcript. A record that carries any
+descriptive text keeps it untouched, and a record with no fact beyond its title gets no
+sentence rather than an empty one. `VideoDescription` holds the wording, in the same EN/FR
+string-table style as the citation formatter — the module's services run without a
+translator.
 
 A video's `uploadDate` is normalised to an ISO 8601 **date-time with an offset**
 (`2021-08-21` → `2021-08-21T00:00:00+00:00`). A NumericDataTypes timestamp is a date, which

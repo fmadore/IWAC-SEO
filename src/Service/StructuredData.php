@@ -48,6 +48,8 @@ class StructuredData
      *   apart from $image because schema.org's thumbnailUrl must depict the
      *   resource: the site's default share graphic is an honest og:image and a
      *   dishonest video thumbnail.
+     * @param string  $locale    the page language ('fr' or 'en'), for the one
+     *   sentence the module composes itself: {@see VideoDescription}
      * @return array<mixed>|null
      */
     public function forResource(
@@ -55,7 +57,8 @@ class StructuredData
         SiteRepresentation $site,
         ?string $canonical,
         ?string $image,
-        ?string $thumbnail = null
+        ?string $thumbnail = null,
+        string $locale = 'en'
     ): ?array {
         $type = $this->classTypes[ResourceUrl::classId($resource)] ?? $this->defaultType;
 
@@ -85,7 +88,7 @@ class StructuredData
         if (in_array($type, self::ENTITY_TYPES, true)) {
             $this->decorateEntity($data, $type, $resource, $site);
         } else {
-            $this->decorateWork($data, $type, $resource, $site, $thumbnail);
+            $this->decorateWork($data, $type, $resource, $site, $thumbnail, $locale);
         }
 
         return $data;
@@ -219,7 +222,8 @@ class StructuredData
         string $type,
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site,
-        ?string $thumbnail = null
+        ?string $thumbnail = null,
+        string $locale = 'en'
     ): void {
         $authors = $this->links($resource, ['bibo:authorList', 'dcterms:creator'], $site, 'Person');
         if ($authors) {
@@ -300,6 +304,27 @@ class StructuredData
         $publisher = $this->publisherFor($type, $resource);
         if ($publisher !== null) {
             $data['publisher'] = ['@type' => 'Organization', 'name' => $publisher];
+        }
+
+        // description is required of a VideoObject, and 310 of IWAC's videos
+        // hold no descriptive text at all. Rather than leave the node invalid
+        // or invent prose, read the record's own facts out as a sentence in
+        // the page's language — VideoDescription explains the trade-off. A
+        // record with any real description keeps it (set in forResource()).
+        if ($type === 'VideoObject' && !isset($data['description'])) {
+            $composed = VideoDescription::compose([
+                'authors'    => array_column($authors, 'name'),
+                'publisher'  => $publisher,
+                'date'       => $date,
+                'duration'   => $this->firstString($resource, ['dcterms:extent']),
+                'language'   => $language,
+                'places'     => $places,
+                'subjects'   => $subjects,
+                'collection' => $site->title(),
+            ], $locale);
+            if ($composed !== null) {
+                $data['description'] = $composed;
+            }
         }
     }
 
