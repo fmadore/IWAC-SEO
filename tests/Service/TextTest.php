@@ -85,30 +85,30 @@ final class TextTest extends TestCase
     public function testUploadDateGivesADateOnlyValueMidnightUtc(): void
     {
         // The shape 1,754 of the 1,790 videos hold.
-        $this->assertSame('2021-08-21T00:00:00+00:00', Text::uploadDate('2021-08-21'));
+        $this->assertNull(Text::uploadDate('2021-08-21'));
     }
 
     public function testUploadDateCompletesAYearOrMonthToTheFirstOfThePeriod(): void
     {
-        $this->assertSame('2019-01-01T00:00:00+00:00', Text::uploadDate('2019'));
-        $this->assertSame('2019-08-01T00:00:00+00:00', Text::uploadDate('2019-08'));
+        $this->assertNull(Text::uploadDate('2019'));
+        $this->assertNull(Text::uploadDate('2019-08'));
     }
 
     public function testUploadDateAddsAnOffsetToAZonelessDateTime(): void
     {
-        $this->assertSame('2021-08-21T14:30:00+00:00', Text::uploadDate('2021-08-21T14:30:00'));
-        $this->assertSame('2021-08-21T14:30+00:00', Text::uploadDate('2021-08-21T14:30'));
+        $this->assertNull(Text::uploadDate('2021-08-21T14:30:00'));
+        $this->assertNull(Text::uploadDate('2021-08-21T14:30'));
     }
 
     public function testUploadDateLeavesAZonedDateTimeAlone(): void
     {
         $this->assertSame('2024-03-31T08:00:00+08:00', Text::uploadDate('2024-03-31T08:00:00+08:00'));
-        $this->assertSame('2024-03-31T08:00:00Z', Text::uploadDate('2024-03-31T08:00:00Z'));
+        $this->assertSame('2024-03-31T08:00:00+00:00', Text::uploadDate('2024-03-31T08:00:00Z'));
     }
 
     public function testUploadDateToleratesSurroundingSpace(): void
     {
-        $this->assertSame('2021-08-21T00:00:00+00:00', Text::uploadDate('  2021-08-21  '));
+        $this->assertNull(Text::uploadDate('  2021-08-21  '));
     }
 
     public function testUploadDateRejectsWhatIsNotADate(): void

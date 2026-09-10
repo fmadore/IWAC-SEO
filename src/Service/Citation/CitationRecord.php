@@ -54,6 +54,17 @@ final class CitationRecord
         public readonly array $keywords = [],
         /** The archive accession number (Cote). */
         public readonly ?string $accession = null,
+        public readonly ?string $genre = null,
+        public readonly ?string $eventTitle = null,
+        public readonly ?string $eventPlace = null,
+        public readonly ?string $sourceUrl = null,
+        public readonly ?string $medium = null,
+        public readonly ?string $number = null,
+        public readonly ?string $edition = null,
+        public readonly ?string $reviewedTitle = null,
+        public readonly ?string $archive = null,
+        public readonly ?string $isbn = null,
+        public readonly ?string $issn = null,
     ) {
     }
 
@@ -90,7 +101,8 @@ final class CitationRecord
         if ($this->doi !== null && $this->doi !== '') {
             return 'https://doi.org/' . $this->doi;
         }
-        return ($this->url ?? '') !== '' ? $this->url : null;
+        return \IwacSeo\Service\MetadataValue::url($this->sourceUrl)
+            ?? \IwacSeo\Service\MetadataValue::url($this->url);
     }
 
     /**
@@ -123,7 +135,12 @@ final class CitationRecord
             'abstract'  => $this->abstract,
             'keywords'  => $this->keywords,
             'accession' => $this->accession,
-        ];
+        ] + array_filter([
+            'genre' => $this->genre, 'eventTitle' => $this->eventTitle, 'eventPlace' => $this->eventPlace,
+            'sourceUrl' => $this->sourceUrl, 'medium' => $this->medium, 'number' => $this->number,
+            'edition' => $this->edition, 'reviewedTitle' => $this->reviewedTitle, 'archive' => $this->archive,
+            'isbn' => $this->isbn, 'issn' => $this->issn,
+        ], static fn ($v) => $v !== null);
     }
 
     /**
@@ -164,6 +181,17 @@ final class CitationRecord
                 'is_string'
             )),
             accession: $string('accession'),
+            genre: $string('genre'),
+            eventTitle: $string('eventTitle'),
+            eventPlace: $string('eventPlace'),
+            sourceUrl: $string('sourceUrl'),
+            medium: $string('medium'),
+            number: $string('number'),
+            edition: $string('edition'),
+            reviewedTitle: $string('reviewedTitle'),
+            archive: $string('archive'),
+            isbn: $string('isbn'),
+            issn: $string('issn'),
         );
     }
 }

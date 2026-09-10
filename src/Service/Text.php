@@ -55,61 +55,30 @@ final class Text
     private static function isoDate(string $value): ?string
     {
         $value = trim($value);
-        return preg_match('/^\d{4}(-\d{2}(-\d{2}(T[0-9:.+\-]+Z?)?)?)?$/', $value) === 1
-            ? $value
-            : null;
+        $date = \IwacSeo\Service\Citation\IssuedDate::parse($value);
+        if ($date->hasYear() && $date->end === null) {
+            return $date->iso();
+        }
+        return self::uploadDate($value) !== null ? $value : null;
     }
 
-    /**
-     * Normalise a stored date into the ISO 8601 *date-time* schema.org's
-     * uploadDate is validated against.
-     *
-     * IWAC stores NumericDataTypes timestamps — 1,754 of the 1,790 videos as
-     * YYYY-MM-DD, six as YYYY-MM or YYYY — and Search Console rejects every
-     * one of them twice over: "incorrect date-time value" because a plain date
-     * is not a date-time, and "missing time zone" because it carries no offset.
-     * A date the archive records to the day therefore becomes midnight UTC.
-     *
-     * UTC rather than a West African zone because the offset here is a
-     * formality, not a fact: the archive does not record what time of day a
-     * video went up, so any wall-clock time it names is invented. UTC invents
-     * the least and is what Googlebot would have assumed anyway.
-     *
-     * A YYYY or YYYY-MM value is completed to the first of the period. That is
-     * a day the archive did not record, but uploadDate is *required*: an
-     * approximate date keeps the node valid where omitting it fails outright,
-     * and the precision the archive does hold is still published verbatim in
-     * datePublished alongside it.
-     *
-     * @return ?string an offset date-time, or null when the value is not a
-     *   date at all (which leaves uploadDate unset rather than invalid)
-     */
+    /** A recorded upload timestamp with a known time zone; never manufacture precision. */
     public static function uploadDate(string $raw): ?string
     {
         $value = trim($raw);
-        $time = '/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?';
-        // A date-time already: kept as it stands, or given UTC when it names
-        // no offset of its own.
-        if (preg_match($time . '(Z|[+\-]\d{2}:?\d{2})$/', $value) === 1) {
-            return $value;
-        }
-        if (preg_match($time . '$/', $value) === 1) {
-            return $value . '+00:00';
-        }
-        // Year, year-month or full date. Month and day nest because a day is
-        // only meaningful under a month.
-        if (preg_match('/^(\d{4})(?:-(\d{2})(?:-(\d{2}))?)?$/', $value, $m) !== 1) {
+        // Never add a missing day, time or zone to catalogue metadata.
+        if (preg_match('/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(?:\.\d+)?(?:Z|[+\-]\d{2}:\d{2})$/D', $value) !== 1) {
             return null;
         }
-        [$year, $month, $day] = [(int) $m[1], (int) ($m[2] ?? 1), (int) ($m[3] ?? 1)];
-        // A date that is not a date — 2021-02-30, month 21 — is dropped rather
-        // than passed on: an unreadable uploadDate invalidates the VideoObject
-        // around it, where a missing one only costs the video rich result.
-        return checkdate($month, $day, $year)
-            ? sprintf('%04d-%02d-%02dT00:00:00+00:00', $year, $month, $day)
-            : null;
+        try {
+            $date = new \DateTimeImmutable($value);
+            $errors = \DateTimeImmutable::getLastErrors();
+            return $errors === false || ($errors['warning_count'] === 0 && $errors['error_count'] === 0)
+                ? $date->format('c') : null;
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
-
     /**
      * The player URL for a YouTube link, or null for anything else.
      *

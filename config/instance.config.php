@@ -22,7 +22,7 @@ namespace IwacSeo;
 return [
     'iwac_seo' => [
         'sitemap' => [
-            'item_chunk_size' => 50000,
+            'item_chunk_size' => 5000,
             // Emit an <image:image> entry (the item's primary-media large
             // thumbnail) per item for Google Images.
             'include_images'  => true,
@@ -100,7 +100,7 @@ return [
                 244 => 'subject',
                 // Primary sources
                 36  => 'newspaper',   // newspaper article
-                60  => 'magazine',    // Islamic-publication issue (periodical)
+                60  => 'periodical-issue', // Complete issue, not a magazine article.
                 38  => 'av',          // audiovisual document
                 49  => 'document',
                 58  => 'photo',       // fieldwork photograph → Zotero artwork

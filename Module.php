@@ -88,6 +88,7 @@ class Module extends AbstractModule
     public function install(ServiceLocatorInterface $services): void
     {
         $this->applyDefaults($services->get('Omeka\Settings'));
+        (new Service\PingRepository($services->get('Omeka\Connection')))->install();
     }
 
     /**
@@ -105,10 +106,18 @@ class Module extends AbstractModule
         ServiceLocatorInterface $services
     ): void {
         $this->applyDefaults($services->get('Omeka\Settings'));
+        $repository = new Service\PingRepository($services->get('Omeka\Connection'));
+        $repository->install();
+        $settings = $services->get('Omeka\Settings');
+        foreach ((array) $settings->get('iwac_seo_ping_pending', []) as $url) {
+            $repository->push((string) $url);
+        }
+        $settings->delete('iwac_seo_ping_pending');
     }
 
     public function uninstall(ServiceLocatorInterface $services): void
     {
+        $services->get('Omeka\Connection')->executeStatement('DROP TABLE IF EXISTS iwac_seo_ping');
         $settings = $services->get('Omeka\Settings');
         foreach (self::SETTINGS as $key) {
             $settings->delete($key);
@@ -300,8 +309,12 @@ class Module extends AbstractModule
             return;
         }
 
-        $queue->push($url);
-        $queue->dispatchIfDue();
+        try {
+            $queue->push($url);
+            $queue->dispatchIfDue();
+        } catch (\Throwable $error) {
+            $services->get('Omeka\Logger')->err('IwacSeo: failed to queue URL: ' . $error->getMessage());
+        }
     }
 
     // ─── Module configuration form ──────────────────────────────────────────

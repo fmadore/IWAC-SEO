@@ -49,7 +49,10 @@ final class CitationKindMap
     /** The kind for a resource, read from its resource class. */
     public function forResource(?AbstractResourceRepresentation $resource): CitationKind
     {
-        return $this->forClassId(ResourceUrl::classId($resource));
+        $kind = $this->forClassId(ResourceUrl::classId($resource));
+        return $kind === CitationKind::Av
+            && $resource instanceof \Omeka\Api\Representation\AbstractResourceEntityRepresentation
+            && MetadataValue::isAudio($resource) ? CitationKind::Audio : $kind;
     }
 
     /**

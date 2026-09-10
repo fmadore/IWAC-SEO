@@ -42,7 +42,8 @@ final class MetadataIntegrationTest extends TestCase
 
     protected function setUp(): void
     {
-        $this->kinds = new CitationKindMap([36 => 'newspaper'], 'item');
+        $config = require dirname(__DIR__, 2) . '/config/instance.config.php';
+        $this->kinds = new CitationKindMap($config['iwac_seo']['citation']['class_kinds'], 'item');
     }
 
     public function testCitationMetaUsesRealLaminasHeadMetaContainer(): void
@@ -70,7 +71,7 @@ final class MetadataIntegrationTest extends TestCase
         self::assertNotNull($rdf);
         self::assertStringContainsString('<z:itemType>newspaperArticle</z:itemType>', $rdf);
         self::assertStringContainsString('<dc:title>A &amp; B in West Africa</dc:title>', $rdf);
-        self::assertStringContainsString('<dcterms:creator>Frédérick Madore</dcterms:creator>', $rdf);
+        self::assertStringContainsString('<foaf:surname>Madore</foaf:surname><foaf:givenName>Frédérick</foaf:givenName>', $rdf);
         self::assertStringContainsString('<prism:publicationName>Fraternité Matin</prism:publicationName>', $rdf);
         self::assertStringContainsString('<bib:pages>3-4</bib:pages>', $rdf);
         self::assertStringContainsString('<rdf:value>iwac-article-0000042</rdf:value>', $rdf);
@@ -129,7 +130,7 @@ final class MetadataIntegrationTest extends TestCase
         );
     }
 
-    public function testLayoutGapFillCanonicalisesQueryVariantsToTheBarePage(): void
+    public function testLayoutGapFillUsesTheSharedFilterPolicy(): void
     {
         // /s/{site}/search is IwacSearch's controller, so no phase-1 listener
         // claims it and only the layout pass runs. Every facet permutation used
@@ -137,13 +138,14 @@ final class MetadataIntegrationTest extends TestCase
         // is what let ~1,300 legacy facet URLs into the index.
         $search = 'https://example.test/s/afrique_ouest/search';
         $view = $this->renderer($search . "?facet%5Bdcterms_type_ss%5D%5B9%5D=Article d'encyclopédie&page=2");
+        $search .= '?facet%5Bdcterms_type_ss%5D%5B9%5D=Article%20d%27encyclop%C3%A9die&page=2';
 
         $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyGlobals($view, $this->site());
 
         $headLink = $this->decoded($view->headLink()->toString());
         self::assertStringContainsString('rel="canonical"', $headLink);
         self::assertStringContainsString('href="' . $search . '"', $headLink);
-        self::assertStringNotContainsString('facet', $headLink);
+
 
         $headMeta = $this->decoded($view->headMeta()->toString());
         self::assertStringContainsString('name="robots" content="noindex, follow"', $headMeta);
@@ -165,7 +167,7 @@ final class MetadataIntegrationTest extends TestCase
         self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
     }
 
-    public function testBrowseKeepsTheSelfReferentialCanonicalAndNoindexesTheVariant(): void
+    public function testBrowseKeepsPaginationIndexableAndSelfCanonical(): void
     {
         // Browse pagination is a genuine series: page 2 must not collapse onto
         // page 1, so the canonical here stays self-referential — noindex, not
@@ -176,7 +178,7 @@ final class MetadataIntegrationTest extends TestCase
         $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyBrowse($view, $this->site());
 
         self::assertStringContainsString('href="' . $paged . '"', $this->decoded($view->headLink()->toString()));
-        self::assertStringContainsString(
+        self::assertStringNotContainsString(
             'name="robots" content="noindex, follow"',
             $this->decoded($view->headMeta()->toString())
         );
@@ -302,7 +304,7 @@ final class MetadataIntegrationTest extends TestCase
         );
 
         self::assertSame($own, $data['thumbnailUrl']);
-        self::assertSame('2022-07-01T00:00:00+00:00', $data['uploadDate']);
+        self::assertArrayNotHasKey('uploadDate', $data);
     }
 
     public function testVideoWithoutItsOwnThumbnailClaimsNone(): void
@@ -542,7 +544,7 @@ final class MetadataIntegrationTest extends TestCase
         self::assertSame($file, $data['contentUrl']);
         self::assertArrayNotHasKey('embedUrl', $data);
         // A year is all the archive holds; uploadDate is required all the same.
-        self::assertSame('2019-01-01T00:00:00+00:00', $data['uploadDate']);
+        self::assertArrayNotHasKey('uploadDate', $data);
     }
 
     public function testVideoIgnoresMediaThatAreNotThePlayableFile(): void
@@ -672,8 +674,9 @@ final class MetadataIntegrationTest extends TestCase
         $values = ['dcterms:title' => [$this->value('A tape')], 'dcterms:date' => [$this->value('2022-07-01')]];
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
+            ->onlyMethods(['id', 'isPublic', 'value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
             ->getMock();
+        $item->method('id')->willReturn(42);
         $item->method('value')->willReturnCallback(
             static function (string $term, array $options = []) use ($values) {
                 $matches = $values[$term] ?? [];
@@ -735,7 +738,7 @@ final class MetadataIntegrationTest extends TestCase
 
         $wrapped = [];
         foreach ($values as $term => $text) {
-            $wrapped[$term] = [$this->value($text)];
+            $wrapped[$term] = is_array($text) ? $text : [$this->value($text)];
         }
         foreach ($links as $term => [$title, $linkedId]) {
             $wrapped[$term] = [$this->linkedValue($title, $linkedId)];
@@ -746,8 +749,9 @@ final class MetadataIntegrationTest extends TestCase
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
+            ->onlyMethods(['id', 'isPublic', 'value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
             ->getMock();
+        $item->method('id')->willReturn(42);
         $item->method('value')->willReturnCallback(
             static function (string $term, array $options = []) use ($wrapped) {
                 $matches = $wrapped[$term] ?? [];
@@ -756,7 +760,7 @@ final class MetadataIntegrationTest extends TestCase
         );
         $item->method('media')->willReturn($media);
         $item->method('resourceClass')->willReturn($class);
-        $item->method('displayTitle')->willReturn($values['dcterms:title'] ?? 'Untitled');
+        $item->method('displayTitle')->willReturn(is_string($values['dcterms:title'] ?? null) ? $values['dcterms:title'] : 'Untitled');
         $item->method('siteUrl')->willReturn(self::CANONICAL);
         $item->method('primaryMedia')->willReturn(null);
         $item->method('thumbnail')->willReturn(null);
@@ -810,6 +814,80 @@ final class MetadataIntegrationTest extends TestCase
         );
     }
 
+    public function testLocalisedRawValuesAndPrivateMetadata(): void
+    {
+        $item = $this->resource(36, [
+            'dcterms:title' => 'Public title',
+            'bibo:shortDescription' => [
+                $this->value('Résumé français', lang: 'fr'),
+                $this->value('Private English', lang: 'en', public: false),
+                $this->value('English & summary', lang: 'en'),
+            ],
+        ]);
+        self::assertSame('English & summary', \IwacSeo\Service\MetadataValue::select($item, ['bibo:shortDescription'], 'en-GB'));
+        self::assertSame('Résumé français', \IwacSeo\Service\MetadataValue::select($item, ['bibo:shortDescription'], 'fr'));
+    }
+
+    public function testCombinedIssueAndRangeReachAllExports(): void
+    {
+        $item = $this->resource(60, [
+            'dcterms:title' => 'Al Mawadda #48-49', 'dcterms:date' => '2009-05/2009-08',
+            'dcterms:publisher' => 'Al Mawadda',
+            'bibo:issue' => [$this->value('48'), $this->value('49')],
+        ]);
+        $record = (new \IwacSeo\Service\CitationData($this->kinds))->build($item, self::CANONICAL);
+        self::assertNotNull($record);
+        self::assertSame('periodical-issue', $record->kind->value);
+        self::assertSame('48–49', $record->issue);
+        $export = new \IwacSeo\Service\CitationExport();
+        $csl = json_decode($export->serialize($record, 'csljson'), true, 512, JSON_THROW_ON_ERROR)[0];
+        self::assertSame('periodical', $csl['type']);
+        self::assertSame([[2009, 5], [2009, 8]], $csl['issued']['date-parts']);
+        self::assertStringContainsString('2009-05/2009-08', $export->serialize($record, 'ris'));
+        self::assertMatchesRegularExpression('/date\\s+= \\{2009-05\\/2009-08\\}/', $export->serialize($record, 'bibtex'));
+    }
+
+    public function testAudioIsNotMisrepresentedAsVideo(): void
+    {
+        $item = $this->resource(38, ['dcterms:title' => 'Radio interview'], media: [
+            $this->media('audio/mpeg', 'https://example.test/radio.mp3'),
+        ]);
+        $record = (new \IwacSeo\Service\CitationData($this->kinds))->build($item, self::CANONICAL);
+        self::assertSame('audio', $record->kind->value);
+        $data = $this->structuredData()->forResource($item, $this->site(), self::CANONICAL, null);
+        self::assertSame('AudioObject', $data['@type']);
+        self::assertSame('https://example.test/radio.mp3', $data['contentUrl']);
+        self::assertArrayNotHasKey('uploadDate', $data);
+    }
+
+    public function testOnlyExplicitUploadTimestampIsEmitted(): void
+    {
+        $item = $this->resource(38, ['dcterms:title' => 'A video', 'dcterms:date' => '1990',
+            'dcterms:issued' => '2025-05-13T10:30:00Z']);
+        $data = $this->structuredData()->forResource($item, $this->site(), self::CANONICAL, null);
+        self::assertSame('2025-05-13T10:30:00+00:00', $data['uploadDate']);
+        self::assertSame('1990', $data['datePublished']);
+    }
+
+    public function testAllMappedWorkClassesPreserveTheirCatalogueTitle(): void
+    {
+        foreach ([36, 60, 38, 49, 58, 35, 178, 43, 40, 52, 88, 82, 77, 305] as $classId) {
+            $item = $this->resource($classId, ['dcterms:title' => 'Islam & société?', 'dcterms:date' => '2024',
+                'dcterms:creator' => 'Aminata Diallo', 'dcterms:publisher' => 'Éditions du Sahel',
+                'dcterms:alternative' => 'Ouvrage collectif']);
+            $record = (new \IwacSeo\Service\CitationData($this->kinds))->build($item, self::CANONICAL);
+            self::assertNotNull($record, 'Class ' . $classId);
+            foreach (['chicago', 'apa', 'mla'] as $style) {
+                foreach (['en', 'fr'] as $locale) {
+                    $html = (new \IwacSeo\Service\CitationFormatter())->format($record, $style, $locale);
+                    self::assertStringContainsString('Islam &amp; société?', $html);
+                    self::assertStringNotContainsString('?.', $html);
+                    self::assertStringNotContainsString('PhD', $html);
+                }
+            }
+        }
+    }
+
     private function decoded(string $html): string
     {
         return html_entity_decode($html, ENT_QUOTES | ENT_HTML5, 'UTF-8');
@@ -843,8 +921,9 @@ final class MetadataIntegrationTest extends TestCase
 
         $item = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
+            ->onlyMethods(['id', 'isPublic', 'value', 'media', 'resourceClass', 'displayTitle', 'siteUrl', 'primaryMedia', 'thumbnail'])
             ->getMock();
+        $item->method('id')->willReturn(42);
         $item->method('value')->willReturnCallback(
             static function (string $term, array $options = []) use ($values) {
                 $matches = $values[$term] ?? [];
@@ -873,8 +952,10 @@ final class MetadataIntegrationTest extends TestCase
     {
         $linked = $this->getMockBuilder(ItemRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['displayTitle', 'siteUrl'])
+            ->onlyMethods(['displayTitle', 'siteUrl', 'isPublic', 'resourceClass', 'value'])
             ->getMock();
+        $linked->method('isPublic')->willReturn(true);
+        $linked->method('value')->willReturnCallback(static fn ($term, $options = []) => !empty($options['all']) ? [] : null);
         $linked->method('displayTitle')->willReturn($title);
         $linked->method('siteUrl')->willReturnCallback(
             static fn (string $slug, bool $canonical = false): string
@@ -883,8 +964,9 @@ final class MetadataIntegrationTest extends TestCase
 
         $value = $this->getMockBuilder(ValueRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['__toString', 'valueResource', 'uri'])
+            ->onlyMethods(['__toString', 'value', 'isPublic', 'lang', 'valueResource', 'uri'])
             ->getMock();
+        $value->method('isPublic')->willReturn(true);
         $value->method('__toString')->willReturn($title);
         $value->method('valueResource')->willReturn($linked);
         $value->method('uri')->willReturn(null);
@@ -910,12 +992,15 @@ final class MetadataIntegrationTest extends TestCase
         return $media;
     }
 
-    private function value(string $text, ?string $uri = null): ValueRepresentation
+    private function value(string $text, ?string $uri = null, ?string $lang = null, bool $public = true): ValueRepresentation
     {
         $value = $this->getMockBuilder(ValueRepresentation::class)
             ->disableOriginalConstructor()
-            ->onlyMethods(['__toString', 'valueResource', 'uri'])
+            ->onlyMethods(['__toString', 'value', 'isPublic', 'lang', 'valueResource', 'uri'])
             ->getMock();
+        $value->method('value')->willReturn($uri === null ? $text : null);
+        $value->method('isPublic')->willReturn($public);
+        $value->method('lang')->willReturn($lang);
         $value->method('__toString')->willReturn($text);
         $value->method('valueResource')->willReturn(null);
         $value->method('uri')->willReturn($uri);

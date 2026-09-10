@@ -34,20 +34,21 @@ final class CitationFormatter
     public const STYLES = ['chicago', 'apa', 'mla'];
 
     /** Kinds whose citation carries a full publication date, not just a year. */
-    private const PERIODICAL_KINDS = [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::Post];
+    private const PERIODICAL_KINDS = [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::PeriodicalIssue,
+        CitationKind::Post, CitationKind::Av, CitationKind::Audio, CitationKind::Communication];
 
     /** @var array<string,array<string,string>> Connectives per locale. */
     private const STR = [
         'en' => [
             'and' => 'and', 'et_al' => 'et al.', 'in' => 'In', 'eds' => 'edited by',
             'no' => 'no.', 'vol' => 'vol.', 'pp' => 'pp.', 'p' => 'p.',
-            'phd' => 'PhD diss.', 'video' => 'Video', 'photograph' => 'Photograph',
+            'phd' => 'Thesis', 'video' => 'Video', 'audio' => 'Audio recording', 'photograph' => 'Photograph',
             'presentation' => 'Presentation', 'untitled' => 'Untitled',
         ],
         'fr' => [
             'and' => 'et', 'et_al' => 'et al.', 'in' => 'Dans', 'eds' => 'sous la dir. de',
             'no' => 'n°', 'vol' => 'vol.', 'pp' => 'p.', 'p' => 'p.',
-            'phd' => 'thèse de doctorat', 'video' => 'Vidéo', 'photograph' => 'Photographie',
+            'phd' => 'thèse', 'video' => 'Vidéo', 'audio' => 'Enregistrement audio', 'photograph' => 'Photographie',
             'presentation' => 'communication', 'untitled' => 'Sans titre',
         ],
     ];
@@ -110,7 +111,7 @@ final class CitationFormatter
                 break;
 
             case CitationKind::Chapter:
-                $seg = $this->str($locale, 'in') . ' ' . $this->italic($record->bookTitle ?: $record->title);
+                $seg = $record->bookTitle !== null ? $this->str($locale, 'in') . ' ' . $this->italic($record->bookTitle) : '';
                 $eds = $this->nameList($record->editors, $locale, 'chicago', false);
                 if ($eds !== '') {
                     $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
@@ -125,8 +126,12 @@ final class CitationFormatter
 
             case CitationKind::Newspaper:
             case CitationKind::Magazine:
+            case CitationKind::PeriodicalIssue:
             case CitationKind::Post:
                 $seg = $this->italic($record->container);
+                if ($record->issue !== null && $kind !== CitationKind::Newspaper) {
+                    $seg .= ', ' . $this->str($locale, 'no') . ' ' . $this->esc($record->issue);
+                }
                 $date = $this->fullDate($record, $locale, 'chicago');
                 if ($date !== '') {
                     $seg = $seg !== '' ? $seg . ', ' . $date : $this->ucfirst($date);
@@ -135,7 +140,7 @@ final class CitationFormatter
                 break;
 
             case CitationKind::Thesis:
-                $seg = $this->str($locale, 'phd');
+                $seg = $this->esc($record->genre) ?: $this->str($locale, 'phd');
                 $inst = $this->esc($record->publisher);
                 if ($inst !== '') {
                     $seg .= ', ' . $inst;
@@ -150,10 +155,7 @@ final class CitationFormatter
             case CitationKind::Communication:
                 $seg = $this->str($locale, 'presentation');
                 $seg = $this->ucfirst($seg);
-                $year = $this->year($record);
-                if ($year !== null) {
-                    $seg .= ', ' . $this->esc($year);
-                }
+                $seg .= $this->eventSegment($record, $locale, 'chicago');
                 $parts[] = $this->terminate($seg);
                 break;
 
@@ -165,6 +167,7 @@ final class CitationFormatter
                 break;
         }
 
+        $parts[] = $this->details($record, $locale);
         $parts[] = $this->linkSegment($record);
         return $this->join($parts);
     }
@@ -180,7 +183,7 @@ final class CitationFormatter
         $date = in_array($kind, self::PERIODICAL_KINDS, true)
             ? $this->fullDate($record, $locale, 'apa')
             : ($this->year($record) !== null ? $this->esc((string) $this->year($record)) : '');
-        $dateSeg = '(' . ($date !== '' ? $date : 'n.d.') . ').';
+        $dateSeg = '(' . ($date !== '' ? $date : ($locale === 'fr' ? 's. d.' : 'n.d.')) . ').';
 
         // "Creator. (Date). Title." — with no creator the title takes the slot
         // and the date follows it ("Title. (Date)."), per APA. Chapter → its own
@@ -205,9 +208,9 @@ final class CitationFormatter
                 $vol = $this->esc($record->volume);
                 if ($vol !== '') {
                     $seg .= ', ' . $this->italic($record->volume);
-                    if ($record->issue !== null) {
-                        $seg .= '(' . $this->esc($record->issue) . ')';
-                    }
+                }
+                if ($record->issue !== null) {
+                    $seg .= ($vol === '' ? ', ' : '') . '(' . $this->esc($record->issue) . ')';
                 }
                 $pages = $record->pageRange();
                 if ($pages !== null) {
@@ -218,12 +221,12 @@ final class CitationFormatter
 
             case CitationKind::Chapter:
                 // In {editors} (Eds.), *Book Title* (pp. x–y). Publisher.
-                $seg = $this->str($locale, 'in') . ' ';
+                $seg = $record->bookTitle !== null ? $this->str($locale, 'in') . ' ' : '';
                 $eds = $this->nameList($record->editors, $locale, 'apa', false);
                 if ($eds !== '') {
                     $seg .= $eds . ' ' . $this->editorRole(count($record->editors), 'apa', $locale) . ', ';
                 }
-                $seg .= $this->italic($record->bookTitle ?: $record->title);
+                $seg .= $this->italic($record->bookTitle);
                 $pages = $record->pageRange();
                 if ($pages !== null) {
                     $seg .= ' (' . $this->str($locale, 'pp') . ' ' . $this->esc($pages) . ')';
@@ -236,15 +239,23 @@ final class CitationFormatter
 
             case CitationKind::Newspaper:
             case CitationKind::Magazine:
+            case CitationKind::PeriodicalIssue:
             case CitationKind::Post:
-                $parts[] = $this->terminate($this->italic($record->container));
+                $seg = $this->italic($record->container);
+                if ($record->volume !== null) {
+                    $seg .= ', ' . $this->italic($record->volume);
+                }
+                if ($record->issue !== null) {
+                    $seg .= '(' . $this->esc($record->issue) . ')';
+                }
+                if ($record->pageRange() !== null) {
+                    $seg .= ', ' . $this->esc($record->pageRange());
+                }
+                $parts[] = $this->terminate($seg);
                 break;
 
             case CitationKind::Thesis:
-                $inst = $this->esc($record->publisher);
-                $label = $this->str($locale, 'phd');
-                $seg = '[' . $this->ucfirst($label) . ($inst !== '' ? ', ' . $inst : '') . ']';
-                $parts[] = $this->terminate($seg);
+                // Degree and institution are attached to the title in APA.
                 break;
 
             default: // book, report, av, photo, document, communication, item
@@ -254,7 +265,13 @@ final class CitationFormatter
                 break;
         }
 
-        $parts[] = $this->linkSegment($record);
+        if ($kind === CitationKind::Communication) {
+            $parts[] = $this->terminate(trim($this->eventSegment($record, $locale, 'apa'), ', '));
+        }
+        if (in_array($kind, [CitationKind::Document, CitationKind::Photo], true)) {
+            $parts[] = $this->terminate(implode(', ', array_filter([$this->esc($record->archive), $this->esc($record->accession)])));
+        }
+        $parts[] = $this->linkSegment($record, false);
         return $this->join($parts);
     }
 
@@ -296,7 +313,7 @@ final class CitationFormatter
                 break;
 
             case CitationKind::Chapter:
-                $seg = $this->italic($record->bookTitle ?: $record->title);
+                $seg = $this->italic($record->bookTitle);
                 $eds = $this->nameList($record->editors, $locale, 'mla', false);
                 if ($eds !== '') {
                     $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
@@ -314,11 +331,18 @@ final class CitationFormatter
 
             case CitationKind::Newspaper:
             case CitationKind::Magazine:
+            case CitationKind::PeriodicalIssue:
             case CitationKind::Post:
                 $seg = $this->italic($record->container);
                 $date = $this->fullDate($record, $locale, 'mla');
                 if ($date !== '') {
                     $seg = $seg !== '' ? $seg . ', ' . $date : $this->ucfirst($date);
+                }
+                if ($record->issue !== null) {
+                    $seg .= ', ' . $this->str($locale, 'no') . ' ' . $this->esc($record->issue);
+                }
+                if ($record->pageRange() !== null) {
+                    $seg .= ', ' . $this->str($locale, 'pp') . ' ' . $this->esc($record->pageRange());
                 }
                 $parts[] = $this->terminate($seg);
                 break;
@@ -331,6 +355,10 @@ final class CitationFormatter
                 break;
         }
 
+        if ($kind === CitationKind::Communication) {
+            $parts[] = $this->terminate(trim($this->eventSegment($record, $locale, 'mla'), ', '));
+        }
+        $parts[] = $this->details($record, $locale);
         $parts[] = $this->linkSegment($record);
         return $this->join($parts);
     }
@@ -345,16 +373,56 @@ final class CitationFormatter
         if ($style === 'apa') {
             // APA: only standalone works are italic; parts stay plain. A thesis
             // is not a "part", so it italicises — correct for APA.
-            return $this->terminate($kind->isPartOfWork() ? $this->esc($title) : $this->italic($title));
+            $segment = $kind->isPartOfWork() && $kind !== CitationKind::Communication ? $this->esc($title) : $this->italic($title);
+            $medium = $record->medium ?? match ($kind) {
+                CitationKind::Av => $this->str($locale, 'video'),
+                CitationKind::Audio => $this->str($locale, 'audio'),
+                CitationKind::Photo => $this->str($locale, 'photograph'),
+                CitationKind::Communication => $this->str($locale, 'presentation'),
+                default => null,
+            };
+            if ($kind === CitationKind::Thesis) {
+                $segment .= ' [' . $this->esc($record->genre ?? $this->str($locale, 'phd'))
+                    . ($record->publisher !== null ? ', ' . $this->esc($record->publisher) : '') . ']';
+            } elseif ($medium !== null) {
+                $segment .= ' [' . $this->esc($medium) . ']';
+            }
+            if ($kind === CitationKind::Report && $record->number !== null) {
+                $segment .= ' (' . $this->str($locale, 'no') . ' ' . $this->esc($record->number) . ')';
+            }
+            if ($kind === CitationKind::Review && $record->reviewedTitle !== null) {
+                $segment .= ' [' . ($locale === 'fr' ? 'Compte rendu de ' : 'Review of ')
+                    . $this->italic($record->reviewedTitle) . ']';
+            }
+            if ($kind === CitationKind::Book && $record->edition !== null) {
+                $segment .= ' (' . $this->edition($record->edition, $locale) . ')';
+            }
+            return $this->terminate($segment);
         }
 
         // Chicago / MLA: parts AND an unpublished thesis go in quotation marks
         // (period inside); other standalone works are italic.
-        $quoted = $kind->isPartOfWork() || $kind === CitationKind::Thesis;
+        $quoted = $kind->isPartOfWork() || ($kind === CitationKind::Thesis && $style === 'chicago');
         if ($quoted) {
-            return '“' . $this->esc($title) . '.”';
+            return '“' . $this->terminate($this->esc($title)) . '”';
         }
-        return $this->terminate($this->italic($title));
+        return $this->terminate($this->italic($title))
+            . ($kind === CitationKind::Book && $record->edition !== null ? ' ' . $this->terminate($this->edition($record->edition, $locale)) : '');
+    }
+
+    private function edition(string $edition, string $locale): string
+    {
+        if (!ctype_digit($edition)) {
+            return $this->esc($edition);
+        }
+        $number = (int) $edition;
+        if ($locale === 'fr') {
+            return $number . ($number === 1 ? 're' : 'e') . ' éd.';
+        }
+        $suffix = $number % 100 >= 11 && $number % 100 <= 13 ? 'th' : match ($number % 10) {
+            1 => 'st', 2 => 'nd', 3 => 'rd', default => 'th',
+        };
+        return $number . $suffix . ' ed.';
     }
 
     // ─── Creators (authors / editors) ────────────────────────────────────────
@@ -393,6 +461,15 @@ final class CitationFormatter
             return '';
         }
         $n = count($people);
+        if ($style === 'chicago' && $n > 6) {
+            return $this->name($people[0], $style, $invertFirst) . ', '
+                . $this->name($people[1], $style, false) . ', '
+                . $this->name($people[2], $style, false) . ', et al.';
+        }
+        if ($style === 'apa' && $n > 20) {
+            $names = array_map(fn (Creator $p) => $this->name($p, 'apa', $invertFirst), array_slice($people, 0, 19));
+            return implode(', ', $names) . ', … ' . $this->name($people[$n - 1], 'apa', $invertFirst);
+        }
         $first = $this->name($people[0], $style, $invertFirst);
         if ($n === 1) {
             return $first;
@@ -507,14 +584,45 @@ final class CitationFormatter
         return $seg;
     }
 
-    private function linkSegment(CitationRecord $record): string
+    private function linkSegment(CitationRecord $record, bool $period = true): string
     {
         $href = $record->link();
-        if ($href === null) {
+        if (MetadataValue::url($href) === null) {
             return '';
         }
         $hrefEsc = $this->esc($href);
-        return '<a href="' . $hrefEsc . '">' . $hrefEsc . '</a>.';
+        return '<a href="' . $hrefEsc . '">' . $hrefEsc . '</a>' . ($period ? '.' : '');
+    }
+
+    private function eventSegment(CitationRecord $record, string $locale, string $style): string
+    {
+        $facts = array_filter([$this->esc($record->eventTitle), $this->esc($record->eventPlace),
+            $style !== 'apa' ? $this->fullDate($record, $locale, $style) : '']);
+        return $facts ? ', ' . implode(', ', $facts) : '';
+    }
+
+    private function details(CitationRecord $record, string $locale): string
+    {
+        $medium = $record->medium ?? match ($record->kind) {
+            CitationKind::Av => $this->str($locale, 'video'),
+            CitationKind::Audio => $this->str($locale, 'audio'),
+            CitationKind::Photo => $this->str($locale, 'photograph'),
+            default => null,
+        };
+        $parts = [];
+        if ($medium !== null) {
+            $parts[] = '[' . $this->esc($medium) . '].';
+        }
+        if ($record->number !== null) {
+            $parts[] = $this->terminate($this->str($locale, 'no') . ' ' . $this->esc($record->number));
+        }
+        if ($record->reviewedTitle !== null) {
+            $parts[] = $this->terminate(($locale === 'fr' ? 'Compte rendu de ' : 'Review of ') . $this->italic($record->reviewedTitle));
+        }
+        if (in_array($record->kind, [CitationKind::Document, CitationKind::Photo], true)) {
+            $parts[] = $this->terminate(implode(', ', array_filter([$this->esc($record->archive), $this->esc($record->accession)])));
+        }
+        return $this->join($parts);
     }
 
     // ─── Dates ───────────────────────────────────────────────────────────────
@@ -533,6 +641,9 @@ final class CitationFormatter
      */
     private function fullDate(CitationRecord $record, string $locale, string $style): string
     {
+        if ($record->issued->end !== null) {
+            return $this->esc($record->issued->literal ?? $record->issued->iso());
+        }
         $y = $record->issued->year;
         $m = $record->issued->month;
         $d = $record->issued->day;

@@ -46,4 +46,21 @@ final class IssuedDateTest extends TestCase
     {
         $this->assertSame('2018', IssuedDate::parse('2018-12-07')->yearOrLiteral());
     }
+
+    public function testRangesRoundTripWithoutLosingPrecision(): void
+    {
+        $date = IssuedDate::parse('2009-05/2009-08');
+        self::assertSame(['date-parts' => [[2009, 5], [2009, 8]]], $date->csl());
+        self::assertSame('2009-05/2009-08', IssuedDate::fromArray($date->toArray())->iso());
+    }
+
+    public function testInvalidDatesRemainLiteral(): void
+    {
+        foreach (['2023-02-29', '2024-13', '2009/2008', 'circa 1990', '1990?'] as $raw) {
+            $date = IssuedDate::parse($raw);
+            self::assertNull($date->iso());
+            self::assertSame(['literal' => $raw], $date->csl());
+        }
+        self::assertSame('2024-02-29', IssuedDate::parse('2024-02-29')->iso());
+    }
 }

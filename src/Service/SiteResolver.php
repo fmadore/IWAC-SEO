@@ -39,16 +39,12 @@ class SiteResolver
             try {
                 $this->site = $this->api->read('sites', $defaultSiteId)->getContent();
                 return $this->site;
-            } catch (\Throwable $e) {
+            } catch (\Omeka\Api\Exception\NotFoundException | \Omeka\Api\Exception\PermissionDeniedException $e) {
                 // fall through to first site
             }
         }
-        try {
-            $sites = $this->api->search('sites', ['limit' => 1])->getContent();
-            $this->site = $sites[0] ?? null;
-        } catch (\Throwable $e) {
-            $this->site = null;
-        }
+        $sites = $this->api->search('sites', ['limit' => 1, 'is_public' => true])->getContent();
+        $this->site = $sites[0] ?? null;
         return $this->site;
     }
 
@@ -56,6 +52,12 @@ class SiteResolver
     {
         $site = $this->defaultSite();
         return $site ? $site->slug() : null;
+    }
+
+    public function publicSite(string $slug): ?SiteRepresentation
+    {
+        $sites = $this->api->search('sites', ['slug' => $slug, 'is_public' => true, 'limit' => 1])->getContent();
+        return $sites[0] ?? null;
     }
 
     /**

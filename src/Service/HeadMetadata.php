@@ -59,7 +59,7 @@ class HeadMetadata
         SiteRepresentation $site
     ): ?string {
         $title = (string) $resource->displayTitle();
-        $description = $this->resourceDescription($resource, $site);
+        $description = $this->resourceDescription($resource, $site, ViewLocale::forCitation($view));
         $canonical = ResourceUrl::forSite($resource, $site->slug());
         $thumbnail = $this->resourceThumbnail($view, $resource);
         $image = $thumbnail ?? $this->resolveDefaultImage($view);
@@ -86,7 +86,7 @@ class HeadMetadata
                 $resource,
                 $site,
                 $canonical,
-                $image,
+                $thumbnail,
                 $thumbnail,
                 ViewLocale::forCitation($view)
             );
@@ -124,7 +124,7 @@ class HeadMetadata
                 'rel'   => 'unapi-server',
                 'type'  => 'application/xml',
                 'title' => 'unAPI',
-                'href'  => $view->serverUrl('/unapi'),
+                'href'  => UrlPolicy::publicUrl($view->serverUrl('/unapi')),
             ]);
             return sprintf(
                 '<abbr class="unapi-id" title="%s"></abbr>',
@@ -202,11 +202,11 @@ class HeadMetadata
         // Self-referential canonical (full current URL) keeps facet/sort
         // variants from looking like duplicate content while staying safe for
         // paginated pages (no collapsing page 2 onto page 1).
-        $current = $view->serverUrl(true);
+        $current = UrlPolicy::canonical(UrlPolicy::publicUrl($view->serverUrl(true)));
         $this->head->canonical($view, $current);
 
-        // Only noindex faceted / paginated / sorted variants (which carry a
-        // query string). Clean landing pages stay indexable — crucially the
+        // Noindex filtered/sorted variants. Clean pagination and landing pages
+        // stay indexable — crucially the
         // item-set pages (/item-set/{id}), which are listed in the sitemap;
         // marking them noindex made Search Console reject that sitemap.
         if ($this->isVariant($current) && $this->settings->isOn('iwac_seo_noindex_browse')) {
@@ -273,19 +273,12 @@ class HeadMetadata
                 $this->head->image($view, $img);
             }
         }
-        // Gap-fill the canonical for routes no phase-1 listener claimed — the
-        // IwacSearch /search app, and any other module's controller. Filling it
-        // with the *current* URL made every query permutation self-canonical:
-        // each facet combination declared itself a distinct page worth
-        // indexing, with no noindex to counterbalance it, which is how ~1,300
-        // legacy /search?facet[…] URLs entered the index. Point them at the
-        // query-less URL and mark the variant noindex instead — the same
-        // pairing applyBrowse() applies to the routes this module does own,
-        // minus the self-referential canonical, because nothing here is known
-        // to be a genuine paginated series.
+        // Apply the shared URL policy to routes without resource/page metadata.
+        // Filter variants receive noindex; tracking and pagination use the same
+        // rules as Omeka browse routes.
         if (!$this->head->has('canonical')) {
-            $current = $view->serverUrl(true);
-            $this->head->canonical($view, Text::withoutQuery($current));
+            $current = UrlPolicy::publicUrl($view->serverUrl(true));
+            $this->head->canonical($view, UrlPolicy::canonical($current));
             if ($this->isVariant($current) && $this->settings->isOn('iwac_seo_noindex_browse')) {
                 $this->head->robots($view, 'noindex, follow');
             }
@@ -306,7 +299,7 @@ class HeadMetadata
         // whatever canonical was written rather than re-deriving it — the two
         // disagreeing is how a share of /search?facet[…] gets its own card.
         if (!$this->head->has('og:url')) {
-            $url = $this->head->writtenCanonical() ?? $view->serverUrl(true);
+            $url = $this->head->writtenCanonical() ?? UrlPolicy::publicUrl($view->serverUrl(true));
             $this->head->openGraph($view, ['og:url' => $url]);
         }
     }
@@ -315,7 +308,8 @@ class HeadMetadata
 
     private function resourceDescription(
         AbstractResourceEntityRepresentation $resource,
-        SiteRepresentation $site
+        SiteRepresentation $site,
+        string $locale
     ): ?string {
         // Newspaper articles carry their summary in bibo:shortDescription (the
         // AI summary); references and publication issues use dcterms:abstract;
@@ -325,12 +319,9 @@ class HeadMetadata
         // a meta description wants the punchy summary, a citation wants the
         // formal abstract. Do not unify the two.
         foreach (['bibo:shortDescription', 'dcterms:abstract', 'dcterms:description', 'bibo:abstract'] as $term) {
-            $value = $resource->value($term);
-            if ($value !== null) {
-                $text = trim(strip_tags((string) $value));
-                if ($text !== '') {
-                    return $this->truncate($text);
-                }
+            $text = MetadataValue::select($resource, [$term], $locale);
+            if ($text !== null) {
+                return $this->truncate($text);
             }
         }
         // Fallback so the tag is never empty and stays unique per page: the
@@ -379,7 +370,7 @@ class HeadMetadata
         // generic file-type icon instead. That icon is not a picture of the
         // resource, so it is not a thumbnail here any more than the site's
         // share graphic is; only a media that has its own derivatives counts.
-        if ($media instanceof MediaRepresentation && $media->hasThumbnails()) {
+        if ($media instanceof MediaRepresentation && $media->isPublic() && $media->hasThumbnails()) {
             $thumb = $media->thumbnailUrl('large');
             if ($thumb) {
                 return $this->absolutize($view, $thumb);
@@ -460,7 +451,7 @@ class HeadMetadata
      */
     private function isVariant(string $url): bool
     {
-        return Text::withoutQuery($url) !== $url;
+        return UrlPolicy::isFiltered($url);
     }
 
     private function jsonLdEnabled(): bool

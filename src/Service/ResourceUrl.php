@@ -27,7 +27,7 @@ final class ResourceUrl
         } catch (\Throwable $e) {
             return null;
         }
-        return is_string($url) && $url !== '' ? $url : null;
+        return is_string($url) && $url !== '' ? UrlPolicy::publicUrl($url) : null;
     }
 
     /**

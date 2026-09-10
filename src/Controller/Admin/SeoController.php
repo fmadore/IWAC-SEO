@@ -27,6 +27,8 @@ class SeoController extends AbstractActionController
         private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
         private readonly Hreflang $hreflang,
+        private readonly \IwacSeo\Service\CitationData $citationData,
+        private readonly \IwacSeo\Service\PingRepository $pingRepository,
     ) {
     }
 
@@ -35,9 +37,22 @@ class SeoController extends AbstractActionController
         $site = $this->resolveSite();
         $hostUrl = $site ? $this->hostUrl($site) : '';
         $indexNowKey = $this->settings->text('iwac_seo_indexnow_key');
+        $preview = null;
+        $previewId = (int) $this->params()->fromQuery('item_id', 0);
+        if ($previewId > 0 && $site !== null) {
+            try {
+                $item = $this->api->read('items', $previewId)->getContent();
+                $preview = $this->citationData->build($item, \IwacSeo\Service\ResourceUrl::forSite($item, $site->slug()));
+            } catch (\Omeka\Api\Exception\NotFoundException $error) {
+                $this->messenger()->addError('Item not found.'); // @translate
+            }
+        }
 
         $view = new ViewModel([
             'site'           => $site,
+            'citationPreview' => $preview,
+            'citationMissing' => $preview !== null ? \IwacSeo\Service\CitationDiagnostics::missing($preview) : [],
+            'queueCounts' => $this->pingRepository->counts(),
             'gscConfigured'  => $this->settings->text('iwac_seo_gsc_verification') !== '',
             'jsonLdEnabled'  => $this->settings->isOn('iwac_seo_jsonld_enabled', true),
             'citationEnabled' => $this->settings->isOn('iwac_seo_citation_meta', true),
@@ -176,6 +191,8 @@ class SeoController extends AbstractActionController
 
         $this->pageSeoStore->setSite($site->id());
         $form = $this->getForm(PageSeoForm::class);
+        $pages = $this->api->search('site_pages', ['site_id' => $site->id()])->getContent();
+        $pageIds = array_map(static fn ($page) => $page->id(), $pages);
 
         if ($this->getRequest()->isPost()) {
             $post = $this->params()->fromPost();
@@ -183,24 +200,33 @@ class SeoController extends AbstractActionController
             if ($form->isValid()) {
                 $map = [];
                 foreach ((array) ($post['pages'] ?? []) as $pageId => $fields) {
+                    if (!is_array($fields) || !in_array((int) $pageId, $pageIds, true)) {
+                        continue;
+                    }
+                    $robots = (string) ($fields['robots'] ?? '');
+                    if (!in_array($robots, \IwacSeo\Service\PageIndexability::ROBOTS, true)) {
+                        $robots = '';
+                    }
                     $overrides = array_filter([
                         'title'       => trim((string) ($fields['title'] ?? '')),
                         'description' => trim((string) ($fields['description'] ?? '')),
                         'image'       => (int) ($fields['image'] ?? 0) ?: null,
-                        'robots'      => ($fields['robots'] ?? '') !== '' ? (string) $fields['robots'] : null,
+                        'robots'      => $robots,
                     ], static fn ($v) => $v !== null && $v !== '');
                     if ($overrides !== []) {
                         $map[(int) $pageId] = $overrides;
                     }
                 }
-                $this->pageSeoStore->replaceAll($map);
+                if (!$this->pageSeoStore->save($map, (string) ($post['revision'] ?? ''))) {
+                    $this->messenger()->addError('Another editor changed these settings. Reload the page before saving.'); // @translate
+                    return $this->redirect()->toRoute('admin/iwac-seo/pages', [], ['query' => ['site_id' => $site->id()]]);
+                }
+                $this->generator->clearCache();
                 $this->messenger()->addSuccess('Static-page SEO saved.'); // @translate
                 return $this->redirect()->toRoute('admin/iwac-seo/pages', [], ['query' => ['site_id' => $site->id()]]);
             }
             $this->messenger()->addError('Invalid form submission.'); // @translate
         }
-
-        $pages = $this->api->search('site_pages', ['site_id' => $site->id()])->getContent();
 
         $view = new ViewModel([
             'site'      => $site,
@@ -208,6 +234,7 @@ class SeoController extends AbstractActionController
             'pages'     => $pages,
             'overrides' => $this->pageSeoStore->all(),
             'form'      => $form,
+            'revision'  => $this->pageSeoStore->revision(),
         ]);
         return $view->setTemplate('iwac-seo/admin/seo/pages');
     }

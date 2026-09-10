@@ -78,6 +78,41 @@ final class XmlCacheTest extends TestCase
         $this->assertSame('live', $cache->remember('k', 3600, static fn (): string => 'live')->xml);
     }
 
+    public function testInvalidationDuringBuildCannotPublishObsoleteCache(): void
+    {
+        $cache = new XmlCache($this->dir);
+        $cache->remember('k', 3600, static function () use ($cache): string {
+            $cache->clear();
+            return 'obsolete';
+        });
+        self::assertFileDoesNotExist($this->dir . '/k.xml');
+        self::assertSame('current', $cache->remember('k', 3600, static fn (): string => 'current')->xml);
+    }
+
+    public function testFailureDoesNotCacheEmptySitemap(): void
+    {
+        $cache = new XmlCache($this->dir);
+        try {
+            $cache->remember('k', 3600, static function (): string {
+                throw new \RuntimeException('database unavailable');
+            });
+            self::fail('The failure must reach the controller.');
+        } catch (\RuntimeException $error) {
+            self::assertSame('database unavailable', $error->getMessage());
+        }
+        self::assertFileDoesNotExist($this->dir . '/k.xml');
+    }
+
+    public function testRepeatedInvalidationStillInvalidatesAnInterveningBuild(): void
+    {
+        $cache = new XmlCache($this->dir);
+        $cache->remember('k', 3600, static fn (): string => 'first');
+        $cache->clear();
+        $cache->remember('k', 3600, static fn (): string => 'between edits');
+        $cache->clear();
+        self::assertSame('latest', $cache->remember('k', 3600, static fn (): string => 'latest')->xml);
+    }
+
     public function testLastModifiedIsTheCacheMtimeOnAHit(): void
     {
         $cache = new XmlCache($this->dir);

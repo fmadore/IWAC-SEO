@@ -70,7 +70,7 @@ class Citation extends AbstractHelper
         $view = $this->getView();
         $url = $this->itemUrl($view, $item);
 
-        $record = $this->citationData->build($item, $url);
+        $record = $this->citationData->build($item, $url, ViewLocale::forCitation($view));
         if ($record === null) {
             return null;
         }

@@ -47,7 +47,13 @@ class SitemapController extends AbstractActionController
         if (!$site) {
             return $this->notFound();
         }
-        return $this->xml($this->generator->buildIndex($this->hostUrl($site), $site->id(), $this->ttl()));
+        $pageSites = [];
+        foreach (array_keys($this->hreflang->sites()) as $slug) {
+            if ($slug !== $site->slug() && $this->siteResolver->publicSite($slug)) {
+                $pageSites[] = $slug;
+            }
+        }
+        return $this->xml($this->generator->buildIndex($this->hostUrl($site), $site->id(), $this->ttl(), $pageSites));
     }
 
     public function pagesAction(): Response
@@ -133,14 +139,11 @@ class SitemapController extends AbstractActionController
     public function robotsAction(): Response
     {
         $lines = ['User-agent: *'];
-        if ($this->settings->isOn('iwac_seo_noindex_site')) {
-            $lines[] = 'Disallow: /';
-        } else {
-            $lines[] = 'Disallow: /admin/';
-            $lines[] = 'Disallow: /login';
-            $lines[] = 'Disallow: /logout';
-            $lines[] = 'Disallow: /maintenance';
-        }
+        // Crawlers must be able to fetch noindex; private staging requires authentication.
+        $lines[] = 'Disallow: /admin/';
+        $lines[] = 'Disallow: /login';
+        $lines[] = 'Disallow: /logout';
+        $lines[] = 'Disallow: /maintenance';
 
         $site = $this->resolveSite();
         if ($this->sitemapEnabled() && $site) {
@@ -165,13 +168,32 @@ class SitemapController extends AbstractActionController
 
     private function resolveSite(): ?SiteRepresentation
     {
+        $slug = $this->params()->fromRoute('site-slug');
+        if (is_string($slug) && $slug !== '') {
+            return $this->siteResolver->publicSite($slug);
+        }
         return $this->siteResolver->defaultSite();
+    }
+
+    public function onDispatch(\Laminas\Mvc\MvcEvent $e): mixed
+    {
+        try {
+            return parent::onDispatch($e);
+        } catch (\Throwable $error) {
+            error_log('IwacSeo: sitemap unavailable: ' . $error->getMessage());
+            return $this->respond(
+                'Temporarily unavailable',
+                'text/plain; charset=utf-8',
+                503,
+                ['Retry-After' => '300', 'Cache-Control' => 'no-store']
+            );
+        }
     }
 
     private function siteUrl(SiteRepresentation $site): string
     {
         return rtrim(
-            $this->url()->fromRoute('site', ['site-slug' => $site->slug()], ['force_canonical' => true]),
+            \IwacSeo\Service\UrlPolicy::publicUrl($this->url()->fromRoute('site', ['site-slug' => $site->slug()], ['force_canonical' => true])),
             '/'
         );
     }

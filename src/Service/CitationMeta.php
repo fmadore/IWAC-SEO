@@ -57,8 +57,10 @@ class CitationMeta
     private const DC_TYPE_OVERRIDE_KINDS = [
         CitationKind::Newspaper,
         CitationKind::Magazine,
+        CitationKind::PeriodicalIssue,
         CitationKind::Post,
         CitationKind::Av,
+        CitationKind::Audio,
         CitationKind::Communication,
         CitationKind::Photo,
         CitationKind::Book,
@@ -75,7 +77,7 @@ class CitationMeta
         ?string $canonical
     ): void {
         $headMeta = $view->headMeta();
-        $kind = $this->kinds->forClassId($classId);
+        $kind = $this->kinds->forResource($resource);
 
         // Dublin Core for every resource.
         $this->dublinCore($headMeta, $resource, $canonical);
@@ -105,7 +107,7 @@ class CitationMeta
             $headMeta->appendName('citation_editor', $editor);
         }
 
-        $this->single($headMeta, 'citation_publication_date', $this->firstString($resource, self::DATE_TERMS));
+        $this->single($headMeta, 'citation_publication_date', $this->firstString($resource, MetadataValue::DATE_TERMS));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
@@ -136,7 +138,7 @@ class CitationMeta
             case CitationKind::Review:    // book review (published in a journal)
                 $this->single($headMeta, 'citation_journal_title', $container);
                 $this->single($headMeta, 'citation_volume', $this->firstString($resource, ['bibo:volume']));
-                $this->single($headMeta, 'citation_issue', $this->firstString($resource, ['bibo:issue']));
+                $this->single($headMeta, 'citation_issue', implode('–', $this->labels($resource, 'bibo:issue')) ?: null);
                 $this->single($headMeta, 'citation_firstpage', $firstPage);
                 $this->single($headMeta, 'citation_lastpage', $lastPage);
                 break;
@@ -155,14 +157,20 @@ class CitationMeta
                 break;
             case CitationKind::Report:
                 $this->single($headMeta, 'citation_technical_report_institution', $container);
+                $this->single($headMeta, 'citation_technical_report_number', $this->firstString($resource, ['bibo:number']));
                 break;
             case CitationKind::Newspaper:
             case CitationKind::Magazine:
+            case CitationKind::PeriodicalIssue:
             case CitationKind::Post:
                 // No Highwire container tag (it would force journalArticle). The
                 // Zotero type is set via DC.type below; the publication name
                 // travels through prism.publicationName → publicationTitle.
                 $this->single($headMeta, 'prism.publicationName', $container);
+                $this->single($headMeta, 'prism.volume', $this->firstString($resource, ['bibo:volume']));
+                $this->single($headMeta, 'prism.number', implode('–', $this->labels($resource, 'bibo:issue')) ?: null);
+                $this->single($headMeta, 'citation_firstpage', $firstPage);
+                $this->single($headMeta, 'citation_lastpage', $lastPage);
                 break;
             // 'av', 'communication', 'document', 'item': title/author/date/
             // abstract already cover them; 'av' & 'communication' are typed via
@@ -190,7 +198,7 @@ class CitationMeta
         foreach ($this->people($resource, ['dcterms:creator', 'bibo:authorList']) as $creator) {
             $headMeta->appendName('DC.creator', $creator);
         }
-        $this->single($headMeta, 'DC.date', $this->firstString($resource, self::DATE_TERMS));
+        $this->single($headMeta, 'DC.date', $this->firstString($resource, MetadataValue::DATE_TERMS));
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
         $this->single($headMeta, 'DC.type', ResourceUrl::classLabel($resource));
         $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));

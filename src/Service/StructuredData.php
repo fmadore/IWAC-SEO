@@ -61,6 +61,9 @@ class StructuredData
         string $locale = 'en'
     ): ?array {
         $type = $this->classTypes[ResourceUrl::classId($resource)] ?? $this->defaultType;
+        if ($type === 'VideoObject' && MetadataValue::isAudio($resource)) {
+            $type = 'AudioObject';
+        }
 
         $data = [
             '@context' => 'https://schema.org',
@@ -69,13 +72,15 @@ class StructuredData
         ];
         if ($canonical) {
             $data['url'] = $canonical;
+            $data['@id'] = $canonical . '#resource';
+            $data['mainEntityOfPage'] = ['@type' => 'WebPage', '@id' => $canonical, 'url' => $canonical];
         }
         if ($image) {
             $data['image'] = $image;
         }
-        $description = $this->firstString($resource, [
+        $description = MetadataValue::select($resource, [
             'dcterms:abstract', 'bibo:shortDescription', 'dcterms:description', 'bibo:abstract',
-        ]);
+        ], $locale);
         if ($description !== null) {
             $data['description'] = $description;
         }
@@ -133,14 +138,6 @@ class StructuredData
             '@type'           => 'WebSite',
             'name'            => $site->title(),
             'url'             => $home,
-            'potentialAction' => [
-                '@type'       => 'SearchAction',
-                'target'      => [
-                    '@type'       => 'EntryPoint',
-                    'urlTemplate' => $home . 'search?q={search_term_string}',
-                ],
-                'query-input' => 'required name=search_term_string',
-            ],
         ];
     }
 
@@ -239,13 +236,27 @@ class StructuredData
         }
 
         $date = $this->firstString($resource, ['dcterms:date', 'dcterms:issued']);
-        if ($date !== null) {
-            $data['datePublished'] = $date;
+        $issued = \IwacSeo\Service\Citation\IssuedDate::parse($date ?? '');
+        if ($issued->hasYear() && $issued->end === null) {
+            $data['datePublished'] = $issued->iso();
         }
 
         $language = $this->firstLabel($resource, 'dcterms:language');
         if ($language !== null) {
-            $data['inLanguage'] = $language;
+            $data['inLanguage'] = MetadataValue::language($language);
+        }
+        if (in_array($type, ['NewsArticle', 'ScholarlyArticle', 'BlogPosting'], true)) {
+            $data['headline'] = (string) $resource->displayTitle();
+        }
+        $doi = $this->doi($resource);
+        if ($doi !== null) {
+            $data['identifier'] = ['@type' => 'PropertyValue', 'propertyID' => 'DOI', 'value' => $doi];
+        }
+        foreach (['pageStart' => 'bibo:pageStart', 'pageEnd' => 'bibo:pageEnd', 'isbn' => 'bibo:isbn'] as $key => $term) {
+            $value = $this->firstString($resource, [$term]);
+            if ($value !== null && ($key !== 'isbn' || $type === 'Book')) {
+                $data[$key] = $value;
+            }
         }
 
         $subjects = $this->labels($resource, 'dcterms:subject');
@@ -268,11 +279,12 @@ class StructuredData
             if ($duration !== null && str_starts_with($duration, 'P')) {
                 $data['duration'] = $duration;
             }
-            if ($date !== null) {
+            $published = $this->firstString($resource, ['dcterms:issued']);
+            if ($published !== null) {
                 // uploadDate is validated as a date-time with an offset, which
                 // a NumericDataTypes timestamp is not; datePublished above
                 // keeps the archive's own precision. Text::uploadDate().
-                $upload = Text::uploadDate($date);
+                $upload = Text::uploadDate($published);
                 if ($upload !== null) {
                     $data['uploadDate'] = $upload;
                 }
@@ -284,6 +296,21 @@ class StructuredData
                 $data['thumbnailUrl'] = $thumbnail;
             }
             $data += $this->videoUrls($resource);
+        }
+        if ($type === 'AudioObject' && $resource instanceof ItemRepresentation) {
+            foreach ($resource->media() as $media) {
+                if ($media->isPublic() && str_starts_with((string) $media->mediaType(), 'audio/')) {
+                    $url = MetadataValue::url($media->originalUrl());
+                    if ($url !== null) {
+                        $data['contentUrl'] = $url;
+                        break;
+                    }
+                }
+            }
+            $duration = $this->firstString($resource, ['dcterms:extent']);
+            if ($duration !== null && preg_match('/^PT(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?$/', $duration) && $duration !== 'PT') {
+                $data['duration'] = $duration;
+            }
         }
 
         // fabio:BookReview records name the book they review in bibo:reviewOf.
@@ -355,7 +382,7 @@ class StructuredData
                 ]);
             }
             if ($type === 'PublicationIssue') {
-                $issue = $this->firstString($resource, ['bibo:issue']);
+                $issue = implode('–', $this->labels($resource, 'bibo:issue')) ?: null;
                 if ($issue !== null) {
                     $data['issueNumber'] = $issue;
                 }
@@ -392,7 +419,7 @@ class StructuredData
      */
     private function publisherFor(string $type, AbstractResourceEntityRepresentation $resource): ?string
     {
-        $publisherTypes = ['Book', 'Chapter', 'Thesis', 'Report', 'BlogPosting', 'VideoObject', 'DigitalDocument'];
+        $publisherTypes = ['Book', 'Chapter', 'Thesis', 'Report', 'BlogPosting', 'VideoObject', 'AudioObject', 'DigitalDocument'];
         if (!in_array($type, $publisherTypes, true)) {
             return null;
         }
@@ -430,7 +457,10 @@ class StructuredData
             if (!$value instanceof ValueRepresentation) {
                 continue;
             }
-            $embed = Text::youtubeEmbedUrl($value->uri() ?: trim((string) $value));
+            if (!$value->isPublic()) {
+                continue;
+            }
+            $embed = Text::youtubeEmbedUrl($value->uri() ?: (MetadataValue::text($value) ?? ''));
             if ($embed !== null) {
                 $out['embedUrl'] = $embed;
                 break;
@@ -471,16 +501,21 @@ class StructuredData
                 if (!$value instanceof ValueRepresentation) {
                     continue;
                 }
+                $label = MetadataValue::text($value);
+                if ($label === null) {
+                    continue;
+                }
                 $linked = $value->valueResource();
                 if ($linked) {
-                    $node = ['@type' => $type, 'name' => (string) $linked->displayTitle()];
+                    $linkedType = $this->classTypes[ResourceUrl::classId($linked)] ?? $type;
+                    $node = ['@type' => $linkedType === 'Organization' ? 'Organization' : $type, 'name' => $label];
                     $url = ResourceUrl::forSite($linked, $site->slug());
                     if ($url !== null) {
                         $node['url'] = $url;
                     }
                     $out[$node['name']] = $node;
                 } else {
-                    $name = trim(strip_tags((string) $value));
+                    $name = $label;
                     if ($name !== '') {
                         $out[$name] = ['@type' => $type, 'name' => $name];
                     }
@@ -500,7 +535,7 @@ class StructuredData
         SiteRepresentation $site
     ): ?array {
         $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation) {
+        if (!$value instanceof ValueRepresentation || MetadataValue::text($value) === null) {
             return null;
         }
         $linked = $value->valueResource();
@@ -544,15 +579,15 @@ class StructuredData
     {
         $out = [];
         foreach ($resource->value('dcterms:identifier', ['all' => true]) as $value) {
-            if (!$value instanceof ValueRepresentation) {
+            if (!$value instanceof ValueRepresentation || !$value->isPublic()) {
                 continue;
             }
             $uri = $value->uri();
             if (!$uri) {
-                $candidate = trim((string) $value);
+                $candidate = MetadataValue::text($value) ?? '';
                 $uri = preg_match('#^https?://#i', $candidate) ? $candidate : null;
             }
-            if ($uri) {
+            if (MetadataValue::url($uri) !== null) {
                 $out[$uri] = $uri;
             }
         }
@@ -562,6 +597,6 @@ class StructuredData
     private function homeUrl(PhpRenderer $view, SiteRepresentation $site): string
     {
         $url = $view->url('site', ['site-slug' => $site->slug()], ['force_canonical' => true]);
-        return rtrim($url, '/') . '/';
+        return rtrim(UrlPolicy::publicUrl($url), '/') . '/';
     }
 }

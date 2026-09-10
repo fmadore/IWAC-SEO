@@ -99,6 +99,14 @@ return $instance + [
                     'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'pages'],
                 ],
             ],
+            'iwac-seo-sitemap-site-pages' => [
+                'type' => Segment::class,
+                'options' => [
+                    'route' => '/sitemap-pages-:site-slug.xml',
+                    'constraints' => ['site-slug' => '[a-zA-Z0-9_-]+'],
+                    'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'pages'],
+                ],
+            ],
             'iwac-seo-sitemap-item-sets' => [
                 'type'    => Literal::class,
                 'options' => [

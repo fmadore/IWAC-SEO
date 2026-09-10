@@ -97,7 +97,7 @@ final class CitationExportTest extends TestCase
             $this->export->serialize($this->record(['kind' => 'chapter']), 'bibtex')
         );
         $this->assertStringStartsWith(
-            '@phdthesis{',
+            '@thesis{',
             $this->export->serialize($this->record(['kind' => 'thesis']), 'bibtex')
         );
         $this->assertStringStartsWith(

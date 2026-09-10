@@ -7,26 +7,14 @@ use IwacSeo\Job\PingSearchEngines;
 use Omeka\Job\Dispatcher;
 
 /**
- * The IndexNow submission queue: which URLs are pending, when a job may be
- * dispatched to drain them, and when a batch is large enough to be a bulk sync
- * rather than an editorial change.
- *
- * This was ~65 lines inside {@see \IwacSeo\Module::handleContentChange()} —
- * business logic in the bootstrap class — and the flood cap had to be a
- * `public const` on Module purely so the job could agree with it. Both halves
- * of that agreement now live here, and the whole policy is testable without an
- * Omeka event.
- *
- * The queue is a plain global setting (a list of URLs), so it survives across
- * requests and needs no table. It is deliberately capped: a bulk import would
- * otherwise grow it without bound, and IndexNow is meant for incremental edits
- * — bulk content is discovered through the sitemap instead.
+ * Dispatch policy over the durable outbox injected by PingQueueFactory.
+ * The optional settings-backed adapter and drain/isBulk methods are retained
+ * for constructor compatibility; production jobs use claim/finish exclusively.
  */
 class PingQueue
 {
     /**
-     * Pending-URL cap. A queue that reaches it is treated as a bulk sync and
-     * skipped at drain time rather than submitted.
+     * Maximum leased batch size; also the legacy settings adapter's flood cap.
      */
     public const CAP = 200;
 
@@ -39,6 +27,7 @@ class PingQueue
     public function __construct(
         private readonly SettingsGate $settings,
         private readonly Dispatcher $dispatcher,
+        private readonly ?PingRepository $repository = null,
     ) {
     }
 
@@ -57,6 +46,10 @@ class PingQueue
     /** Queue a URL for submission, de-duplicated and capped. */
     public function push(string $url): void
     {
+        if ($this->repository !== null) {
+            $this->repository->push($url);
+            return;
+        }
         if ($url === '') {
             return;
         }
@@ -99,6 +92,18 @@ class PingQueue
         $pending = $this->settings->list(self::PENDING);
         $this->settings->set(self::PENDING, []);
         return array_values(array_unique(array_filter($pending)));
+    }
+
+    /** @return array<int,array<string,mixed>> */
+    public function claim(): array
+    {
+        return $this->repository?->claim(self::CAP) ?? [];
+    }
+
+    /** @param array<int,array<string,mixed>> $rows */
+    public function finish(array $rows, bool $success): void
+    {
+        $this->repository?->finish($rows, $success);
     }
 
     /**

@@ -9,8 +9,7 @@ Google Search Console verification, and there is no `sitemap.xml` or `robots.txt
 module fills all of that in — **manually for static pages, automatically for every
 resource page** — and adds a sitemap, a robots file, and an optional IndexNow ping.
 
-It is a self-contained, settings-only module. No third-party Composer dependencies, no
-database tables, no theme edits.
+It is self-contained, with no third-party runtime Composer dependencies or theme edits. Version 1.1 adds a durable IndexNow outbox table. See [operations and migration](OPERATIONS.md) for the server cron and optional Search Console workflow.
 
 > **IWAC is bilingual.** The same collection is published as two Omeka sites —
 > `afrique_ouest` (French, the default the host root redirects to) and `westafrica`
@@ -27,15 +26,15 @@ database tables, no theme edits.
 |---|---|
 | **Meta tags** | `<title>`, `<meta name="description">`, canonical link on every public page. |
 | **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. |
-| **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` + `SearchAction` on the home page and `BreadcrumbList` on resource pages. |
+| **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` on the home page and `BreadcrumbList` on resource pages. |
 | **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
 | **unAPI (Zotero RDF)** | Primary-source items also advertise a `/unapi` endpoint serving **Zotero RDF**. Zotero prefers unAPI over the meta tags, so it imports a fuller record — the call number (*Cote*) from the `iwac-` identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. |
 | **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
-| **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (chunked at 50k). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
-| **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. A staging switch can `Disallow: /` the whole site. |
+| **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
+| **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
 | **Google Search Console** | Paste the verification snippet in the module config; the `<meta name="google-site-verification">` tag is injected site-wide. |
-| **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (throttled; skips bulk imports). |
+| **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (durable, throttled batches and retries). |
 
 Static-page SEO is **set by hand** (a central admin table); resource-page SEO is **derived
 automatically** from each item's metadata, with the configurable defaults filling any gaps.
@@ -103,8 +102,8 @@ on install.
 | **Default meta description** | Used on pages without their own description (home, browse, search). |
 | **Default social share image** | `og:image` fallback (≈1200×630). Used when a page or an item with no media is shared. |
 | **Twitter / X @handle** | Emitted as `twitter:site`. |
-| **Discourage indexing (whole site)** | Staging switch: every page becomes `noindex,nofollow` and robots.txt disallows everything. **Off in production.** |
-| **Noindex filtered/paginated browse** | Keeps facet/pagination URLs out of the index while still following links to resources. On by default. |
+| **Discourage indexing (whole site)** | Staging switch: every page becomes `noindex,nofollow` while robots.txt permits reading that directive. **Off in production.** |
+| **Noindex filtered browse** | Keeps filter/sort URLs out of the index; clean pagination stays indexable and self-canonical. On by default. |
 | **Emit schema.org JSON-LD** | Toggle structured data. On by default. |
 | **Emit citation meta tags** | Toggle Zotero / Scholar tags. On by default. |
 | **Serve unAPI (Zotero RDF)** | Toggle the `/unapi` endpoint + discovery tags for primary sources. On by default; needs the meta tags on for the fallback. |
@@ -153,7 +152,7 @@ The head signals are written into Omeka's request-global head placeholder helper
 * **Static pages** (`view.show.after` on the Page controller): the editor's per-page
   overrides, else defaults; `WebSite` JSON-LD on the home page.
 * **Browse/search pages** (`view.browse.after`): self-referential canonical and optional
-  `noindex` on faceted/paginated variants.
+  `noindex` on filtered variants; tracking parameters are removed and pagination remains indexable.
 * **Every page** (`view.layout`): site-wide constants (`og:site_name`, `og:locale`,
   `twitter:card`, verification tags) and gap-fills for anything not already set. Resource
   values always win because the resource listeners run before the layout listener.
@@ -253,14 +252,7 @@ sentence rather than an empty one. `VideoDescription` holds the wording, in the 
 string-table style as the citation formatter — the module's services run without a
 translator.
 
-A video's `uploadDate` is normalised to an ISO 8601 **date-time with an offset**
-(`2021-08-21` → `2021-08-21T00:00:00+00:00`). A NumericDataTypes timestamp is a date, which
-Search Console rejects twice over — as an incorrect date-time value, and as one missing a
-time zone. UTC is used because the offset is a formality here: the archive does not record
-what time of day a video went up, so any wall-clock time is invented, and UTC invents the
-least. A `YYYY` or `YYYY-MM` value is completed to the first of the period, `uploadDate`
-being required where `datePublished` alongside it still carries the archive's own precision.
-A value that is not a date is dropped rather than passed on.
+A video's `uploadDate` is emitted only from an explicit `dcterms:issued` timestamp with a known time zone. Catalogue dates retain their precision in `datePublished`; missing days, times and zones are never invented. Incomplete video metadata remains an editorial task and may prevent rich-result eligibility.
 
 `embedUrl` and `contentUrl` say where the video can be played, and come from disjoint
 sources: 1,745 records name a source in `fabio:hasURL` — all but two a YouTube watch page,
@@ -440,32 +432,24 @@ Configure the language map, `x_default` and page pairs under `iwac_seo.hreflang`
 * `/sitemap-pages.xml` — the home page + all public site pages (driven by the site
   navigation, so menu order and depth set the priority).
 * `/sitemap-item-sets.xml` — public item-set browse pages.
-* `/sitemap-items-{n}.xml` — public items, chunked at 50,000 URLs per file (IWAC's ~22,600
-  public items fit in a single chunk).
+* `/sitemap-items-{n}.xml` — public items, defaulting to 5,000 URLs per file.
+* `/sitemap-pages-{site-slug}.xml` — other public language sites, including untranslated pages; pages marked `noindex` are excluded.
 
 Each item entry also carries an **`<image:image>`** element (the primary media's large
 thumbnail — the page scan or cover) so Google Images can index the scans; disable via
 `iwac_seo.sitemap.include_images` in a local config override.
 
 Resource ids + modified timestamps are read with one lean DBAL query per type (public
-resources scoped to the site), so the whole sitemap renders in well under a second. Output is
+resources scoped to the site), avoiding representation hydration for each item. Output is
 cached under `files/iwac-seo-cache/` and served with `Cache-Control` / `Last-Modified`
 headers; the cache is invalidated when an item or page changes, and any cache failure falls
 back to live generation.
 
 ---
 
-## IndexNow ping — and the bulk-import caveat
+## IndexNow ping
 
-When **Ping IndexNow** is on, public item/page **create** and **update** events queue the
-changed URL — and **delete** events too, so engines recrawl and drop the URL; a background
-job submits the queue to IndexNow at most once every 15 minutes.
-
-> **IWAC content arrives mainly through bulk imports that write thousands of items at once.**
-> The queue is therefore capped (200) and the job *skips* pinging when it looks like a bulk
-> change — those URLs are discovered through the sitemap instead. IndexNow is meant for
-> occasional **manual** edits. If in doubt, leave it **off** and rely on the sitemap +
-> Search Console.
+Public content changes enter a durable outbox. Background jobs send leased batches of up to 200 URLs, grouped by origin, and acknowledge only accepted submissions. Failed work retries with backoff; leases expire after worker failure. Schedule the independent five-minute drain so pending work does not depend on another edit. See [operations](OPERATIONS.md) for migration, cron, retries and the optional GitHub Search Console monitor.
 
 Google is **not** pinged: its sitemap-ping endpoint was retired in 2023. Google discovers
 content via the robots.txt `Sitemap:` line and Search Console.

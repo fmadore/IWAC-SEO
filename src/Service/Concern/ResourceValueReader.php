@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Service\Concern;
 
 use IwacSeo\Service\Citation\CitationRecord;
+use IwacSeo\Service\MetadataValue;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -22,9 +23,6 @@ use Omeka\Api\Representation\ValueRepresentation;
  */
 trait ResourceValueReader
 {
-    /** Publication-date properties, in preference order. */
-    private const DATE_TERMS = ['dcterms:date', 'dcterms:issued', 'dcterms:created'];
-
     /**
      * Abstract/summary properties in *citation* preference order (the formal
      * abstract first). HeadMetadata's meta description deliberately uses a
@@ -42,28 +40,13 @@ trait ResourceValueReader
      */
     private function firstString(AbstractResourceEntityRepresentation $resource, array $terms): ?string
     {
-        foreach ($terms as $term) {
-            $value = $resource->value($term);
-            if ($value instanceof ValueRepresentation) {
-                $text = trim(strip_tags((string) $value));
-                if ($text !== '') {
-                    return $text;
-                }
-            }
-        }
-        return null;
+        return MetadataValue::select($resource, $terms);
     }
 
     /** Label of the first value of $term: a linked resource's title, else the literal. */
     private function firstLabel(AbstractResourceEntityRepresentation $resource, string $term): ?string
     {
-        $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation) {
-            return null;
-        }
-        $linked = $value->valueResource();
-        $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-        return $label !== '' ? $label : null;
+        return MetadataValue::select($resource, [$term]);
     }
 
     /**
@@ -78,9 +61,8 @@ trait ResourceValueReader
             if (!$value instanceof ValueRepresentation) {
                 continue;
             }
-            $linked = $value->valueResource();
-            $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-            if ($label !== '') {
+            $label = MetadataValue::text($value);
+            if ($label !== null) {
                 $out[$label] = $label;
             }
         }
@@ -111,7 +93,7 @@ trait ResourceValueReader
             if (!$value instanceof ValueRepresentation) {
                 continue;
             }
-            $text = trim(strip_tags((string) $value));
+            $text = MetadataValue::text($value) ?? '';
             if (stripos($text, 'iwac-') === 0) {
                 return $text;
             }
@@ -125,16 +107,17 @@ trait ResourceValueReader
      */
     private function doi(AbstractResourceEntityRepresentation $resource): ?string
     {
-        $value = $resource->value('bibo:doi');
-        if (!$value instanceof ValueRepresentation) {
-            return null;
+        foreach ($resource->value('bibo:doi', ['all' => true]) as $value) {
+            if (!$value instanceof ValueRepresentation || MetadataValue::text($value) === null) {
+                continue;
+            }
+            $doi = $value->uri() ?: MetadataValue::text($value);
+            $doi = preg_replace('#^(https?://(dx\.)?doi\.org/|doi:)#i', '', $doi);
+            if ($doi !== null && preg_match('~^10\.\d{4,9}/[^\s<>]+$~', $doi)) {
+                return $doi;
+            }
         }
-        $doi = $value->uri() ?: trim(strip_tags((string) $value));
-        if ($doi === '') {
-            return null;
-        }
-        $doi = preg_replace('#^(https?://(dx\.)?doi\.org/|doi:)#i', '', $doi);
-        return $doi !== '' ? $doi : null;
+        return null;
     }
 
     /** The original URL of the item's first public PDF media, if any. */

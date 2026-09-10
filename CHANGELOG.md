@@ -3,6 +3,19 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.1.0 — 2026-09-10
+
+- Preserve citation date intervals, combined issues, explicit thesis types, event details, original URLs, media kinds, editions and archive identifiers. Share public raw-value and locale selection; retain structured authority names.
+- Correct whole-issue and audio typing, APA medium/degree placement, issue-without-volume rendering, long author lists and unsafe-link handling. Add bilingual admin citation previews and catalogue-gap diagnostics.
+- Stop manufacturing upload timestamps. Use resource thumbnails, stable JSON-LD identities, language codes and corporate author types; remove obsolete SearchAction markup.
+- Use one tracking/filter/pagination policy, with an optional trusted public origin. Keep staging noindex readable by crawlers. Include other-language static-page sitemaps and exclude noindex pages.
+- Publish sitemap caches atomically, prevent invalidated builds from populating the cache, bound rebuild waits and stale fallback, propagate generation failures as 503, and enforce sitemap size limits. Default to 5,000-item chunks.
+- Add a versioned, leased IndexNow database outbox with retries and an independent cron entry point. Newer edits survive older acknowledgements. Upgrade migrates the former pending-URL setting.
+- Reject concurrent stale admin saves, validate page ownership and robots values, and label editor controls for assistive technology.
+- Add an opt-in read-only Search Console GitHub workflow with short-lived OIDC credentials, bilingual sentinels, persisted observations, repeated-finding confirmation and summary/artifact reports. Offline tests require no Google credentials.
+
+See [OPERATIONS.md](OPERATIONS.md) for upgrade, cron and Google/GitHub configuration. Earlier changelog entries describe historical behaviour; the date-padding and bulk-discard policies are superseded by this release.
+
 ## 1.0.5 — 2026-09-08
 
 ### Fixed

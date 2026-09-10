@@ -35,7 +35,9 @@ enum CitationKind: string
     // Primary sources.
     case Newspaper = 'newspaper';
     case Magazine = 'magazine';
+    case PeriodicalIssue = 'periodical-issue';
     case Av = 'av';
+    case Audio = 'audio';
     case Document = 'document';
     case Photo = 'photo';
 
@@ -85,14 +87,16 @@ enum CitationKind: string
         return match ($this) {
             self::Newspaper => 'article-newspaper',
             self::Magazine => 'article-magazine',
+            self::PeriodicalIssue => 'periodical',
             self::Article => 'article-journal',
-            self::Review => 'review',
+            self::Review => 'review-book',
             self::Chapter => 'chapter',
             self::Book => 'book',
             self::Thesis => 'thesis',
             self::Report => 'report',
             self::Post => 'post-weblog',
             self::Av => 'motion_picture',
+            self::Audio => 'song',
             self::Communication => 'speech',
             self::Photo => 'graphic',
             default => 'document',
@@ -106,9 +110,10 @@ enum CitationKind: string
             self::Article, self::Review, self::Newspaper, self::Magazine => 'article',
             self::Chapter => 'incollection',
             self::Book => 'book',
-            self::Thesis => 'phdthesis',
+            self::Thesis => 'thesis',
+            self::PeriodicalIssue => 'periodical',
             self::Report => 'techreport',
-            self::Communication => 'inproceedings',
+            self::Communication => 'misc',
             self::Post => 'online',
             default => 'misc',
         };
@@ -120,14 +125,16 @@ enum CitationKind: string
         return match ($this) {
             self::Newspaper => 'NEWS',
             self::Magazine => 'MGZN',
+            self::PeriodicalIssue => 'SER',
             self::Article, self::Review => 'JOUR',
             self::Chapter => 'CHAP',
             self::Book => 'BOOK',
             self::Thesis => 'THES',
             self::Report => 'RPRT',
-            self::Communication => 'CONF',
+            self::Communication => 'GEN',
             self::Post => 'BLOG',
             self::Av => 'VIDEO',
+            self::Audio => 'SOUND',
             self::Photo => 'ART',
             default => 'GEN',
         };
@@ -144,8 +151,10 @@ enum CitationKind: string
         return match ($this) {
             self::Newspaper => 'newspaperArticle',
             self::Magazine => 'magazineArticle',
+            self::PeriodicalIssue => 'document',
             self::Post => 'blogPost',
             self::Av => 'videoRecording',
+            self::Audio => 'audioRecording',
             self::Communication => 'presentation',
             self::Photo => 'artwork',
             self::Book => 'book',

@@ -95,7 +95,7 @@ class UnapiController extends AbstractActionController
 
         try {
             $item = $this->api->read('items', (int) $m[1])->getContent();
-        } catch (\Throwable $e) {
+        } catch (\Omeka\Api\Exception\NotFoundException | \Omeka\Api\Exception\PermissionDeniedException $e) {
             return null;
         }
         if (!$item instanceof ItemRepresentation) {

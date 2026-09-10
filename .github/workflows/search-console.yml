@@ -1,0 +1,70 @@
+name: Search Console monitor
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: '23 6 * * *'
+permissions:
+  contents: read
+concurrency:
+  group: search-console-monitor
+  cancel-in-progress: false
+jobs:
+  live-html:
+    if: vars.LIVE_SEO_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - run: python3 .github/scripts/live-seo.py
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: live-seo-checks
+          path: live-seo-results/
+          retention-days: 30
+  inspect:
+    if: vars.GSC_ENABLED == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    permissions:
+      contents: read
+      actions: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@v7.0.1
+        with:
+          persist-credentials: false
+      - name: Restore last observation state
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          run_id=$(gh run list --workflow search-console.yml --branch "$GITHUB_REF_NAME" --status completed --limit 1 --json databaseId --jq '.[0].databaseId // empty')
+          if [ -n "$run_id" ]; then
+            gh run download "$run_id" --name search-console-inspection --dir previous || echo 'Previous artifact unavailable; establishing a new baseline.'
+          fi
+          mkdir -p monitor-results
+          if [ -f previous/inspection.json ]; then
+            cp previous/inspection.json monitor-results/inspection.json
+          fi
+      - id: auth
+        uses: google-github-actions/auth@v3
+        with:
+          workload_identity_provider: ${{ vars.GSC_WORKLOAD_IDENTITY_PROVIDER }}
+          service_account: ${{ vars.GSC_SERVICE_ACCOUNT }}
+          token_format: access_token
+          access_token_scopes: https://www.googleapis.com/auth/webmasters.readonly
+          create_credentials_file: false
+      - name: Inspect indexed URLs and submitted sitemaps
+        env:
+          GSC_ACCESS_TOKEN: ${{ steps.auth.outputs.access_token }}
+          GSC_PROPERTY: ${{ vars.GSC_PROPERTY }}
+        run: python3 .github/scripts/search-console.py
+      - uses: actions/upload-artifact@v7.0.1
+        if: always()
+        with:
+          name: search-console-inspection
+          path: monitor-results/
+          retention-days: 30
+          if-no-files-found: warn

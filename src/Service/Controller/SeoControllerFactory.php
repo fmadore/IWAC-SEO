@@ -23,6 +23,8 @@ final class SeoControllerFactory implements FactoryInterface
             $container->get(SettingsGate::class),
             $container->get(SiteResolver::class),
             $container->get(Hreflang::class),
+            $container->get(\IwacSeo\Service\CitationData::class),
+            new \IwacSeo\Service\PingRepository($container->get('Omeka\Connection')),
         );
     }
 }

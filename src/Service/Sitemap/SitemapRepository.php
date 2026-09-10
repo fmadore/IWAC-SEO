@@ -12,9 +12,8 @@ use Doctrine\DBAL\Connection;
  * Deliberately not the ORM or the API layer — hydrating ~9k item
  * representations to emit ~9k `<loc>` elements would cost seconds and megabytes
  * for two columns per row. Every query is scoped to the site and to public
- * resources, and every one degrades to an empty result rather than throwing:
- * a sitemap that is missing a section is recoverable, a 500 on /sitemap.xml is
- * not.
+ * resources. Failures propagate to the cache/controller: never cache an empty
+ * sitemap as though a database outage meant the collection was empty.
  */
 final class SitemapRepository implements SitemapRepositoryInterface
 {
@@ -89,7 +88,11 @@ final class SitemapRepository implements SitemapRepositoryInterface
         } catch (\Throwable $e) {
             // A failing image subquery (schema drift) must not empty the
             // sitemap — retry lean before giving up.
-            return $withImages ? $this->fetchItems($siteId, $offset, $limit, false) : [];
+            error_log('IwacSeo: sitemap item query failed: ' . $e->getMessage());
+            if ($withImages) {
+                return $this->fetchItems($siteId, $offset, $limit, false);
+            }
+            throw $e;
         }
     }
 
@@ -121,7 +124,8 @@ final class SitemapRepository implements SitemapRepositoryInterface
         try {
             return (int) $this->connection->fetchOne($sql, $params);
         } catch (\Throwable $e) {
-            return 0;
+            error_log('IwacSeo: sitemap count failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 
@@ -134,7 +138,8 @@ final class SitemapRepository implements SitemapRepositoryInterface
         try {
             return $this->connection->fetchAllAssociative($sql, $params);
         } catch (\Throwable $e) {
-            return [];
+            error_log('IwacSeo: sitemap query failed: ' . $e->getMessage());
+            throw $e;
         }
     }
 }

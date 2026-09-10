@@ -35,6 +35,13 @@ final class SitemapGeneratorTest extends TestCase
         ], $locations);
     }
 
+    public function testOtherLanguagePagesAreListedWithoutAnInventedModificationDate(): void
+    {
+        $xml = $this->generator([])->buildIndex('https://example.test', 1, 0, ['westafrica'])->xml;
+        self::assertStringContainsString('https://example.test/sitemap-pages-westafrica.xml', $xml);
+        self::assertStringNotContainsString('<lastmod>', $xml);
+    }
+
     public function testPagesFollowHomepageThenNavigationThenUnlistedOrder(): void
     {
         $this->repository->pages = [

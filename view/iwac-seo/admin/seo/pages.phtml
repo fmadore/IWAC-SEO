@@ -44,6 +44,7 @@ $form->prepare();
     <?php echo $this->form()->openTag($form); ?>
     <?php echo $this->formElement($form->get('csrf')); ?>
     <input type="hidden" name="site_id" value="<?php echo (int) $site->id(); ?>">
+    <input type="hidden" name="revision" value="<?php echo $this->escapeHtmlAttr($revision); ?>">
 
     <table class="tablesaw" data-tablesaw-mode="stack">
         <thead>
@@ -69,11 +70,13 @@ $form->prepare();
                     </td>
                     <td>
                         <input type="text" name="<?php echo $this->escapeHtmlAttr($base . '[title]'); ?>"
+                            aria-label="<?php echo $this->escapeHtmlAttr($page->title() . ': ' . $this->translate('Meta title')); ?>"
                             value="<?php echo $this->escapeHtmlAttr($o['title'] ?? ''); ?>"
                             placeholder="<?php echo $this->escapeHtmlAttr($page->title()); ?>">
                     </td>
                     <td>
                         <textarea name="<?php echo $this->escapeHtmlAttr($base . '[description]'); ?>" rows="2"
+                            aria-label="<?php echo $this->escapeHtmlAttr($page->title() . ': ' . $this->translate('Meta description')); ?>"
                             placeholder="<?php echo $this->escapeHtmlAttr($this->translate('150–160 characters')); ?>"><?php echo $this->escapeHtml($o['description'] ?? ''); ?></textarea>
                     </td>
                     <td class="iwac-seo-asset">
@@ -83,11 +86,13 @@ $form->prepare();
                         // sidebar dynamically, so it works on this page as-is.
                         $assetElement = new \Omeka\Form\Element\Asset($base . '[image]');
                         $assetElement->setValue((string) ($o['image'] ?? ''));
+                        $assetElement->setAttribute('aria-label', $page->title() . ': ' . $this->translate('Share image'));
                         echo $this->formAsset($assetElement);
                         ?>
                     </td>
                     <td>
-                        <select name="<?php echo $this->escapeHtmlAttr($base . '[robots]'); ?>">
+                        <select name="<?php echo $this->escapeHtmlAttr($base . '[robots]'); ?>"
+                            aria-label="<?php echo $this->escapeHtmlAttr($page->title() . ': ' . $this->translate('Indexing')); ?>">
                             <?php foreach ($robotsOptions as $value => $label): ?>
                                 <option value="<?php echo $this->escapeHtmlAttr($value); ?>"
                                     <?php echo ($o['robots'] ?? '') === $value ? 'selected' : ''; ?>>

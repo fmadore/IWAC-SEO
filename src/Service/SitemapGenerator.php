@@ -38,6 +38,7 @@ class SitemapGenerator
         private readonly XmlCache $cache,
         private readonly array $config,
         private readonly ?string $fileBaseUri = null,
+        private readonly ?PageSeoStore $pageSeoStore = null,
     ) {
     }
 
@@ -49,16 +50,20 @@ class SitemapGenerator
 
     // ─── Index ──────────────────────────────────────────────────────────────
 
-    public function buildIndex(string $hostUrl, int $siteId, int $ttl): SitemapDocument
+    /** @param string[] $pageSites Public site slugs with their own page sitemap. */
+    public function buildIndex(string $hostUrl, int $siteId, int $ttl, array $pageSites = []): SitemapDocument
     {
-        return $this->cache->remember($this->key($siteId, 'index'), $ttl, function () use ($hostUrl, $siteId) {
+        return $this->cache->remember($this->key($siteId, 'index', $hostUrl . serialize($pageSites)), $ttl, function () use ($hostUrl, $siteId, $pageSites) {
             $children = ['sitemap-pages.xml', 'sitemap-item-sets.xml'];
+            foreach ($pageSites as $slug) {
+                $children[] = 'sitemap-pages-' . rawurlencode($slug) . '.xml';
+            }
             for ($i = 1, $n = $this->itemChunkCount($siteId); $i <= $n; $i++) {
                 $children[] = 'sitemap-items-' . $i . '.xml';
             }
             return $this->writer->renderIndex(
                 array_map(static fn (string $child): string => $hostUrl . '/' . $child, $children),
-                UrlsetWriter::now()
+                null
             );
         });
     }
@@ -81,12 +86,17 @@ class SitemapGenerator
         ?int $homepageId = null
     ): SitemapDocument {
         return $this->cache->remember(
-            $this->key($siteId, 'pages'),
+            $this->key($siteId, 'pages', $siteUrl),
             $ttl,
             function () use ($siteUrl, $siteId, $navTree, $homepageId): string {
                 // All public pages, keyed by id.
                 $pagesById = [];
+                $this->pageSeoStore?->setSite($siteId);
                 foreach ($this->repository->fetchPages($siteId) as $row) {
+                    $overrides = $this->pageSeoStore?->get((int) $row['id']) ?? [];
+                    if (!PageIndexability::allows($overrides['robots'] ?? null)) {
+                        continue;
+                    }
                     $pagesById[(int) $row['id']] = $row;
                 }
 
@@ -106,7 +116,7 @@ class SitemapGenerator
                 if ($homepageId !== null && isset($pagesById[$homepageId])) {
                     $urls[] = $pageUrl($pagesById[$homepageId], $this->priority('home'), $this->changefreq('home'));
                     $emitted[$homepageId] = true;
-                } else {
+                } elseif ($homepageId === null) {
                     $urls[] = [
                         'loc'        => $siteUrl . '/',
                         'changefreq' => $this->changefreq('home'),
@@ -149,7 +159,7 @@ class SitemapGenerator
         ?string $xDefaultBase = null
     ): SitemapDocument {
         return $this->cache->remember(
-            $this->key($siteId, 'item-sets'),
+            $this->key($siteId, 'item-sets', $siteUrl . serialize([$altBases, $xDefaultBase])),
             $ttl,
             function () use ($siteUrl, $siteId, $altBases, $xDefaultBase): string {
                 $urls = [];
@@ -181,7 +191,7 @@ class SitemapGenerator
     ): SitemapDocument {
         $chunk = max(1, $chunk);
         return $this->cache->remember(
-            $this->key($siteId, 'items-' . $chunk),
+            $this->key($siteId, 'items-' . $chunk, $siteUrl . serialize([$altBases, $xDefaultBase])),
             $ttl,
             function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase): string {
                 $size = $this->chunkSize();
@@ -218,10 +228,20 @@ class SitemapGenerator
     /** @return array{items:int,itemSets:int,pages:int} */
     public function counts(int $siteId): array
     {
+        $pageCount = $this->repository->countPages($siteId);
+        if ($this->pageSeoStore !== null) {
+            $this->pageSeoStore->setSite($siteId);
+            $pageCount = 0;
+            foreach ($this->repository->fetchPages($siteId) as $row) {
+                if (PageIndexability::allows($this->pageSeoStore->get((int) $row['id'])['robots'] ?? null)) {
+                    $pageCount++;
+                }
+            }
+        }
         return [
             'items'    => $this->repository->countItems($siteId),
             'itemSets' => $this->repository->countItemSets($siteId),
-            'pages'    => $this->repository->countPages($siteId),
+            'pages'    => $pageCount,
         ];
     }
 
@@ -303,9 +323,10 @@ class SitemapGenerator
      * Cache key, namespaced by site id. Without the site id, changing
      * `default_site` served the previous site's XML until the TTL expired.
      */
-    private function key(int $siteId, string $type): string
+    private function key(int $siteId, string $type, string $origin = ''): string
     {
-        return 'site-' . $siteId . '-' . $type;
+        return 'v2-' . substr(hash('sha256', $origin . serialize($this->config) . $this->fileBaseUri), 0, 16)
+            . '-site-' . $siteId . '-' . $type;
     }
 
     private function changefreq(string $kind): ?string

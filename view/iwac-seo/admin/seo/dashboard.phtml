@@ -30,7 +30,7 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
 <div class="active section" role="tabpanel">
 
     <?php if ($noindexSite): ?>
-    <p class="messages"><span class="message warning"><?php echo $this->translate('Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production.'); ?></span></p>
+    <p class="messages"><span class="message warning"><?php echo $this->translate('Site-wide “discourage indexing” is ON. Crawlers can fetch pages to read noindex. Turn it off in Configure for production.'); ?></span></p>
     <?php endif; ?>
 
     <h2><?php echo $this->translate('Status'); ?></h2>
@@ -75,6 +75,28 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
             </tr>
         </tbody>
     </table>
+
+    <p><?php echo $this->translate('A verification tag does not confirm Google account access or enable the GitHub Search Console monitor.'); ?></p>
+    <p><?php echo sprintf($this->translate('IndexNow queue: %1$d pending; %2$d exhausted retries.'), $queueCounts['pending'], $queueCounts['failed']); ?></p>
+    <h2><?php echo $this->translate('Citation preview'); ?></h2>
+    <form method="get">
+        <label for="citation-item-id"><?php echo $this->translate('Item ID'); ?></label>
+        <input id="citation-item-id" name="item_id" type="number" min="1" required>
+        <button type="submit"><?php echo $this->translate('Preview'); ?></button>
+    </form>
+    <?php if ($citationPreview !== null): ?>
+        <p><?php echo $this->escapeHtml($citationPreview->kind->value); ?></p>
+        <?php if ($citationMissing): ?>
+            <p><?php echo $this->translate('Missing catalogue fields:'); ?> <?php echo $this->escapeHtml(implode(', ', $citationMissing)); ?></p>
+        <?php endif; ?>
+        <?php $formatter = new \IwacSeo\Service\CitationFormatter(); ?>
+        <?php foreach (['en', 'fr'] as $locale): ?>
+            <?php foreach ($formatter::STYLES as $style): ?>
+                <p><strong><?php echo $this->escapeHtml(strtoupper($style) . ' (' . $locale . ')'); ?></strong><br>
+                    <?php echo $formatter->format($citationPreview, $style, $locale); ?></p>
+            <?php endforeach; ?>
+        <?php endforeach; ?>
+    <?php endif; ?>
 
     <?php if ($sitemapEnabled && $sitemapUrl): ?>
     <h2><?php echo $this->translate('Sitemap'); ?></h2>

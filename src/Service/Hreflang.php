@@ -141,7 +141,7 @@ class Hreflang
             } catch (\Throwable $e) {
                 continue;
             }
-            $out[] = ['lang' => (string) $lang, 'href' => $href, 'slug' => (string) $slug];
+            $out[] = ['lang' => (string) $lang, 'href' => UrlPolicy::publicUrl($href), 'slug' => (string) $slug];
         }
         return $out;
     }

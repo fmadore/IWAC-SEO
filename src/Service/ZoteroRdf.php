@@ -62,7 +62,9 @@ class ZoteroRdf
     private const ELIGIBLE_KINDS = [
         CitationKind::Newspaper,
         CitationKind::Magazine,
+        CitationKind::PeriodicalIssue,
         CitationKind::Av,
+        CitationKind::Audio,
         CitationKind::Document,
         CitationKind::Photo,
     ];
@@ -102,6 +104,10 @@ class ZoteroRdf
         }
 
         $bibType = $this->bibType($kind);
+        $record = (new CitationData($this->kinds))->build($item, $canonical);
+        if ($record === null) {
+            return null;
+        }
         $props = [];
 
         $props[] = $this->el('z:itemType', $kind->zoteroItemType());
@@ -111,15 +117,19 @@ class ZoteroRdf
             $props[] = $creator;
         }
 
-        $props[] = $this->el('dc:date', $this->firstString($item, self::DATE_TERMS));
+        $props[] = $this->el('dc:date', $record->issued->iso() ?? $record->issued->literal);
         $props[] = $this->el('dc:language', $this->firstLabel($item, 'dcterms:language'));
 
         // Only the periodical kinds carry a container (publication) + issue/pages.
-        if ($kind === CitationKind::Newspaper || $kind === CitationKind::Magazine) {
+        if (in_array($kind, [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::PeriodicalIssue], true)) {
             $props[] = $this->el('prism:publicationName', $this->firstLabel($item, 'dcterms:publisher'));
             $props[] = $this->el('prism:volume', $this->firstString($item, ['bibo:volume']));
-            $props[] = $this->el('prism:number', $this->firstString($item, ['bibo:issue']));
+            $props[] = $this->el('prism:number', $record->issue);
             $props[] = $this->el('bib:pages', $this->pageRange($item));
+        }
+        $props[] = $this->el('dc:publisher', $record->publisher);
+        foreach ($record->editors as $editor) {
+            $props[] = $this->el('bib:editors', $editor->literal);
         }
 
         $abstract = $this->firstString($item, self::ABSTRACT_TERMS);
@@ -192,17 +202,22 @@ class ZoteroRdf
                 if (!$value instanceof ValueRepresentation) {
                     continue;
                 }
-                $linked = $value->valueResource();
-                $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-                if ($label === '') {
+                $creator = MetadataValue::creator($value, $this->kinds);
+                if ($creator === null) {
                     continue;
                 }
-                if ($this->kinds->isOrganization($linked)) {
+                $label = $creator->literal;
+                if ($creator->isInstitution) {
                     // foaf:Person with only a surname → fieldMode 1 (not split).
                     $out[] = sprintf(
                         '<dcterms:creator><foaf:Person><foaf:surname>%s</foaf:surname></foaf:Person></dcterms:creator>',
                         $this->esc($label)
                     );
+                } elseif ($creator->family !== null && $creator->given !== null) {
+                    $out[] = '<dcterms:creator><foaf:Person>'
+                        . $this->el('foaf:surname', $creator->family)
+                        . $this->el('foaf:givenName', $creator->given)
+                        . '</foaf:Person></dcterms:creator>';
                 } else {
                     // Literal → Zotero's cleanAuthor splits it (persons), exactly
                     // as the citation_author / DC.creator meta path does.

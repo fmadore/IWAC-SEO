@@ -81,6 +81,9 @@ jobs:
       - name: Validate Composer metadata
         run: composer validate --strict
 
+      - name: Test Search Console monitor without credentials
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
       - name: Locate Composer cache
         id: composer-cache
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
@@ -156,7 +159,7 @@ jobs:
         with:
           php-version: '8.5'
           coverage: none
-          extensions: mbstring, pdo_mysql
+          extensions: mbstring, pdo_mysql, pdo_sqlite
 
       - name: Locate Composer cache
         id: composer-cache

@@ -12,3 +12,7 @@ Thumbs.db
 
 # PHPUnit
 /.phpunit.cache/
+__pycache__/
+/monitor-results/
+/live-seo-results/
+/previous/

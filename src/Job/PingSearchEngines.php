@@ -13,10 +13,7 @@ use Omeka\Job\AbstractJob;
  * public items/pages change) and submits it to IndexNow. Runs asynchronously so
  * the saving request is never blocked by the network call.
  *
- * If the queue is at the flood cap the change almost certainly came from a bulk
- * sync, so the ping is skipped — those URLs are discovered through the sitemap
- * instead, and IndexNow is reserved for genuine incremental edits. The cap is
- * PingQueue's, so the queue and its drain can no longer disagree about it.
+ * Leases survive worker failures. Only accepted batches are acknowledged.
  */
 class PingSearchEngines extends AbstractJob
 {
@@ -35,30 +32,31 @@ class PingSearchEngines extends AbstractJob
             return;
         }
 
-        $urls = $queue->drain();
+        $batch = $queue->claim();
+        $urls = array_column($batch, 'url');
         if ($urls === []) {
             return;
         }
-        if ($queue->isBulk($urls)) {
-            $logger->info(sprintf(
-                'IwacSeo: skipped IndexNow ping for a bulk change (%d URLs); the sitemap covers discovery.',
-                count($urls)
-            ));
-            return;
+        $groups = [];
+        foreach ($batch as $row) {
+            $origin = \IwacSeo\Service\SiteResolver::hostFromUrl($row['url']);
+            $groups[$origin][] = $row;
         }
-
-        $host = (string) (parse_url($urls[0], PHP_URL_HOST) ?: '');
-        $scheme = (string) (parse_url($urls[0], PHP_URL_SCHEME) ?: 'https');
-        if ($host === '') {
-            return;
+        foreach ($groups as $origin => $rows) {
+            $host = (string) parse_url($origin, PHP_URL_HOST);
+            try {
+                $ok = $services->get(Pinger::class)->submitIndexNow(
+                    $host,
+                    $key,
+                    $origin . '/' . $key . '.txt',
+                    array_column($rows, 'url')
+                );
+            } catch (\Throwable $error) {
+                $ok = false;
+                $logger->err('IwacSeo: IndexNow transport failed: ' . $error->getMessage());
+            }
+            $queue->finish($rows, $ok);
+            $logger->info(sprintf('IwacSeo: IndexNow ping %s for %d URL(s).', $ok ? 'accepted' : 'failed', count($rows)));
         }
-        $keyLocation = $scheme . '://' . $host . '/' . $key . '.txt';
-
-        $ok = $services->get(Pinger::class)->submitIndexNow($host, $key, $keyLocation, $urls);
-        $logger->info(sprintf(
-            'IwacSeo: IndexNow ping %s for %d URL(s).',
-            $ok ? 'accepted' : 'failed',
-            count($urls)
-        ));
     }
 }

@@ -52,6 +52,9 @@ final class CitationExport
     {
         $kind = $record->kind;
         $type = $kind->bibtexType();
+        if ($kind === CitationKind::Thesis && preg_match('/doctor|ph\.?d/i', $record->genre ?? '')) {
+            $type = 'phdthesis';
+        }
         $key = $this->citeKey($record);
 
         $fields = [];
@@ -74,6 +77,7 @@ final class CitationExport
             case CitationKind::Review:
             case CitationKind::Newspaper:
             case CitationKind::Magazine:
+            case CitationKind::PeriodicalIssue:
                 $this->addField($fields, 'journal', $record->container);
                 break;
             case CitationKind::Chapter:
@@ -97,19 +101,30 @@ final class CitationExport
         if ($record->issued->hasYear()) {
             $fields['year'] = (string) $record->issued->year;
         }
+        $this->addField($fields, 'date', $record->issued->iso());
+        if (!$record->issued->hasYear()) {
+            $this->addField($fields, 'note', $record->issued->literal);
+        }
+        foreach (
+            ['type' => $record->genre, 'eventtitle' => $record->eventTitle,
+            'venue' => $record->eventPlace, 'edition' => $record->edition,
+            'isbn' => $record->isbn, 'issn' => $record->issn] as $field => $value
+        ) {
+            $this->addField($fields, $field, $value);
+        }
         $this->addField($fields, 'volume', $record->volume);
-        $this->addField($fields, 'number', $record->issue);
+        $this->addField($fields, 'number', $record->number ?? $record->issue);
         $pages = $record->pageRange();
         if ($pages !== null) {
-            $fields['pages'] = str_replace('-', '--', $pages);
+            $fields['pages'] = $this->bibtexEscape(preg_replace('/[-–]+/u', '--', $pages) ?? $pages);
         }
         // DOI/URL are verbatim fields — do NOT LaTeX-escape them (the French site
         // slug "afrique_ouest" carries an underscore biber must read literally).
         if ($record->doi !== null) {
-            $fields['doi'] = $record->doi;
+            $fields['doi'] = $this->verbatim($record->doi);
         }
         if ($record->url !== null) {
-            $fields['url'] = $record->url;
+            $fields['url'] = $this->verbatim($record->sourceUrl ?? $record->url);
         }
         $this->addField($fields, 'language', $record->language);
         if ($record->keywords !== []) {
@@ -160,13 +175,15 @@ final class CitationExport
 
     private function bibtexEscape(string $text): string
     {
-        // Escape the LaTeX specials that would otherwise break a value. Braces
-        // are left intact (used deliberately around titles / corporate names).
-        return str_replace(
-            ['\\', '&', '%', '$', '#', '_', '~', '^'],
-            ['\\textbackslash{}', '\\&', '\\%', '\\$', '\\#', '\\_', '\\textasciitilde{}', '\\textasciicircum{}'],
-            $text
-        );
+        // Structural braces are added by the caller, never read from metadata.
+        return strtr($text, ['\\' => '\\textbackslash{}', '&' => '\\&', '%' => '\\%',
+            '$' => '\\$', '#' => '\\#', '_' => '\\_', '~' => '\\textasciitilde{}',
+            '^' => '\\textasciicircum{}', '{' => '\\{', '}' => '\\}']);
+    }
+
+    private function verbatim(string $text): string
+    {
+        return strtr($text, ['{' => '%7B', '}' => '%7D', "\r" => '', "\n" => '', '\\' => '%5C']);
     }
 
     // ─── RIS ─────────────────────────────────────────────────────────────────
@@ -194,12 +211,22 @@ final class CitationExport
             $lines[] = $this->risLine('PY', (string) $record->issued->year);
             $lines[] = $this->risLine('DA', $this->risDate($record->issued));
         }
+        if ($record->issued->end !== null || !$record->issued->hasYear()) {
+            $lines[] = $this->risLine('N1', $record->issued->literal);
+        }
+        $lines[] = $this->risLine('M3', $record->genre);
+        $lines[] = $this->risLine('C1', $record->eventTitle);
+        $lines[] = $this->risLine('CY', $record->eventPlace);
+        $lines[] = $this->risLine('M1', $record->number);
+        $lines[] = $this->risLine('ET', $record->edition);
+        $lines[] = $this->risLine('SN', $record->isbn ?? $record->issn);
+        $lines[] = $this->risLine('AN', $record->accession);
         $lines[] = $this->risLine('VL', $record->volume);
         $lines[] = $this->risLine('IS', $record->issue);
         $lines[] = $this->risLine('SP', $record->pageFirst);
         $lines[] = $this->risLine('EP', $record->pageLast);
         $lines[] = $this->risLine('DO', $record->doi);
-        $lines[] = $this->risLine('UR', $record->url);
+        $lines[] = $this->risLine('UR', $record->sourceUrl ?? $record->url);
         $lines[] = $this->risLine('LA', $record->language);
         foreach ($record->keywords as $keyword) {
             $lines[] = $this->risLine('KW', $keyword);
@@ -285,15 +312,26 @@ final class CitationExport
         if ($pages !== null) {
             $item['page'] = $pages;
         }
-        $dateParts = $this->cslDateParts($record->issued);
-        if ($dateParts) {
-            $item['issued'] = ['date-parts' => [$dateParts]];
+        $date = $record->issued->csl();
+        if ($date) {
+            $item['issued'] = $date;
+        }
+        foreach (
+            ['genre' => $record->genre, 'event-title' => $record->eventTitle,
+            'event-place' => $record->eventPlace, 'medium' => $record->medium,
+            'number' => $record->number, 'edition' => $record->edition,
+            'reviewed-title' => $record->reviewedTitle, 'archive' => $record->archive,
+            'call-number' => $record->accession, 'ISBN' => $record->isbn, 'ISSN' => $record->issn] as $field => $value
+        ) {
+            if ($value !== null) {
+                $item[$field] = $value;
+            }
         }
         if ($record->doi !== null) {
             $item['DOI'] = $record->doi;
         }
-        if ($record->url !== null) {
-            $item['URL'] = $record->url;
+        if ($record->sourceUrl !== null || $record->url !== null) {
+            $item['URL'] = $record->sourceUrl ?? $record->url;
         }
         if ($record->language !== null) {
             $item['language'] = $record->language;
@@ -331,22 +369,6 @@ final class CitationExport
             $out[] = $name;
         }
         return $out;
-    }
-
-    /** @return array<int,int> date-parts [year(,month(,day))] or [] */
-    private function cslDateParts(IssuedDate $issued): array
-    {
-        if (!$issued->hasYear()) {
-            return [];
-        }
-        $parts = [(int) $issued->year];
-        if ($issued->month !== null) {
-            $parts[] = $issued->month;
-            if ($issued->day !== null) {
-                $parts[] = $issued->day;
-            }
-        }
-        return $parts;
     }
 
     private function addField(array &$fields, string $name, ?string $value): void

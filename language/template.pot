@@ -21,6 +21,10 @@ msgstr ""
 msgid "A 8–128 character hex key you choose. The module serves it at /{key}.txt so IndexNow can verify ownership. Generate one with: openssl rand -hex 16."
 msgstr ""
 
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "A verification tag does not confirm Google account access or enable the GitHub Search Console monitor."
+msgstr ""
+
 #: src/Form/ConfigForm.php
 msgid "Adds Highwire Press (citation_*) and Dublin Core (DC.*) <meta> tags to resource pages so the Zotero Connector, Google Scholar and reference managers capture each item as a proper reference. Recommended."
 msgstr ""
@@ -33,6 +37,10 @@ msgstr ""
 msgid "Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended."
 msgstr ""
 
+#: src/Controller/Admin/SeoController.php
+msgid "Another editor changed these settings. Reload the page before saving."
+msgstr ""
+
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Bilingual (hreflang) coverage"
 msgstr ""
@@ -43,6 +51,10 @@ msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Broken alternate links"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Citation preview"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
@@ -122,6 +134,10 @@ msgstr ""
 msgid "IndexNow ping"
 msgstr ""
 
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "IndexNow queue: %1$d pending; %2$d exhausted retries."
+msgstr ""
+
 #: view/iwac-seo/admin/seo/pages.phtml
 msgid "Indexing"
 msgstr ""
@@ -130,8 +146,16 @@ msgstr ""
 msgid "Invalid form submission."
 msgstr ""
 
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Item ID"
+msgstr ""
+
+#: src/Controller/Admin/SeoController.php
+msgid "Item not found."
+msgstr ""
+
 #: src/Form/ConfigForm.php
-msgid "Keeps faceted and paginated browse URLs out of the index (they add little and dilute crawl budget) while still letting crawlers follow links to the resource pages. Recommended."
+msgid "Keeps search, filter and sort variants out of the index. Clean pagination remains indexable and tracking parameters are removed from canonical URLs."
 msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml
@@ -140,6 +164,10 @@ msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml
 msgid "Meta title"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Missing catalogue fields:"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
@@ -155,7 +183,7 @@ msgid "Noindex"
 msgstr ""
 
 #: src/Form/ConfigForm.php
-msgid "Noindex filtered / paginated browse pages"
+msgid "Noindex filtered browse pages"
 msgstr ""
 
 #: src/Form/ConfigForm.php
@@ -198,6 +226,10 @@ msgstr ""
 msgid "Ping IndexNow when content changes"
 msgstr ""
 
+#: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "Preview"
+msgstr ""
+
 #: config/module.config.php
 #: view/iwac-seo/admin/seo/dashboard.phtml
 #: view/iwac-seo/admin/seo/pages.phtml
@@ -225,7 +257,7 @@ msgid "Site"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
-msgid "Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production."
+msgid "Site-wide “discourage indexing” is ON. Crawlers can fetch pages to read noindex. Turn it off in Configure for production."
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
@@ -241,7 +273,7 @@ msgid "Sitemap cache lifetime (seconds)"
 msgstr ""
 
 #: src/Form/ConfigForm.php
-msgid "Staging switch. When on, every page gets robots \"noindex, nofollow\" and robots.txt disallows everything. Turn OFF in production."
+msgid "Staging switch. Every page gets noindex, nofollow; crawlers can fetch that directive. Use authentication for private staging. Turn OFF in production."
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml

@@ -74,7 +74,7 @@ class CitationController extends AbstractActionController
     {
         try {
             $item = $this->api->read('items', $id)->getContent();
-        } catch (\Throwable $e) {
+        } catch (\Omeka\Api\Exception\NotFoundException | \Omeka\Api\Exception\PermissionDeniedException $e) {
             return null;
         }
         if (!$item instanceof ItemRepresentation) {

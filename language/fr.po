@@ -246,3 +246,39 @@ msgstr "pointe vers %s, qui n’est pas une page publique"
 
 msgid "schema.org JSON-LD"
 msgstr "JSON-LD schema.org"
+
+msgid "Another editor changed these settings. Reload the page before saving."
+msgstr "Une autre personne a modifié ces paramètres. Rechargez la page avant d’enregistrer."
+
+msgid "Item not found."
+msgstr "Contenu introuvable."
+
+msgid "Site-wide “discourage indexing” is ON. Crawlers can fetch pages to read noindex. Turn it off in Configure for production."
+msgstr "L’option « décourager l’indexation » est activée pour tout le site. Les robots peuvent lire la directive noindex. Désactivez-la dans Configurer pour la production."
+
+msgid "A verification tag does not confirm Google account access or enable the GitHub Search Console monitor."
+msgstr "Une balise de vérification ne confirme pas l’accès au compte Google et n’active pas le suivi Search Console dans GitHub."
+
+msgid "IndexNow queue: %1$d pending; %2$d exhausted retries."
+msgstr "File IndexNow : %1$d en attente ; %2$d ayant épuisé les tentatives."
+
+msgid "Citation preview"
+msgstr "Aperçu des références"
+
+msgid "Item ID"
+msgstr "Identifiant du contenu"
+
+msgid "Preview"
+msgstr "Aperçu"
+
+msgid "Missing catalogue fields:"
+msgstr "Champs manquants dans le catalogue :"
+
+msgid "Staging switch. Every page gets noindex, nofollow; crawlers can fetch that directive. Use authentication for private staging. Turn OFF in production."
+msgstr "Option de préproduction. Chaque page porte noindex, nofollow, que les robots peuvent lire. Utilisez une authentification pour une préproduction privée. Désactivez en production."
+
+msgid "Noindex filtered browse pages"
+msgstr "Ne pas indexer les pages de navigation filtrées"
+
+msgid "Keeps search, filter and sort variants out of the index. Clean pagination remains indexable and tracking parameters are removed from canonical URLs."
+msgstr "Exclut de l’index les variantes de recherche, de filtre et de tri. La pagination reste indexable et les paramètres de suivi sont retirés des URL canoniques."

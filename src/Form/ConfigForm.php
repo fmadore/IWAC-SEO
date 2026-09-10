@@ -84,7 +84,7 @@ class ConfigForm extends Form
             'type'    => Element\Checkbox::class,
             'options' => [
                 'label' => 'Discourage search engines from indexing the whole site', // @translate
-                'info'  => 'Staging switch. When on, every page gets robots "noindex, nofollow" and robots.txt disallows everything. Turn OFF in production.', // @translate
+                'info'  => 'Staging switch. Every page gets noindex, nofollow; crawlers can fetch that directive. Use authentication for private staging. Turn OFF in production.', // @translate
             ],
             'attributes' => ['id' => 'iwac_seo_noindex_site'],
         ]);
@@ -93,8 +93,8 @@ class ConfigForm extends Form
             'name'    => 'iwac_seo_noindex_browse',
             'type'    => Element\Checkbox::class,
             'options' => [
-                'label' => 'Noindex filtered / paginated browse pages', // @translate
-                'info'  => 'Keeps faceted and paginated browse URLs out of the index (they add little and dilute crawl budget) while still letting crawlers follow links to the resource pages. Recommended.', // @translate
+                'label' => 'Noindex filtered browse pages', // @translate
+                'info'  => 'Keeps search, filter and sort variants out of the index. Clean pagination remains indexable and tracking parameters are removed from canonical URLs.', // @translate
             ],
             'attributes' => ['id' => 'iwac_seo_noindex_browse'],
         ]);

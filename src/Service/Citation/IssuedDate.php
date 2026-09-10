@@ -19,6 +19,7 @@ final class IssuedDate
         public readonly ?int $month = null,
         public readonly ?int $day = null,
         public readonly ?string $literal = null,
+        public readonly ?self $end = null,
     ) {
     }
 
@@ -28,8 +29,7 @@ final class IssuedDate
     }
 
     /**
-     * Parse a stored timestamp. Anything with a four-digit year yields its
-     * parts; anything else is preserved as a literal.
+     * Parse a calendar-valid partial date or interval. Other values remain literal.
      */
     public static function parse(string $raw): self
     {
@@ -37,7 +37,21 @@ final class IssuedDate
         if ($raw === '') {
             return self::unknown();
         }
-        if (preg_match('/(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?/', $raw, $m)) {
+        if (str_contains($raw, '/')) {
+            $parts = explode('/', $raw);
+            if (count($parts) === 2) {
+                $start = self::parse($parts[0]);
+                $end = self::parse($parts[1]);
+                if ($start->hasYear() && $end->hasYear() && strcmp($start->iso() ?? '', $end->iso() ?? '') <= 0) {
+                    return new self($start->year, $start->month, $start->day, $raw, $end);
+                }
+            }
+            return new self(literal: $raw);
+        }
+        if (preg_match('/^(\d{4})(?:-(\d{1,2})(?:-(\d{1,2}))?)?$/D', $raw, $m)) {
+            if (!checkdate((int) ($m[2] ?? 1), (int) ($m[3] ?? 1), (int) $m[1])) {
+                return new self(literal: $raw);
+            }
             return new self(
                 (int) $m[1],
                 ($m[2] ?? '') !== '' ? (int) $m[2] : null,
@@ -51,7 +65,39 @@ final class IssuedDate
     /** The year as a string, falling back to the raw literal, else null. */
     public function yearOrLiteral(): ?string
     {
+        if ($this->end !== null) {
+            return $this->literal;
+        }
         return $this->year !== null ? (string) $this->year : $this->literal;
+    }
+
+    /** ISO date preserving the precision and optional range. */
+    public function iso(): ?string
+    {
+        if (!$this->hasYear()) {
+            return null;
+        }
+        $value = sprintf('%04d', $this->year);
+        if ($this->month !== null) {
+            $value .= sprintf('-%02d', $this->month);
+            if ($this->day !== null) {
+                $value .= sprintf('-%02d', $this->day);
+            }
+        }
+        return $value . ($this->end !== null ? '/' . $this->end->iso() : '');
+    }
+
+    /** @return array<string,mixed> CSL date object, including unparsed literals. */
+    public function csl(): array
+    {
+        if (!$this->hasYear()) {
+            return $this->literal !== null ? ['literal' => $this->literal] : [];
+        }
+        $parts = [array_values(array_filter([$this->year, $this->month, $this->day], static fn ($v) => $v !== null))];
+        if ($this->end !== null) {
+            $parts[] = array_values(array_filter([$this->end->year, $this->end->month, $this->end->day], static fn ($v) => $v !== null));
+        }
+        return ['date-parts' => $parts];
     }
 
     public function hasYear(): bool
@@ -59,7 +105,7 @@ final class IssuedDate
         return $this->year !== null;
     }
 
-    /** @return array{year:?int,month:?int,day:?int,literal:?string} */
+    /** @return array<string,mixed> */
     public function toArray(): array
     {
         return [
@@ -67,7 +113,7 @@ final class IssuedDate
             'month'   => $this->month,
             'day'     => $this->day,
             'literal' => $this->literal,
-        ];
+        ] + ($this->end !== null ? ['end' => $this->end->toArray()] : []);
     }
 
     /** @param array<string,mixed> $data the inverse of {@see toArray()} */
@@ -78,6 +124,7 @@ final class IssuedDate
             isset($data['month']) ? (int) $data['month'] : null,
             isset($data['day']) ? (int) $data['day'] : null,
             isset($data['literal']) ? (string) $data['literal'] : null,
+            isset($data['end']) && is_array($data['end']) ? self::fromArray($data['end']) : null,
         );
     }
 }

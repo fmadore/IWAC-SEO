@@ -29,13 +29,13 @@ final class UrlsetWriter
      *
      * @param string[] $childUrls absolute URLs of the child sitemaps
      */
-    public function renderIndex(array $childUrls, string $lastmod): string
+    public function renderIndex(array $childUrls, ?string $lastmod = null): string
     {
         $xml = '<?xml version="1.0" encoding="UTF-8"?>' . "\n"
             . '<sitemapindex xmlns="' . self::XMLNS . '">' . "\n";
         foreach ($childUrls as $url) {
             $xml .= '  <sitemap><loc>' . $this->esc($url) . '</loc>'
-                . '<lastmod>' . $this->esc($lastmod) . '</lastmod></sitemap>' . "\n";
+                . ($lastmod !== null ? '<lastmod>' . $this->esc($lastmod) . '</lastmod>' : '') . '</sitemap>' . "\n";
         }
         return $xml . '</sitemapindex>' . "\n";
     }
@@ -73,7 +73,11 @@ final class UrlsetWriter
             $xml .= '</url>' . "\n";
         }
 
-        return $xml . '</urlset>' . "\n";
+        $xml .= '</urlset>' . "\n";
+        if (strlen($xml) > 50 * 1024 * 1024 || count($urls) > 50000) {
+            throw new \LengthException('Sitemap exceeds protocol limits; reduce item_chunk_size.');
+        }
+        return $xml;
     }
 
     /**

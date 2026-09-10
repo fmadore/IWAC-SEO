@@ -59,7 +59,7 @@ final class CitationData
      *
      * @param string|null $url the item's public (canonical) page URL
      */
-    public function build(ItemRepresentation $item, ?string $url = null): ?CitationRecord
+    public function build(ItemRepresentation $item, ?string $url = null, ?string $locale = null): ?CitationRecord
     {
         $kind = $this->kinds->forResource($item);
         if ($kind->isAuthorityRecord()) {
@@ -69,7 +69,7 @@ final class CitationData
         // dcterms:publisher is the one container field; route it to the slot the
         // kind needs, mirroring CitationMeta's per-kind branches.
         $container = $this->firstLabel($item, 'dcterms:publisher');
-        $abstract = $this->firstString($item, self::ABSTRACT_TERMS);
+        $abstract = MetadataValue::select($item, self::ABSTRACT_TERMS, $locale);
 
         return new CitationRecord(
             id: $item->id(),
@@ -84,15 +84,26 @@ final class CitationData
                 ? $this->firstString($item, ['dcterms:alternative'])
                 : null,
             volume: $this->firstString($item, ['bibo:volume']),
-            issue: $this->firstString($item, ['bibo:issue']),
+            issue: implode('–', $this->labels($item, 'bibo:issue')) ?: null,
             pageFirst: $this->firstString($item, ['bibo:pageStart']),
             pageLast: $this->firstString($item, ['bibo:pageEnd']),
             doi: $this->doi($item),
             url: ($url !== null && $url !== '') ? $url : null,
-            language: $this->firstLabel($item, 'dcterms:language'),
+            language: MetadataValue::language($this->firstLabel($item, 'dcterms:language')),
             abstract: $abstract !== null ? $this->clip($abstract) : null,
             keywords: $this->keywords($item),
             accession: $this->cote($item),
+            genre: $this->firstLabel($item, 'dcterms:type'),
+            eventTitle: $kind === CitationKind::Communication ? $this->firstLabel($item, 'dcterms:isPartOf') : null,
+            eventPlace: $kind === CitationKind::Communication ? $this->firstLabel($item, 'dcterms:spatial') : null,
+            sourceUrl: MetadataValue::url($this->firstString($item, ['fabio:hasURL'])),
+            medium: $this->firstLabel($item, 'dcterms:medium'),
+            number: $this->firstString($item, ['bibo:number']),
+            edition: $this->firstString($item, ['bibo:edition']),
+            reviewedTitle: $this->firstLabel($item, 'bibo:reviewOf'),
+            archive: $this->cote($item) !== null ? 'Islam West Africa Collection' : null,
+            isbn: $this->firstString($item, ['bibo:isbn13', 'bibo:isbn10', 'bibo:isbn']),
+            issn: $this->firstString($item, ['bibo:issn']),
         );
     }
 
@@ -108,7 +119,8 @@ final class CitationData
     {
         return match ($kind) {
             CitationKind::Chapter, CitationKind::Book,
-            CitationKind::Thesis, CitationKind::Report => 'publisher',
+            CitationKind::Thesis, CitationKind::Report, CitationKind::Av, CitationKind::Audio,
+            CitationKind::Photo, CitationKind::Document => 'publisher',
             default => 'container',
         };
     }
@@ -131,12 +143,10 @@ final class CitationData
                 if (!$value instanceof ValueRepresentation) {
                     continue;
                 }
-                $linked = $value->valueResource();
-                $label = $linked ? (string) $linked->displayTitle() : trim(strip_tags((string) $value));
-                if ($label === '') {
-                    continue;
+                $creator = MetadataValue::creator($value, $this->kinds);
+                if ($creator !== null) {
+                    $out[] = $creator;
                 }
-                $out[] = Creator::parse($label, $this->kinds->isOrganization($linked));
             }
             if ($out) {
                 return $out;
@@ -153,20 +163,7 @@ final class CitationData
      */
     private function issued(ItemRepresentation $item): IssuedDate
     {
-        foreach (self::DATE_TERMS as $term) {
-            $value = $item->value($term);
-            if (!$value instanceof ValueRepresentation) {
-                continue;
-            }
-            $raw = trim((string) $value->value());
-            if ($raw === '') {
-                $raw = trim(strip_tags((string) $value));
-            }
-            if ($raw !== '') {
-                return IssuedDate::parse($raw);
-            }
-        }
-        return IssuedDate::unknown();
+        return IssuedDate::parse(MetadataValue::select($item, MetadataValue::DATE_TERMS) ?? '');
     }
 
     // doi(), cote() and clip() live in the shared ResourceValueReader trait.

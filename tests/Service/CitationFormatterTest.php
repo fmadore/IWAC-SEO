@@ -171,7 +171,7 @@ final class CitationFormatterTest extends TestCase
         ]);
 
         $this->assertSame(
-            'Madore, Frédérick. “Islam politique.” PhD diss., Université Laval, 2018.',
+            'Madore, Frédérick. “Islam politique.” Thesis, Université Laval, 2018.',
             $this->formatter->format($record, 'chicago', 'en')
         );
     }

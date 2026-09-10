@@ -31,8 +31,10 @@ class PageSeoStore
     /** The site id $cached belongs to, so a switch invalidates it. */
     private ?int $cachedSiteId = null;
 
-    public function __construct(private readonly SiteSettings $siteSettings)
-    {
+    public function __construct(
+        private readonly SiteSettings $siteSettings,
+        private readonly ?\Doctrine\DBAL\Connection $connection = null,
+    ) {
     }
 
     public function setSite(int $siteId): void
@@ -66,5 +68,38 @@ class PageSeoStore
     {
         $this->siteSettings->set(self::KEY, $map);
         $this->cached = $map;
+    }
+
+    public function revision(): string
+    {
+        return hash('sha256', json_encode($this->all(), JSON_THROW_ON_ERROR));
+    }
+
+    /** Compare the submitted revision under a site-row lock, including the first save.
+     * @param array<int,array<string,mixed>> $map
+     */
+    public function save(array $map, string $revision): bool
+    {
+        if ($this->connection === null) {
+            if (!hash_equals($this->revision(), $revision)) {
+                return false;
+            }
+            $this->replaceAll($map);
+            return true;
+        }
+        return $this->connection->transactional(function () use ($map, $revision): bool {
+            $lock = $this->connection->getDatabasePlatform()->getForUpdateSQL();
+            $this->connection->fetchOne('SELECT id FROM site WHERE id = ? ' . $lock, [$this->cachedSiteId]);
+            $raw = $this->connection->fetchOne(
+                'SELECT value FROM site_setting WHERE site_id = ? AND id = ?',
+                [$this->cachedSiteId, self::KEY]
+            );
+            $current = $raw === false ? [] : json_decode($raw, true, 512, JSON_THROW_ON_ERROR);
+            if (!hash_equals(hash('sha256', json_encode($current, JSON_THROW_ON_ERROR)), $revision)) {
+                return false;
+            }
+            $this->replaceAll($map);
+            return true;
+        });
     }
 }

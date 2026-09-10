@@ -30,6 +30,7 @@ final class SitemapGeneratorFactory implements FactoryInterface
             new XmlCache($cacheDir),
             is_array($sitemapConfig) ? $sitemapConfig : [],
             is_string($fileBaseUri) && $fileBaseUri !== '' ? $fileBaseUri : null,
+            $container->get(PageSeoStore::class),
         );
     }
 }
