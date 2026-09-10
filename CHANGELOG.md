@@ -3,6 +3,13 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.1.1 — 2026-09-10
+
+- Fix installation and upgrades failing with `Class "IwacSeo\Service\PingRepository" not found`. Load the lifecycle dependencies explicitly because Omeka has not registered an inactive module's service autoloader.
+- Add isolated installation and upgrade regression tests, including legacy pending-URL migration and repeated execution.
+
+If the 1.1.0 upgrade failed, replace the module files with this release and retry **Upgrade**. Keep the module installed; do not uninstall it or remove its settings.
+
 ## 1.1.0 — 2026-09-10
 
 - Preserve citation date intervals, combined issues, explicit thesis types, event details, original URLs, media kinds, editions and archive identifiers. Share public raw-value and locale selection; retain structured authority names.

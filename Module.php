@@ -87,6 +87,7 @@ class Module extends AbstractModule
 
     public function install(ServiceLocatorInterface $services): void
     {
+        $this->loadLifecycleDependencies();
         $this->applyDefaults($services->get('Omeka\Settings'));
         (new Service\PingRepository($services->get('Omeka\Connection')))->install();
     }
@@ -105,6 +106,7 @@ class Module extends AbstractModule
         $newVersion,
         ServiceLocatorInterface $services
     ): void {
+        $this->loadLifecycleDependencies();
         $this->applyDefaults($services->get('Omeka\Settings'));
         $repository = new Service\PingRepository($services->get('Omeka\Connection'));
         $repository->install();
@@ -113,6 +115,14 @@ class Module extends AbstractModule
             $repository->push((string) $url);
         }
         $settings->delete('iwac_seo_ping_pending');
+    }
+
+    private function loadLifecycleDependencies(): void
+    {
+        // Omeka invokes install/upgrade while this module is inactive: its src/
+        // namespace and services have not been registered for the request yet.
+        require_once __DIR__ . '/src/Service/MetadataValue.php';
+        require_once __DIR__ . '/src/Service/PingRepository.php';
     }
 
     public function uninstall(ServiceLocatorInterface $services): void
