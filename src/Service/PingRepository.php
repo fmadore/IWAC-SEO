@@ -81,6 +81,16 @@ final class PingRepository
         }
     }
 
+    /** Whether any URL is due for submission now (not leased, not backing off, not exhausted). */
+    public function hasDue(?int $now = null): bool
+    {
+        $now ??= time();
+        return (bool) $this->connection->fetchOne(
+            'SELECT 1 FROM iwac_seo_ping WHERE available_at <= :now AND lease_until <= :now AND attempts < 5 LIMIT 1',
+            ['now' => $now]
+        );
+    }
+
     /** @return array{pending:int,failed:int} */
     public function counts(): array
     {

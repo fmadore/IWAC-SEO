@@ -35,6 +35,25 @@ final class UrlPolicy
         return $params !== [];
     }
 
+    /**
+     * Whether $url names this deployment: the host the request arrived on, or
+     * the pinned public origin's host. Behind a proxy that rewrites Host the
+     * two differ, and the page's own canonical carries the public one.
+     */
+    public static function isOwnHost(string $url, ?string $requestHost): bool
+    {
+        $host = parse_url($url, PHP_URL_HOST);
+        if (!is_string($host) || $host === '') {
+            return false;
+        }
+        foreach ([$requestHost, parse_url(self::publicUrl('/'), PHP_URL_HOST)] as $own) {
+            if (is_string($own) && strcasecmp($host, $own) === 0) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     /** Pin the deployment's public origin independently of request Host headers. */
     public static function publicUrl(string $url): string
     {

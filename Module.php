@@ -198,7 +198,13 @@ class Module extends AbstractModule
         // Sitemap invalidation + auto-ping on content changes. Deletes are
         // included: the URL leaves the sitemap, and IndexNow is also the
         // fastest way to tell engines a URL vanished (they recrawl → 404).
-        foreach (['Omeka\Api\Adapter\ItemAdapter', 'Omeka\Api\Adapter\SitePageAdapter'] as $adapter) {
+        // Item sets have their own child sitemap, so their edits count too.
+        $contentAdapters = [
+            'Omeka\Api\Adapter\ItemAdapter',
+            'Omeka\Api\Adapter\ItemSetAdapter',
+            'Omeka\Api\Adapter\SitePageAdapter',
+        ];
+        foreach ($contentAdapters as $adapter) {
             $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleContentChange']);

@@ -18,6 +18,7 @@ use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\EventManager\EventManager;
+use Laminas\EventManager\SharedEventManager;
 use Laminas\Http\PhpEnvironment\Request;
 use Laminas\Mvc\Controller\ControllerManager;
 use Laminas\Mvc\Controller\PluginManager as ControllerPluginManager;
@@ -86,6 +87,20 @@ final class WiringIntegrationTest extends TestCase
         ];
         foreach ($controllerClasses as $controller) {
             self::assertInstanceOf($controller, $controllers->get($controller));
+        }
+    }
+
+    public function testEveryContentTypeWithASitemapInvalidatesIt(): void
+    {
+        require_once dirname(__DIR__, 2) . '/Module.php';
+        $events = new SharedEventManager();
+        (new \IwacSeo\Module())->attachListeners($events);
+
+        foreach (['ItemAdapter', 'ItemSetAdapter', 'SitePageAdapter'] as $adapter) {
+            foreach (['api.create.post', 'api.update.post', 'api.delete.post'] as $event) {
+                $listeners = $events->getListeners(['Omeka\\Api\\Adapter\\' . $adapter], $event);
+                self::assertNotEmpty($listeners, $adapter . ' ' . $event);
+            }
         }
     }
 

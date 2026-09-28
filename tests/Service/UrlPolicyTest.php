@@ -15,6 +15,23 @@ final class UrlPolicyTest extends TestCase
         self::assertSame('https://example.test/items', UrlPolicy::canonical('https://example.test/items?page=1&gclid=abc'));
     }
 
+    public function testOwnHostAcceptsTheRequestHostOrThePinnedPublicOrigin(): void
+    {
+        $id = 'https://islam.zmo.de/s/afrique_ouest/item/2231';
+        self::assertTrue(UrlPolicy::isOwnHost($id, 'ISLAM.zmo.de'));
+        self::assertFalse(UrlPolicy::isOwnHost($id, 'omeka.internal'));
+        self::assertFalse(UrlPolicy::isOwnHost('/s/afrique_ouest/item/2231', 'islam.zmo.de'));
+
+        putenv('IWAC_SEO_PUBLIC_ORIGIN=https://islam.zmo.de');
+        try {
+            // Behind a proxy that rewrites Host, the canonical still names the public origin.
+            self::assertTrue(UrlPolicy::isOwnHost($id, 'omeka.internal'));
+            self::assertFalse(UrlPolicy::isOwnHost('https://evil.example/s/x/item/1', 'omeka.internal'));
+        } finally {
+            putenv('IWAC_SEO_PUBLIC_ORIGIN');
+        }
+    }
+
     public function testFiltersAreNotMadeIndexableByPagination(): void
     {
         self::assertTrue(UrlPolicy::isFiltered('https://example.test/items?page=2&search=islam'));
