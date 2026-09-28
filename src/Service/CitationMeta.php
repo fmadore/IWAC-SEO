@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
+use IwacSeo\Service\Citation\IssuedDate;
 use IwacSeo\Service\Concern\ResourceValueReader;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
@@ -107,7 +108,7 @@ class CitationMeta
             $headMeta->appendName('citation_editor', $editor);
         }
 
-        $this->single($headMeta, 'citation_publication_date', $this->firstString($resource, MetadataValue::DATE_TERMS));
+        $this->single($headMeta, 'citation_publication_date', $this->scholarDate($this->firstString($resource, MetadataValue::DATE_TERMS)));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
@@ -247,6 +248,24 @@ class CitationMeta
     }
 
     // doi(), pdfUrl() and clip() live in the shared ResourceValueReader trait.
+
+    /**
+     * The publication date in the form Google Scholar's inclusion guidelines
+     * ask for — "2010/5/12", or the year alone — rather than the stored ISO
+     * value. An interval is cited by its start: "2009-05/2009-08" read as a
+     * slashed date would be garbage. DC.date keeps the stored value.
+     */
+    private function scholarDate(?string $raw): ?string
+    {
+        if ($raw === null) {
+            return null;
+        }
+        $date = IssuedDate::parse($raw);
+        if (!$date->hasYear()) {
+            return $raw;
+        }
+        return implode('/', array_filter([$date->year, $date->month, $date->day], static fn ($part) => $part !== null));
+    }
 
     private function single(\Laminas\View\Helper\HeadMeta $headMeta, string $name, ?string $content): void
     {

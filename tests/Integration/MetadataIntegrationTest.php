@@ -62,6 +62,9 @@ final class MetadataIntegrationTest extends TestCase
         self::assertStringContainsString('name="DC.type" content="newspaperArticle"', $metadata);
         self::assertStringContainsString('name="DC.subject" content="Islam"', $metadata);
         self::assertStringContainsString('name="DC.subject" content="Côte d\'Ivoire"', $metadata);
+        // Scholar's documented date form; Dublin Core keeps the stored value.
+        self::assertStringContainsString('name="citation_publication_date" content="2025/5/13"', $metadata);
+        self::assertStringContainsString('name="DC.date" content="2025-05-13"', $metadata);
     }
 
     public function testZoteroRdfUsesRealOmekaItemAndValueContracts(): void
