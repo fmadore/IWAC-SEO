@@ -5,6 +5,7 @@ namespace IwacSeo\Service;
 
 use IwacSeo\Service\Citation\CitationRecord;
 use IwacSeo\Service\Citation\Creator;
+use IwacSeo\Service\Citation\IssuedDate;
 
 /**
  * Formats a {@see CitationRecord} as a Chicago, APA or MLA
@@ -25,9 +26,11 @@ use IwacSeo\Service\Citation\Creator;
  *     — title in italics.
  *
  * Coverage is precise for the common kinds; rarer kinds fall back to a sensible
- * "author. title. container/publisher, year. url" shape. Multi-author handling
- * lists all names for Chicago/APA and uses "et al." beyond two for MLA, matching
- * each style; the corpus is overwhelmingly 0–3 authors.
+ * "author. title. container/publisher, year. url" shape. Author lists follow
+ * each manual: Chicago names up to six (the first three and "et al." beyond),
+ * APA up to twenty, MLA "et al." after the first of three or more; the corpus
+ * is overwhelmingly 0–3 authors. Page ranges take an en dash, and a date
+ * interval is read as a date ("May–August 2009"), never as raw ISO.
  */
 final class CitationFormatter
 {
@@ -58,6 +61,9 @@ final class CitationFormatter
         'en' => [1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
         'fr' => [1 => 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
     ];
+
+    /** @var array<int,string> MLA works-cited month abbreviations (MLA 9, English). */
+    private const MLA_MONTHS_EN = [1 => 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
 
     public function format(CitationRecord $record, string $style, string $locale = 'en'): string
     {
@@ -103,7 +109,7 @@ final class CitationFormatter
                 if ($year !== null) {
                     $seg .= ' (' . $this->esc($year) . ')';
                 }
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
                     $seg .= ': ' . $this->esc($pages);
                 }
@@ -116,7 +122,7 @@ final class CitationFormatter
                 if ($eds !== '') {
                     $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
                 }
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
                     $seg .= ', ' . $this->esc($pages);
                 }
@@ -212,7 +218,7 @@ final class CitationFormatter
                 if ($record->issue !== null) {
                     $seg .= ($vol === '' ? ', ' : '') . '(' . $this->esc($record->issue) . ')';
                 }
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
                     $seg .= ', ' . $this->esc($pages);
                 }
@@ -227,9 +233,9 @@ final class CitationFormatter
                     $seg .= $eds . ' ' . $this->editorRole(count($record->editors), 'apa', $locale) . ', ';
                 }
                 $seg .= $this->italic($record->bookTitle);
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
-                    $seg .= ' (' . $this->str($locale, 'pp') . ' ' . $this->esc($pages) . ')';
+                    $seg .= ' (' . $this->pageLabel($record, $locale) . ' ' . $this->esc($pages) . ')';
                 }
                 $parts[] = $this->terminate($seg);
                 if ($this->esc($record->publisher) !== '') {
@@ -246,10 +252,14 @@ final class CitationFormatter
                     $seg .= ', ' . $this->italic($record->volume);
                 }
                 if ($record->issue !== null) {
-                    $seg .= '(' . $this->esc($record->issue) . ')';
+                    // "Periodical, 12(3)" — but with no volume the issue is its
+                    // own element: "Periodical, (48–49)", never "Periodical(48–49)".
+                    $seg .= ($record->volume === null && $seg !== '' ? ', ' : '')
+                        . '(' . $this->esc($record->issue) . ')';
                 }
-                if ($record->pageRange() !== null) {
-                    $seg .= ', ' . $this->esc($record->pageRange());
+                $pages = $this->pages($record);
+                if ($pages !== null) {
+                    $seg .= ', ' . $this->esc($pages);
                 }
                 $parts[] = $this->terminate($seg);
                 break;
@@ -305,9 +315,9 @@ final class CitationFormatter
                 if ($year !== null) {
                     $seg .= ', ' . $this->esc($year);
                 }
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
-                    $seg .= ', ' . $this->str($locale, 'pp') . ' ' . $this->esc($pages);
+                    $seg .= ', ' . $this->pageLabel($record, $locale) . ' ' . $this->esc($pages);
                 }
                 $parts[] = $this->terminate($seg);
                 break;
@@ -322,9 +332,9 @@ final class CitationFormatter
                 if ($py !== '') {
                     $seg .= ', ' . $py;
                 }
-                $pages = $record->pageRange();
+                $pages = $this->pages($record);
                 if ($pages !== null) {
-                    $seg .= ', ' . $this->str($locale, 'pp') . ' ' . $this->esc($pages);
+                    $seg .= ', ' . $this->pageLabel($record, $locale) . ' ' . $this->esc($pages);
                 }
                 $parts[] = $this->terminate($seg);
                 break;
@@ -333,16 +343,18 @@ final class CitationFormatter
             case CitationKind::Magazine:
             case CitationKind::PeriodicalIssue:
             case CitationKind::Post:
+                // MLA's core-element order: container, volume, number, date,
+                // location — so the issue number precedes the date.
+                $pages = $this->pages($record);
+                $elements = array_filter([
+                    $record->volume !== null ? $this->str($locale, 'vol') . ' ' . $this->esc($record->volume) : '',
+                    $record->issue !== null ? $this->str($locale, 'no') . ' ' . $this->esc($record->issue) : '',
+                    $this->fullDate($record, $locale, 'mla'),
+                    $pages !== null ? $this->pageLabel($record, $locale) . ' ' . $this->esc($pages) : '',
+                ]);
                 $seg = $this->italic($record->container);
-                $date = $this->fullDate($record, $locale, 'mla');
-                if ($date !== '') {
-                    $seg = $seg !== '' ? $seg . ', ' . $date : $this->ucfirst($date);
-                }
-                if ($record->issue !== null) {
-                    $seg .= ', ' . $this->str($locale, 'no') . ' ' . $this->esc($record->issue);
-                }
-                if ($record->pageRange() !== null) {
-                    $seg .= ', ' . $this->str($locale, 'pp') . ' ' . $this->esc($record->pageRange());
+                if ($elements) {
+                    $seg = $seg !== '' ? $seg . ', ' . implode(', ', $elements) : $this->ucfirst(implode(', ', $elements));
                 }
                 $parts[] = $this->terminate($seg);
                 break;
@@ -584,6 +596,26 @@ final class CitationFormatter
         return $seg;
     }
 
+    /**
+     * The page range as all three manuals print it, with an en dash between
+     * first and last page ("185–209"). A single stored value is left as it is,
+     * since a hyphen inside one ("A-12") is part of the page designator.
+     */
+    private function pages(CitationRecord $record): ?string
+    {
+        if ($record->pageFirst !== null && $record->pageLast !== null && $record->pageFirst !== $record->pageLast) {
+            return $record->pageFirst . '–' . $record->pageLast;
+        }
+        return $record->pageRange();
+    }
+
+    /** "pp." before a range, "p." before a single page. */
+    private function pageLabel(CitationRecord $record, string $locale): string
+    {
+        $range = $record->pageFirst !== null && $record->pageLast !== null && $record->pageFirst !== $record->pageLast;
+        return $this->str($locale, $range ? 'pp' : 'p');
+    }
+
     private function linkSegment(CitationRecord $record, bool $period = true): string
     {
         $href = $record->link();
@@ -627,41 +659,117 @@ final class CitationFormatter
 
     // ─── Dates ───────────────────────────────────────────────────────────────
 
+    /**
+     * The year, or "2000–2001" for an interval spanning years — never the raw
+     * ISO interval, which reads as data rather than as a date.
+     */
     private function year(CitationRecord $record): ?string
     {
-        return $record->issued->yearOrLiteral();
+        $issued = $record->issued;
+        if ($issued->end !== null && $issued->year !== null && $issued->end->year !== null) {
+            return $issued->year === $issued->end->year
+                ? (string) $issued->year
+                : $issued->year . '–' . $issued->end->year;
+        }
+        return $issued->yearOrLiteral();
     }
 
     /**
      * Full date in the style's order:
-     *   Chicago  → "December 7, 2018" / "décembre 2018"
-     *   APA      → "2018, December 7"
-     *   MLA      → "7 December 2018"
-     * Falls back to the year (or the raw literal) when month/day are absent.
+     *   Chicago  → "December 7, 2018" / "7 décembre 2018"
+     *   APA      → "2018, December 7" / "2018, 7 décembre"
+     *   MLA      → "7 Dec. 2018" / "7 décembre 2018"
+     * Falls back to the year (or the raw literal) when month/day are absent,
+     * and reads an interval as one: "May–August 2009", "2009, May–August".
      */
     private function fullDate(CitationRecord $record, string $locale, string $style): string
     {
-        if ($record->issued->end !== null) {
-            return $this->esc($record->issued->literal ?? $record->issued->iso());
+        $issued = $record->issued;
+        if ($issued->year === null) {
+            return $issued->literal !== null ? $this->esc($issued->literal) : '';
         }
-        $y = $record->issued->year;
-        $m = $record->issued->month;
-        $d = $record->issued->day;
-        if ($y === null) {
-            return $record->issued->literal !== null ? $this->esc($record->issued->literal) : '';
+        if ($issued->end !== null) {
+            return $this->esc($this->dateRange($issued, $issued->end, $locale, $style));
         }
-        if (!$m) {
-            return $this->esc((string) $y);
-        }
-        $month = self::MONTHS[$locale][$m] ?? self::MONTHS['en'][$m] ?? (string) $m;
+        return $this->esc($this->dateText($issued, $locale, $style));
+    }
 
-        return match ($style) {
-            'apa' => $this->esc($y . ', ' . $month . ($d ? ' ' . $d : '')),
-            'mla' => $this->esc(($d ? $d . ' ' : '') . $month . ' ' . $y),
-            default => $locale === 'fr'
-                ? $this->esc(($d ? $d . ' ' : '') . $month . ' ' . $y)          // 7 décembre 2018
-                : $this->esc($month . ($d ? ' ' . $d . ',' : '') . ' ' . $y),   // December 7, 2018
+    /**
+     * Whether the day precedes the month: in French, and in MLA ("7 Dec.
+     * 2018") whatever the language; Chicago and APA in English put it after.
+     */
+    private function dayFirst(string $locale, string $style): bool
+    {
+        return $locale === 'fr' || $style === 'mla';
+    }
+
+    private function dateText(IssuedDate $date, string $locale, string $style): string
+    {
+        $year = (string) $date->year;
+        if ($date->month === null) {
+            return $year;
+        }
+        $month = $this->monthName($date->month, $locale, $style);
+        $dayMonth = match (true) {
+            $date->day === null => $month,
+            $this->dayFirst($locale, $style) => $date->day . ' ' . $month,
+            default => $month . ' ' . $date->day,
         };
+        return match (true) {
+            $style === 'apa' => $year . ', ' . $dayMonth,
+            $date->day !== null && !$this->dayFirst($locale, $style) => $dayMonth . ', ' . $year,
+            default => $dayMonth . ' ' . $year,
+        };
+    }
+
+    /**
+     * An interval written the way each style writes one, stating what the two
+     * ends share only once: "May–August 2009", "8–10 mai 2019", "2009,
+     * May–August". Ends in different years, or of different precision, are
+     * each written in full around the dash.
+     */
+    private function dateRange(IssuedDate $start, IssuedDate $end, string $locale, string $style): string
+    {
+        $precision = static fn (IssuedDate $d): int => $d->month === null ? 1 : ($d->day === null ? 2 : 3);
+        $level = $precision($start);
+        if ($level === 1 && $precision($end) === 1) {
+            return $start->year === $end->year ? (string) $start->year : $start->year . '–' . $end->year;
+        }
+        if ($level !== $precision($end) || $start->year !== $end->year) {
+            return $this->dateText($start, $locale, $style) . '–' . $this->dateText($end, $locale, $style);
+        }
+
+        $year = (string) $start->year;
+        $fromMonth = $this->monthName((int) $start->month, $locale, $style);
+        $toMonth = $this->monthName((int) $end->month, $locale, $style);
+        $sameMonth = $start->month === $end->month;
+        if ($level === 2) {
+            $span = $sameMonth ? $fromMonth : $fromMonth . '–' . $toMonth;
+            return $style === 'apa' ? $year . ', ' . $span : $span . ' ' . $year;
+        }
+
+        $dayFirst = $this->dayFirst($locale, $style);
+        $days = $start->day === $end->day ? (string) $start->day : $start->day . '–' . $end->day;
+        $span = match (true) {
+            $sameMonth && $dayFirst => $days . ' ' . $fromMonth,
+            $sameMonth => $fromMonth . ' ' . $days,
+            $dayFirst => $start->day . ' ' . $fromMonth . '–' . $end->day . ' ' . $toMonth,
+            default => $fromMonth . ' ' . $start->day . '–' . $toMonth . ' ' . $end->day,
+        };
+        return match (true) {
+            $style === 'apa' => $year . ', ' . $span,
+            $dayFirst => $span . ' ' . $year,
+            default => $span . ', ' . $year,
+        };
+    }
+
+    /** MLA abbreviates English month names longer than four letters ("Sept."). */
+    private function monthName(int $month, string $locale, string $style): string
+    {
+        if ($style === 'mla' && $locale === 'en') {
+            return self::MLA_MONTHS_EN[$month] ?? (string) $month;
+        }
+        return self::MONTHS[$locale][$month] ?? self::MONTHS['en'][$month] ?? (string) $month;
     }
 
     // ─── Primitives ──────────────────────────────────────────────────────────

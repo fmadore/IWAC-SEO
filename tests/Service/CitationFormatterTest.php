@@ -105,7 +105,7 @@ final class CitationFormatterTest extends TestCase
         ]);
 
         $this->assertSame(
-            'Triaud, Jean-Louis. “Muslim Politics.” <em>Journal of African History</em> 42, no. 3 (2001): 185-209.',
+            'Triaud, Jean-Louis. “Muslim Politics.” <em>Journal of African History</em> 42, no. 3 (2001): 185–209.',
             $this->formatter->format($record, 'chicago', 'en')
         );
     }
@@ -155,7 +155,7 @@ final class CitationFormatterTest extends TestCase
 
         $this->assertSame(
             'Miran, Marie. “The Politics of Piety.” In <em>Muslim Societies</em>, '
-            . 'edited by David Robinson, 55-80. Brill, 2005.',
+            . 'edited by David Robinson, 55–80. Brill, 2005.',
             $this->formatter->format($record, 'chicago', 'en')
         );
     }
@@ -193,7 +193,7 @@ final class CitationFormatterTest extends TestCase
         ]);
 
         $this->assertSame(
-            'Triaud, J.-L. (2001). Muslim Politics. <em>Journal of African History</em>, <em>42</em>(3), 185-209.',
+            'Triaud, J.-L. (2001). Muslim Politics. <em>Journal of African History</em>, <em>42</em>(3), 185–209.',
             $this->formatter->format($record, 'apa', 'en')
         );
     }
@@ -240,7 +240,7 @@ final class CitationFormatterTest extends TestCase
 
         $this->assertSame(
             'Miran, M. (2005). The Politics of Piety. In D. Robinson & J.-L. Triaud (Eds.), '
-            . '<em>Muslim Societies</em> (pp. 55-80). Brill.',
+            . '<em>Muslim Societies</em> (pp. 55–80). Brill.',
             $this->formatter->format($record, 'apa', 'en')
         );
     }
@@ -274,7 +274,7 @@ final class CitationFormatterTest extends TestCase
             'issued'    => ['year' => 2018, 'month' => 12, 'day' => 7, 'literal' => '2018-12-07'],
         ]);
 
-        $this->assertStringContainsString('7 December 2018', $this->formatter->format($record, 'mla', 'en'));
+        $this->assertStringContainsString('7 Dec. 2018', $this->formatter->format($record, 'mla', 'en'));
     }
 
     // ─── Cross-cutting behaviour ─────────────────────────────────────────────
@@ -334,5 +334,104 @@ final class CitationFormatterTest extends TestCase
             $this->formatter->format($record, 'chicago', 'en'),
             $this->formatter->format($record, 'nope', 'de')
         );
+    }
+
+    // ─── Dates, pages and whole issues ───────────────────────────────────────
+
+    /** Item 10224's shape: a combined issue over a four-month interval, no volume. */
+    private function combinedIssue(): CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'periodical-issue',
+            'title'     => 'Al Mawadda #48-49',
+            'container' => 'Al Mawadda',
+            'issue'     => '48–49',
+            'issued'    => [
+                'year' => 2009, 'month' => 5, 'day' => null, 'literal' => '2009-05/2009-08',
+                'end' => ['year' => 2009, 'month' => 8, 'day' => null, 'literal' => '2009-08'],
+            ],
+        ]);
+    }
+
+    public function testApaIssueWithoutVolumeIsSeparatedFromThePeriodical(): void
+    {
+        $this->assertSame(
+            '<em>Al Mawadda #48-49</em>. (2009, May–August). <em>Al Mawadda</em>, (48–49).',
+            $this->formatter->format($this->combinedIssue(), 'apa', 'en')
+        );
+    }
+
+    public function testDateIntervalsReadAsDatesInEveryStyle(): void
+    {
+        $issue = $this->combinedIssue();
+        $this->assertStringContainsString('<em>Al Mawadda</em>, no. 48–49, May–August 2009.', $this->formatter->format($issue, 'chicago', 'en'));
+        $this->assertStringContainsString('<em>Al Mawadda</em>, n° 48–49, mai–août 2009.', $this->formatter->format($issue, 'chicago', 'fr'));
+        $this->assertStringContainsString('(2009, mai–août).', $this->formatter->format($issue, 'apa', 'fr'));
+        // MLA: number before date, English months abbreviated.
+        $this->assertStringContainsString('<em>Al Mawadda</em>, no. 48–49, May–Aug. 2009.', $this->formatter->format($issue, 'mla', 'en'));
+        foreach (CitationFormatter::STYLES as $style) {
+            $this->assertStringNotContainsString('2009-05/2009-08', $this->formatter->format($issue, $style, 'en'));
+        }
+    }
+
+    public function testDayIntervalsStateSharedPartsOnce(): void
+    {
+        $range = static fn (string $from, string $to): array => [
+            'year' => (int) substr($from, 0, 4), 'month' => (int) substr($from, 5, 2), 'day' => (int) substr($from, 8, 2),
+            'literal' => $from . '/' . $to,
+            'end' => ['year' => (int) substr($to, 0, 4), 'month' => (int) substr($to, 5, 2), 'day' => (int) substr($to, 8, 2)],
+        ];
+        $talk = fn (array $issued): CitationRecord => $this->record(['kind' => 'post', 'title' => 'T', 'container' => 'Blog', 'issued' => $issued]);
+
+        $sameMonth = $talk($range('2019-05-08', '2019-05-10'));
+        $this->assertStringContainsString('May 8–10, 2019', $this->formatter->format($sameMonth, 'chicago', 'en'));
+        $this->assertStringContainsString('8–10 mai 2019', $this->formatter->format($sameMonth, 'chicago', 'fr'));
+        $this->assertStringContainsString('(2019, May 8–10)', $this->formatter->format($sameMonth, 'apa', 'en'));
+        $this->assertStringContainsString('8–10 May 2019', $this->formatter->format($sameMonth, 'mla', 'en'));
+
+        $acrossMonths = $talk($range('2019-05-30', '2019-06-02'));
+        $this->assertStringContainsString('May 30–June 2, 2019', $this->formatter->format($acrossMonths, 'chicago', 'en'));
+        $this->assertStringContainsString('(2019, 30 mai–2 juin)', $this->formatter->format($acrossMonths, 'apa', 'fr'));
+
+        $acrossYears = $talk($range('2018-12-30', '2019-01-02'));
+        $this->assertStringContainsString('December 30, 2018–January 2, 2019', $this->formatter->format($acrossYears, 'chicago', 'en'));
+        $this->assertStringContainsString('(2018, December 30–2019, January 2)', $this->formatter->format($acrossYears, 'apa', 'en'));
+    }
+
+    public function testYearIntervalOnAStandaloneWorkIsAYearSpan(): void
+    {
+        $book = $this->record([
+            'kind'   => 'book',
+            'title'  => 'T',
+            'issued' => ['year' => 2000, 'literal' => '2000/2001', 'end' => ['year' => 2001]],
+        ]);
+        $this->assertSame('<em>T</em>. (2000–2001).', $this->formatter->format($book, 'apa', 'en'));
+        $this->assertSame('<em>T</em>. 2000–2001.', $this->formatter->format($book, 'chicago', 'en'));
+    }
+
+    public function testApaDatePutsTheDayBeforeTheMonthInFrench(): void
+    {
+        $record = $this->record([
+            'kind'      => 'newspaper',
+            'title'     => 'Titre',
+            'container' => 'Sidwaya',
+            'issued'    => ['year' => 2018, 'month' => 12, 'day' => 7, 'literal' => '2018-12-07'],
+        ]);
+        $this->assertStringContainsString('(2018, 7 décembre).', $this->formatter->format($record, 'apa', 'fr'));
+        $this->assertStringContainsString('(2018, December 7).', $this->formatter->format($record, 'apa', 'en'));
+    }
+
+    public function testMlaUsesPForASinglePageAndPpForARange(): void
+    {
+        $single = $this->record(['kind' => 'newspaper', 'title' => 'T', 'container' => 'Le Pays', 'pageFirst' => '4']);
+        $this->assertStringContainsString('<em>Le Pays</em>, p. 4.', $this->formatter->format($single, 'mla', 'en'));
+        $range = $this->record(['kind' => 'newspaper', 'title' => 'T', 'container' => 'Le Pays', 'pageFirst' => '4', 'pageLast' => '5']);
+        $this->assertStringContainsString('<em>Le Pays</em>, pp. 4–5.', $this->formatter->format($range, 'mla', 'en'));
+    }
+
+    public function testASinglePageDesignatorKeepsItsOwnHyphen(): void
+    {
+        $record = $this->record(['kind' => 'newspaper', 'title' => 'T', 'container' => 'Le Pays', 'pageFirst' => 'A-12']);
+        $this->assertStringContainsString('A-12', $this->formatter->format($record, 'apa', 'en'));
     }
 }
