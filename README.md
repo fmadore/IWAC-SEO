@@ -442,7 +442,7 @@ thumbnail — the page scan or cover) so Google Images can index the scans; disa
 Resource ids + modified timestamps are read with one lean DBAL query per type (public
 resources scoped to the site), avoiding representation hydration for each item. Output is
 cached under `files/iwac-seo-cache/` and served with `Cache-Control` / `Last-Modified`
-headers; the cache is invalidated when an item or page changes, and any cache failure falls
+headers; the cache is invalidated when an item, item set or page changes, and any cache failure falls
 back to live generation.
 
 ---

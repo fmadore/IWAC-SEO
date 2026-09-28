@@ -140,7 +140,11 @@ status remains missing; editors should resolve catalogue gaps rather than guess 
 | Blog post | Blog title, full date and original source URL |
 
 CSL-JSON is the richest interchange format. The `.bib` export supports BibLaTeX fields
-and types (`date`, `periodical`, generic `thesis`); legacy BibTeX styles may ignore them.
+and types (`date`, `langid`, `entrysubtype` for newspaper and magazine articles, `periodical`
+with the periodical as `title` and the issue as `issuetitle`, `unpublished` for talks, generic
+`thesis`); legacy BibTeX styles may ignore them. The accession number is filed as Zotero's
+call number and archive location in every download (RIS `CN`/`AN`, CSL `call-number`/
+`archive_location`), with the collection as the archive (RIS `DB`, CSL `archive`).
 RIS cannot represent a date interval losslessly as structured date parts, so its
 original interval is retained in a note. Corporate names in RIS and whole periodical
 issues in Zotero have importer-specific limitations: use CSL-JSON for structured

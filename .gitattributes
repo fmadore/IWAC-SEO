@@ -33,4 +33,7 @@
 /phpstan-baseline.neon export-ignore
 /phpcs.xml.dist   export-ignore
 /ROADMAP.md       export-ignore
+/SEO-CITATION-AUDIT.md export-ignore
+/REVIEW-2026-09.md export-ignore
+/config/search-console-urls.json export-ignore
 /CLAUDE.md        export-ignore

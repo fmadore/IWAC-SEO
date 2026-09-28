@@ -72,7 +72,7 @@ jobs:
           contents=$(unzip -Z1 "$zip")
           echo "$contents"
 
-          for unwanted in tests/ .github/ CLAUDE.md ROADMAP.md phpunit phpstan phpcs .editorconfig .gitignore .gitattributes; do
+          for unwanted in tests/ .github/ CLAUDE.md ROADMAP.md SEO-CITATION-AUDIT.md REVIEW- search-console-urls.json phpunit phpstan phpcs .editorconfig .gitignore .gitattributes; do
             if echo "$contents" | grep -qF "IwacSeo/$unwanted"; then
               echo "::error::Development file leaked into the release zip: $unwanted"
               exit 1
