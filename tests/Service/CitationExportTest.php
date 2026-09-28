@@ -183,4 +183,64 @@ final class CitationExportTest extends TestCase
         $this->assertMatchesRegularExpression('/^[A-Za-z0-9._-]+$/', $filename);
         $this->assertStringNotContainsString('/', $filename);
     }
+
+    // ─── biblatex semantics and archive fields ───────────────────────────────
+
+    public function testBibtexNewspaperArticleIsMarkedAsNonAcademic(): void
+    {
+        $this->assertStringContainsString('entrysubtype = {newspaper}', $this->export->serialize($this->record(), 'bibtex'));
+    }
+
+    public function testBibtexWholeIssueNamesThePeriodicalAsItsTitle(): void
+    {
+        $bib = $this->export->serialize($this->record([
+            'kind'      => 'periodical-issue',
+            'title'     => 'Al Mawadda #48-49',
+            'container' => 'Al Mawadda',
+            'issue'     => '48–49',
+        ]), 'bibtex');
+        $this->assertStringStartsWith('@periodical{', $bib);
+        $this->assertMatchesRegularExpression('/^  title\s+= \{\{Al Mawadda\}\},$/m', $bib);
+        $this->assertStringContainsString("  issuetitle = {Al Mawadda \\#48-49},\n", $bib);
+        $this->assertStringNotContainsString('journal', $bib);
+    }
+
+    public function testBibtexMiscKeepsPublisherAndSourceUrlWithoutAPageUrl(): void
+    {
+        $bib = $this->export->serialize($this->record([
+            'kind'      => 'av',
+            'container' => null,
+            'publisher' => 'RTB - Radiodiffusion Télévision du Burkina',
+            'url'       => null,
+            'sourceUrl' => 'https://www.youtube.com/watch?v=abcdefghijk',
+        ]), 'bibtex');
+        $this->assertStringStartsWith('@misc{', $bib);
+        $this->assertMatchesRegularExpression('/^  howpublished = \{RTB - Radiodiffusion Télévision du Burkina\},$/m', $bib);
+        $this->assertMatchesRegularExpression('/^  url\s+= \{https:\/\/www\.youtube\.com\/watch\?v=abcdefghijk\},$/m', $bib);
+    }
+
+    public function testBibtexLanguageUsesBabelNamesForLangidAndLanguage(): void
+    {
+        $bib = $this->export->serialize($this->record(['language' => 'fr']), 'bibtex');
+        $this->assertMatchesRegularExpression('/^  langid\s+= \{french\},$/m', $bib);
+        $this->assertMatchesRegularExpression('/^  language\s+= \{french\},$/m', $bib);
+        // A language without a babel name stays a literal, with no langid.
+        $other = $this->export->serialize($this->record(['language' => 'Mooré']), 'bibtex');
+        $this->assertStringNotContainsString('langid', $other);
+        $this->assertMatchesRegularExpression('/^  language\s+= \{Mooré\},$/m', $other);
+    }
+
+    public function testRisAndCslCarryTheAccessionAsCallNumberAndArchiveLocation(): void
+    {
+        $record = $this->record(['archive' => 'Islam West Africa Collection']);
+        $ris = $this->export->serialize($record, 'ris');
+        $this->assertStringContainsString("CN  - iwac-article-0000123\r\n", $ris);
+        $this->assertStringContainsString("AN  - iwac-article-0000123\r\n", $ris);
+        $this->assertStringContainsString("DB  - Islam West Africa Collection\r\n", $ris);
+
+        $csl = json_decode($this->export->serialize($record, 'csljson'), true, 512, JSON_THROW_ON_ERROR)[0];
+        $this->assertSame('iwac-article-0000123', $csl['call-number']);
+        $this->assertSame('iwac-article-0000123', $csl['archive_location']);
+        $this->assertSame('Islam West Africa Collection', $csl['archive']);
+    }
 }

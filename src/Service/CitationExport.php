@@ -19,6 +19,15 @@ use IwacSeo\Service\Citation\IssuedDate;
  */
 final class CitationExport
 {
+    /**
+     * Babel/polyglossia names for the language codes the archive records, for
+     * biblatex's `langid` (hyphenation and case rules) and `language` (a
+     * localisation key, printed as "French" rather than as the bare code).
+     */
+    private const BIBLATEX_LANGUAGES = [
+        'fr' => 'french', 'en' => 'english', 'de' => 'ngerman', 'ar' => 'arabic', 'pt' => 'portuguese',
+    ];
+
     /** Format id => [extension, MIME type]. */
     public const FORMATS = [
         'bibtex'  => ['bib', 'application/x-bibtex; charset=utf-8'],
@@ -66,20 +75,34 @@ final class CitationExport
         if ($editors !== '') {
             $fields['editor'] = $editors;
         }
-        if ($record->title !== null) {
-            // Wrap in an extra pair of braces to protect title-case.
-            $fields['title'] = '{' . $this->bibtexEscape($record->title) . '}';
+        // biblatex's @periodical is the whole issue: `title` names the
+        // periodical and `issuetitle` the issue's own title, if it has one.
+        $title = $record->title;
+        $issueTitle = null;
+        if ($kind === CitationKind::PeriodicalIssue && $record->container !== null) {
+            $title = $record->container;
+            $issueTitle = $record->title !== $record->container ? $record->title : null;
         }
+        if ($title !== null) {
+            // Wrap in an extra pair of braces to protect title-case.
+            $fields['title'] = '{' . $this->bibtexEscape($title) . '}';
+        }
+        $this->addField($fields, 'issuetitle', $issueTitle);
 
         // Container routes to journal / booktitle / publisher-adjacent fields.
         switch ($kind) {
             case CitationKind::Article:
             case CitationKind::Review:
-            case CitationKind::Newspaper:
-            case CitationKind::Magazine:
-            case CitationKind::PeriodicalIssue:
                 $this->addField($fields, 'journal', $record->container);
                 break;
+            case CitationKind::Newspaper:
+            case CitationKind::Magazine:
+                $this->addField($fields, 'journal', $record->container);
+                // biblatex's marker for a non-academic @article.
+                $fields['entrysubtype'] = $kind === CitationKind::Newspaper ? 'newspaper' : 'magazine';
+                break;
+            case CitationKind::PeriodicalIssue:
+                break; // the periodical is the entry's own title, above
             case CitationKind::Chapter:
                 $this->addField($fields, 'booktitle', $record->bookTitle);
                 $this->addField($fields, 'publisher', $record->publisher);
@@ -94,7 +117,9 @@ final class CitationExport
                 $this->addField($fields, 'publisher', $record->publisher);
                 break;
             default:
-                $this->addField($fields, 'howpublished', $record->container);
+                // @misc has no publisher field: audiovisual, photograph and
+                // document records carry their publisher here, or lose it.
+                $this->addField($fields, 'howpublished', $record->container ?? $record->publisher);
                 break;
         }
 
@@ -123,10 +148,15 @@ final class CitationExport
         if ($record->doi !== null) {
             $fields['doi'] = $this->verbatim($record->doi);
         }
-        if ($record->url !== null) {
-            $fields['url'] = $this->verbatim($record->sourceUrl ?? $record->url);
+        $url = $record->sourceUrl ?? $record->url;
+        if ($url !== null) {
+            $fields['url'] = $this->verbatim($url);
         }
-        $this->addField($fields, 'language', $record->language);
+        $babel = self::BIBLATEX_LANGUAGES[$record->language ?? ''] ?? null;
+        if ($babel !== null) {
+            $fields['langid'] = $babel;
+        }
+        $this->addField($fields, 'language', $babel ?? $record->language);
         if ($record->keywords !== []) {
             $fields['keywords'] = $this->bibtexEscape(implode(', ', $record->keywords));
         }
@@ -220,7 +250,12 @@ final class CitationExport
         $lines[] = $this->risLine('M1', $record->number);
         $lines[] = $this->risLine('ET', $record->edition);
         $lines[] = $this->risLine('SN', $record->isbn ?? $record->issn);
+        // Zotero reads AN as "Loc. in Archive", CN as "Call Number" and DB as
+        // "Archive": the accession fills both slots, matching the Zotero RDF
+        // (callNumber) and CSL-JSON (call-number, archive_location) exports.
         $lines[] = $this->risLine('AN', $record->accession);
+        $lines[] = $this->risLine('CN', $record->accession);
+        $lines[] = $this->risLine('DB', $record->archive);
         $lines[] = $this->risLine('VL', $record->volume);
         $lines[] = $this->risLine('IS', $record->issue);
         $lines[] = $this->risLine('SP', $record->pageFirst);
@@ -321,7 +356,8 @@ final class CitationExport
             'event-place' => $record->eventPlace, 'medium' => $record->medium,
             'number' => $record->number, 'edition' => $record->edition,
             'reviewed-title' => $record->reviewedTitle, 'archive' => $record->archive,
-            'call-number' => $record->accession, 'ISBN' => $record->isbn, 'ISSN' => $record->issn] as $field => $value
+            'call-number' => $record->accession, 'archive_location' => $record->accession,
+            'ISBN' => $record->isbn, 'ISSN' => $record->issn] as $field => $value
         ) {
             if ($value !== null) {
                 $item[$field] = $value;
