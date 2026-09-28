@@ -34,7 +34,7 @@ msgid "Adds a /unapi endpoint and discovery tags to newspaper articles, periodic
 msgstr ""
 
 #: src/Form/ConfigForm.php
-msgid "Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended."
+msgid "Adds schema.org structured data (Person, Place, Organization, NewsArticle, VideoObject, scholarly types …) to resource pages, so search engines can tell what each record is. Recommended."
 msgstr ""
 
 #: src/Controller/Admin/SeoController.php
@@ -187,7 +187,7 @@ msgid "Noindex filtered browse pages"
 msgstr ""
 
 #: src/Form/ConfigForm.php
-msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item or page is added or edited, so it is crawled sooner. Throttled, and skipped during bulk syncs. Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
+msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item, item set or page is added or edited, so it is crawled sooner. Changes are queued and sent in throttled batches, bulk imports included; schedule scripts/drain-indexnow.php (see OPERATIONS.md). Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
