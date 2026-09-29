@@ -495,10 +495,13 @@ IwacSeo/
 │       ├── SitemapGenerator.php      # which URLs go in which sitemap
 │       ├── Sitemap/                  # SitemapRepository, UrlsetWriter, XmlCache, SitemapDocument
 │       ├── PageSeoStore.php          # per-page overrides (site setting)
-│       ├── PingQueue.php             # IndexNow queue: dedupe, flood cap, throttle
+│       ├── PingQueue.php             # IndexNow dispatch policy: enabled, throttle, batch size
+│       ├── PingRepository.php        # the durable outbox (PingOutboxInterface)
 │       ├── Pinger.php                # IndexNow submit
+│       ├── RobotsTxt.php             # robots.txt body + Google's longest-match check
 │       ├── SettingsGate.php          # typed reads over the iwac_seo_* settings
-│       ├── ResourceUrl.php, ViewLocale.php, Text.php  # small shared helpers
+│       ├── UrlPolicy.php             # canonical/query policy, pinned public origin
+│       ├── ResourceUrl.php, ViewLocale.php, MonthNames.php, Text.php  # small shared helpers
 │       └── *Factory.php
 ├── view/iwac-seo/admin/seo/{dashboard,pages}.phtml
 ├── asset/css/admin.css

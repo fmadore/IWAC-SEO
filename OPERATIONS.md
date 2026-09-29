@@ -8,6 +8,9 @@ change Google permissions, or install a server cron job.
 ## Public origin
 
 Set `IWAC_SEO_PUBLIC_ORIGIN=https://islam.zmo.de` in the PHP web **and CLI** environment.
+A value that is not an HTTP(S) origin without a path is ignored rather than allowed to
+break page renders: pages fall back to Omeka's own URLs, the SEO dashboard shows an error,
+and the IndexNow cron script exits with status 2 until it is fixed.
 This pins canonical URLs, resource identities, hreflang links and sitemap origins
 independently of incoming Host headers. Without it, Omeka's configured URL generation
 is used. Configure the reverse proxy to accept only the production hostname; use
