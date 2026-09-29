@@ -105,7 +105,7 @@ class ConfigForm extends Form
             'type'    => Element\Checkbox::class,
             'options' => [
                 'label' => 'Emit schema.org JSON-LD', // @translate
-                'info'  => 'Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended.', // @translate
+                'info'  => 'Adds schema.org structured data (Person, Place, Organization, NewsArticle, VideoObject, scholarly types …) to resource pages, so search engines can tell what each record is. Recommended.', // @translate
             ],
             'attributes' => ['id' => 'iwac_seo_jsonld_enabled'],
         ]);
@@ -157,7 +157,7 @@ class ConfigForm extends Form
             'type'    => Element\Checkbox::class,
             'options' => [
                 'label' => 'Ping IndexNow when content changes', // @translate
-                'info'  => 'Notifies Bing/Yandex (and other IndexNow engines) when a public item or page is added or edited, so it is crawled sooner. Throttled, and skipped during bulk syncs. Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead).', // @translate
+                'info'  => 'Notifies Bing/Yandex (and other IndexNow engines) when a public item, item set or page is added or edited, so it is crawled sooner. Changes are queued and sent in throttled batches, bulk imports included; schedule scripts/drain-indexnow.php (see OPERATIONS.md). Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead).', // @translate
             ],
             'attributes' => ['id' => 'iwac_seo_ping_enabled'],
         ]);

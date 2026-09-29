@@ -3,9 +3,8 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service;
 
-use IwacSeo\Service\Concern\ResourceValueReader;
+use IwacSeo\Service\Citation\Creator;
 use Omeka\Api\Representation\ItemRepresentation;
-use Omeka\Api\Representation\ValueRepresentation;
 
 /**
  * Serialises an IWAC item to **Zotero RDF**, served from the unAPI endpoint
@@ -44,8 +43,6 @@ use Omeka\Api\Representation\ValueRepresentation;
  */
 class ZoteroRdf
 {
-    use ResourceValueReader;
-
     /** Namespaces, exactly as RDF.js expects them. */
     private const NS = [
         'rdf'     => 'http://www.w3.org/1999/02/22-rdf-syntax-ns#',
@@ -69,8 +66,10 @@ class ZoteroRdf
         CitationKind::Photo,
     ];
 
-    public function __construct(private readonly CitationKindMap $kinds)
-    {
+    public function __construct(
+        private readonly CitationKindMap $kinds,
+        private readonly CitationData $citationData,
+    ) {
     }
 
     /** Whether an item of this resource class is served via unAPI. */
@@ -104,47 +103,46 @@ class ZoteroRdf
         }
 
         $bibType = $this->bibType($kind);
-        $record = (new CitationData($this->kinds))->build($item, $canonical);
+        // The same normalised record the downloads and the formatted styles
+        // read, so the three paths cannot disagree about a field.
+        $record = $this->citationData->build($item, $canonical);
         if ($record === null) {
             return null;
         }
         $props = [];
 
         $props[] = $this->el('z:itemType', $kind->zoteroItemType());
-        $props[] = $this->el('dc:title', $this->firstString($item, ['dcterms:title']));
+        $props[] = $this->el('dc:title', $record->title);
 
-        foreach ($this->creators($item) as $creator) {
-            $props[] = $creator;
+        foreach ($record->authors as $author) {
+            $props[] = $this->creator($author);
         }
 
         $props[] = $this->el('dc:date', $record->issued->iso() ?? $record->issued->literal);
-        $props[] = $this->el('dc:language', $this->firstLabel($item, 'dcterms:language'));
+        $props[] = $this->el('dc:language', MetadataValue::select($item, ['dcterms:language']));
 
         // Only the periodical kinds carry a container (publication) + issue/pages.
         if (in_array($kind, [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::PeriodicalIssue], true)) {
-            $props[] = $this->el('prism:publicationName', $this->firstLabel($item, 'dcterms:publisher'));
-            $props[] = $this->el('prism:volume', $this->firstString($item, ['bibo:volume']));
+            $props[] = $this->el('prism:publicationName', $record->container);
+            $props[] = $this->el('prism:volume', $record->volume);
             $props[] = $this->el('prism:number', $record->issue);
-            $props[] = $this->el('bib:pages', $this->pageRange($item));
+            $props[] = $this->el('bib:pages', $record->pageRange());
         }
         $props[] = $this->el('dc:publisher', $record->publisher);
         foreach ($record->editors as $editor) {
             $props[] = $this->el('bib:editors', $editor->literal);
         }
 
-        $abstract = $this->firstString($item, self::ABSTRACT_TERMS);
-        if ($abstract !== null) {
-            $props[] = $this->el('dcterms:abstract', $this->clip($abstract));
-        }
-        $props[] = $this->el('dc:rights', $this->firstLabel($item, 'dcterms:rights'));
+        $props[] = $this->el('dcterms:abstract', $record->abstract);
+        $props[] = $this->el('dc:rights', MetadataValue::select($item, ['dcterms:rights']));
 
         // Tags: Sujet (dcterms:subject) + Couverture spatiale (dcterms:spatial).
-        foreach ($this->keywords($item) as $tag) {
+        foreach ($record->keywords as $tag) {
             $props[] = $this->el('dc:subject', $tag);
         }
 
         // Cote / call number: the iwac- accession number, via a dcterms:LCC node.
-        $cote = $this->cote($item);
+        $cote = $record->accession;
         if ($cote !== null) {
             $props[] = sprintf(
                 '<dc:subject><dcterms:LCC><rdf:value>%s</rdf:value></dcterms:LCC></dc:subject>',
@@ -159,7 +157,7 @@ class ZoteroRdf
         );
 
         // Public full-text PDF → a "Full Text PDF" attachment.
-        $pdf = $this->pdfUrl($item);
+        $pdf = MetadataValue::pdfUrl($item);
         if ($pdf !== null) {
             $props[] = $this->el('eprints:document_url', $pdf);
         }
@@ -187,53 +185,32 @@ class ZoteroRdf
     // ─── Creators ────────────────────────────────────────────────────────────
 
     /**
-     * Author fragments, from the first populated role property, in document
-     * order. Institutions (creators linked to an Organization authority record)
-     * are emitted as a single-field foaf:Person; everyone else is a literal that
-     * Zotero splits into first/last name.
-     *
-     * @return string[]
+     * One author as Zotero's RDF import reads it. An institution (a creator
+     * linked to an Organisation record) is a foaf:Person with only a surname,
+     * which Zotero keeps as one field; a structured name is split as recorded;
+     * anything else is a literal that Zotero splits itself, exactly as the
+     * citation_author / DC.creator meta path does.
      */
-    private function creators(ItemRepresentation $item): array
+    private function creator(Creator $creator): string
     {
-        foreach (['bibo:authorList', 'dcterms:creator'] as $term) {
-            $out = [];
-            foreach ($item->value($term, ['all' => true]) as $value) {
-                if (!$value instanceof ValueRepresentation) {
-                    continue;
-                }
-                $creator = MetadataValue::creator($value, $this->kinds);
-                if ($creator === null) {
-                    continue;
-                }
-                $label = $creator->literal;
-                if ($creator->isInstitution) {
-                    // foaf:Person with only a surname → fieldMode 1 (not split).
-                    $out[] = sprintf(
-                        '<dcterms:creator><foaf:Person><foaf:surname>%s</foaf:surname></foaf:Person></dcterms:creator>',
-                        $this->esc($label)
-                    );
-                } elseif ($creator->family !== null && $creator->given !== null) {
-                    $out[] = '<dcterms:creator><foaf:Person>'
-                        . $this->el('foaf:surname', $creator->family)
-                        . $this->el('foaf:givenName', $creator->given)
-                        . '</foaf:Person></dcterms:creator>';
-                } else {
-                    // Literal → Zotero's cleanAuthor splits it (persons), exactly
-                    // as the citation_author / DC.creator meta path does.
-                    $out[] = $this->el('dcterms:creator', $label);
-                }
-            }
-            if ($out) {
-                return $out;
-            }
+        if ($creator->isInstitution) {
+            return sprintf(
+                '<dcterms:creator><foaf:Person><foaf:surname>%s</foaf:surname></foaf:Person></dcterms:creator>',
+                $this->esc($creator->literal)
+            );
         }
-        return [];
+        if ($creator->family !== null && $creator->given !== null) {
+            return '<dcterms:creator><foaf:Person>'
+                . $this->el('foaf:surname', $creator->family)
+                . $this->el('foaf:givenName', $creator->given)
+                . '</foaf:Person></dcterms:creator>';
+        }
+        return (string) $this->el('dcterms:creator', $creator->literal);
     }
 
     // ─── Field readers ───────────────────────────────────────────────────────
-    // cote(), pdfUrl(), pageRange() and clip() live in the shared
-    // ResourceValueReader trait.
+    // Everything but the rights statement and the PDF comes from the
+    // CitationRecord; those two are read through MetadataValue.
 
     // ─── XML helpers ─────────────────────────────────────────────────────────
 

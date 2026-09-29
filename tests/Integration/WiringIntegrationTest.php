@@ -13,11 +13,13 @@ use IwacSeo\Service\CitationMeta;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\EventManager\EventManager;
+use Laminas\EventManager\SharedEventManager;
 use Laminas\Http\PhpEnvironment\Request;
 use Laminas\Mvc\Controller\ControllerManager;
 use Laminas\Mvc\Controller\PluginManager as ControllerPluginManager;
@@ -62,11 +64,13 @@ final class WiringIntegrationTest extends TestCase
         $dependencies = [
             CitationData::class,
             CitationExport::class,
+            \IwacSeo\Service\CitationFormatter::class,
             SitemapGenerator::class,
             PageSeoStore::class,
             SettingsGate::class,
             SiteResolver::class,
             Hreflang::class,
+            RobotsTxt::class,
             ZoteroRdf::class,
         ];
         foreach ($dependencies as $class) {
@@ -75,6 +79,7 @@ final class WiringIntegrationTest extends TestCase
         $services->setService('EventManager', new EventManager());
         $services->setService('ControllerPluginManager', new ControllerPluginManager($services));
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
+        $services->setService('Omeka\Settings\Site', $this->withoutConstructor(\Omeka\Settings\SiteSettings::class));
         $services->setService('Omeka\Connection', \Doctrine\DBAL\DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]));
 
         $controllers = new ControllerManager($services, $this->config['controllers']);
@@ -86,6 +91,33 @@ final class WiringIntegrationTest extends TestCase
         ];
         foreach ($controllerClasses as $controller) {
             self::assertInstanceOf($controller, $controllers->get($controller));
+        }
+    }
+
+    public function testEveryContentTypeWithASitemapInvalidatesIt(): void
+    {
+        require_once dirname(__DIR__, 2) . '/Module.php';
+        $events = new SharedEventManager();
+        (new \IwacSeo\Module())->attachListeners($events);
+
+        $handlers = static function (string $adapter, string $event) use ($events): array {
+            $out = [];
+            foreach ($events->getListeners(['Omeka\\Api\\Adapter\\' . $adapter], $event) as $byPriority) {
+                foreach ($byPriority as $listener) {
+                    $out[] = is_array($listener) ? $listener[1] : null;
+                }
+            }
+            return $out;
+        };
+        foreach (['api.create.post', 'api.update.post', 'api.delete.post'] as $event) {
+            // Sitemap URLs of their own: invalidate and ping.
+            foreach (['ItemAdapter', 'ItemSetAdapter', 'SitePageAdapter'] as $adapter) {
+                self::assertSame(['handleContentChange'], $handlers($adapter, $event), $adapter . ' ' . $event);
+            }
+            // Media visibility and site navigation reshape a sitemap: invalidate only.
+            foreach (['MediaAdapter', 'SiteAdapter'] as $adapter) {
+                self::assertSame(['handleSitemapChange'], $handlers($adapter, $event), $adapter . ' ' . $event);
+            }
         }
     }
 

@@ -122,6 +122,7 @@ class Module extends AbstractModule
         // Omeka invokes install/upgrade while this module is inactive: its src/
         // namespace and services have not been registered for the request yet.
         require_once __DIR__ . '/src/Service/MetadataValue.php';
+        require_once __DIR__ . '/src/Service/PingOutboxInterface.php';
         require_once __DIR__ . '/src/Service/PingRepository.php';
     }
 
@@ -198,10 +199,26 @@ class Module extends AbstractModule
         // Sitemap invalidation + auto-ping on content changes. Deletes are
         // included: the URL leaves the sitemap, and IndexNow is also the
         // fastest way to tell engines a URL vanished (they recrawl → 404).
-        foreach (['Omeka\Api\Adapter\ItemAdapter', 'Omeka\Api\Adapter\SitePageAdapter'] as $adapter) {
+        // Item sets have their own child sitemap, so their edits count too.
+        $contentAdapters = [
+            'Omeka\Api\Adapter\ItemAdapter',
+            'Omeka\Api\Adapter\ItemSetAdapter',
+            'Omeka\Api\Adapter\SitePageAdapter',
+        ];
+        foreach ($contentAdapters as $adapter) {
             $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleContentChange']);
+        }
+
+        // Changes that alter a sitemap without being a sitemap URL of their
+        // own: a media's visibility (the items' image entries), a site's
+        // navigation or homepage (page order and priority). They clear the
+        // cache and queue no IndexNow ping.
+        foreach (['Omeka\Api\Adapter\MediaAdapter', 'Omeka\Api\Adapter\SiteAdapter'] as $adapter) {
+            $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleSitemapChange']);
+            $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleSitemapChange']);
+            $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleSitemapChange']);
         }
     }
 
@@ -288,18 +305,7 @@ class Module extends AbstractModule
             return;
         }
 
-        // Invalidate the sitemap cache so the change shows up on the next
-        // crawl instead of after the TTL. Any create/update can affect the
-        // URL set or a <lastmod> (including a public→private edit), so there
-        // is no public check here. The clear is debounced per request, so a
-        // bulk import pays for it once rather than once per saved item.
-        if ($services->get(SettingsGate::class)->isOn('iwac_seo_sitemap_enabled', true)) {
-            try {
-                $services->get(SitemapGenerator::class)->clearCache();
-            } catch (\Throwable $e) {
-                // never let SEO bookkeeping break a save
-            }
-        }
+        $this->invalidateSitemap();
 
         $queue = $services->get(PingQueue::class);
         if (!$queue->isEnabled()) {
@@ -325,6 +331,11 @@ class Module extends AbstractModule
         } catch (\Throwable $error) {
             $services->get('Omeka\Logger')->err('IwacSeo: failed to queue URL: ' . $error->getMessage());
         }
+    }
+
+    public function handleSitemapChange(EventInterface $event): void
+    {
+        $this->invalidateSitemap();
     }
 
     // ─── Module configuration form ──────────────────────────────────────────
@@ -372,6 +383,26 @@ class Module extends AbstractModule
     }
 
     // ─── Internals ──────────────────────────────────────────────────────────
+
+    /**
+     * Invalidate the sitemap cache so a change shows up on the next crawl
+     * instead of after the TTL. Any create/update can affect the URL set or a
+     * <lastmod> (including a public→private edit), so there is no public check.
+     * The clear is debounced per request, so a bulk import pays for it once
+     * rather than once per saved item.
+     */
+    private function invalidateSitemap(): void
+    {
+        $services = $this->getServiceLocator();
+        if (!$services->get(SettingsGate::class)->isOn('iwac_seo_sitemap_enabled', true)) {
+            return;
+        }
+        try {
+            $services->get(SitemapGenerator::class)->clearCache();
+        } catch (\Throwable $e) {
+            // never let SEO bookkeeping break a save
+        }
+    }
 
     /** Set each default that has no stored value yet. */
     private function applyDefaults(\Omeka\Settings\Settings $settings): void

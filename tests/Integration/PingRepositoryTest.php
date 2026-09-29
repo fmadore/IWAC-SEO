@@ -25,6 +25,22 @@ final class PingRepositoryTest extends TestCase
         self::assertSame(0, $queue->counts()['pending']);
     }
 
+    public function testHasDueIgnoresLeasedAndBackingOffUrls(): void
+    {
+        $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);
+        $queue = new PingRepository($connection);
+        $queue->install();
+        self::assertFalse($queue->hasDue());
+        $queue->push('https://example.test/item/1');
+        $now = time() + 1;
+        self::assertTrue($queue->hasDue($now));
+        $claimed = $queue->claim(now: $now);
+        self::assertFalse($queue->hasDue($now), 'a leased URL is not due');
+        $queue->finish($claimed, false, $now);
+        self::assertFalse($queue->hasDue($now + 1), 'a failed URL waits out its backoff');
+        self::assertTrue($queue->hasDue($now + 121));
+    }
+
     public function testFailureRetriesAndAbandonedLeaseExpires(): void
     {
         $connection = DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]);

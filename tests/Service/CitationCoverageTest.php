@@ -62,7 +62,7 @@ final class CitationCoverageTest extends TestCase
         self::assertSame('speech', $csl['type']);
         self::assertSame('Annual conference', $csl['event-title']);
         self::assertSame([[2023, 11, 9]], $csl['issued']['date-parts']);
-        self::assertStringStartsWith('@misc{', $export->serialize($record, 'bibtex'));
+        self::assertStringStartsWith('@unpublished{', $export->serialize($record, 'bibtex'));
         self::assertStringContainsString(
             'Annual conference, Bayreuth, November 9, 2023',
             (new CitationFormatter())->format($record, 'chicago')
@@ -78,6 +78,16 @@ final class CitationCoverageTest extends TestCase
         $known = new CitationRecord(2, CitationKind::Thesis, 'Muslim communities', publisher: 'University', genre: 'Doctoral dissertation');
         self::assertStringStartsWith('@phdthesis{', (new CitationExport())->serialize($known, 'bibtex'));
         self::assertStringContainsString('[Doctoral dissertation, University]', (new CitationFormatter())->format($known, 'apa'));
+    }
+
+    public function testDiagnosticsOnlyReturnTranslatableLabels(): void
+    {
+        foreach (CitationKind::cases() as $kind) {
+            $missing = CitationDiagnostics::missing(new CitationRecord(1, $kind));
+            foreach ($missing as $label) {
+                self::assertContains($label, CitationDiagnostics::LABELS, $kind->value);
+            }
+        }
     }
 
     public function testUnknownDateAndEditionAreLocalised(): void

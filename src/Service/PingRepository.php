@@ -7,7 +7,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 /** Durable outbox. Versioned leases make acknowledgement safe during concurrent edits. */
-final class PingRepository
+final class PingRepository implements PingOutboxInterface
 {
     public function __construct(private readonly Connection $connection)
     {
@@ -79,6 +79,16 @@ final class PingRepository
                     'attempts' => $attempts, 'available_at' => $now + min(86400, 60 * (2 ** $attempts))], $where);
             }
         }
+    }
+
+    /** Whether any URL is due for submission now (not leased, not backing off, not exhausted). */
+    public function hasDue(?int $now = null): bool
+    {
+        $now ??= time();
+        return (bool) $this->connection->fetchOne(
+            'SELECT 1 FROM iwac_seo_ping WHERE available_at <= :now AND lease_until <= :now AND attempts < 5 LIMIT 1',
+            ['now' => $now]
+        );
     }
 
     /** @return array{pending:int,failed:int} */

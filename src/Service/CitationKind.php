@@ -113,7 +113,9 @@ enum CitationKind: string
             self::Thesis => 'thesis',
             self::PeriodicalIssue => 'periodical',
             self::Report => 'techreport',
-            self::Communication => 'misc',
+            // biblatex's type for "the script of a talk", and the one whose
+            // standard drivers print eventtitle, eventdate and venue.
+            self::Communication => 'unpublished',
             self::Post => 'online',
             default => 'misc',
         };

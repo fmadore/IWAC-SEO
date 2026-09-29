@@ -68,14 +68,14 @@ class Citation extends AbstractHelper
 
         /** @var PhpRenderer $view */
         $view = $this->getView();
-        $url = $this->itemUrl($view, $item);
+        $siteSlug = $this->siteSlug($view);
+        $url = ResourceUrl::forSite($item, $siteSlug);
+        $locale = ViewLocale::forCitation($view);
 
-        $record = $this->citationData->build($item, $url, ViewLocale::forCitation($view));
+        $record = $this->citationData->build($item, $url, $locale);
         if ($record === null) {
             return null;
         }
-
-        $locale = ViewLocale::forCitation($view);
 
         $styles = [];
         foreach ($this->styleLabels as $id => $label) {
@@ -88,13 +88,16 @@ class Citation extends AbstractHelper
             return null;
         }
 
+        // Downloads carry the reader's site, so the file links this page and
+        // reads in its language rather than the default site's.
+        $siteQuery = $siteSlug !== null ? '?site=' . rawurlencode($siteSlug) : '';
         $downloads = [];
         foreach ($this->enabledFormats as $fmt) {
             if (!isset(CitationExport::FORMATS[$fmt])) {
                 continue;
             }
             $downloads[$fmt] = [
-                'url'   => $view->serverUrl('/cite/' . $record->id . '/' . $fmt),
+                'url'   => $view->serverUrl('/cite/' . $record->id . '/' . $fmt) . $siteQuery,
                 'label' => self::FORMAT_LABELS[$fmt] ?? strtoupper($fmt),
                 'ext'   => CitationExport::FORMATS[$fmt][0],
             ];
@@ -116,13 +119,13 @@ class Citation extends AbstractHelper
         ];
     }
 
-    private function itemUrl(PhpRenderer $view, ItemRepresentation $item): ?string
+    private function siteSlug(PhpRenderer $view): ?string
     {
         try {
             $site = $view->currentSite();
         } catch (\Throwable $e) {
             return null;
         }
-        return $site ? ResourceUrl::forSite($item, $site->slug()) : null;
+        return $site ? $site->slug() : null;
     }
 }

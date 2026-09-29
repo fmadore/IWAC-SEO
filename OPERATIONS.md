@@ -8,6 +8,9 @@ change Google permissions, or install a server cron job.
 ## Public origin
 
 Set `IWAC_SEO_PUBLIC_ORIGIN=https://islam.zmo.de` in the PHP web **and CLI** environment.
+A value that is not an HTTP(S) origin without a path is ignored rather than allowed to
+break page renders: pages fall back to Omeka's own URLs, the SEO dashboard shows an error,
+and the IndexNow cron script exits with status 2 until it is fixed.
 This pins canonical URLs, resource identities, hreflang links and sitemap origins
 independently of incoming Host headers. Without it, Omeka's configured URL generation
 is used. Configure the reverse proxy to accept only the production hostname; use
@@ -18,6 +21,17 @@ Clean pagination has its own canonical and remains indexable. Tracking parameter
 (`utm_*`, `gclid`, `fbclid`, `msclkid`) are removed. Search/filter/sort variants are
 self-canonical and `noindex, follow` when the existing browse setting is on. Resource
 pages retain their resource canonical even when a linked-record widget is paginated.
+
+`robots.txt` also disallows those query variants, following Google's faceted-navigation
+guidance: a `noindex` has to be crawled to be read, so it spends the crawl budget it is
+meant to save. The rules live in `iwac_seo.robots` (`config/instance.config.php`) and cover
+the IwacSearch pages (`/search?`, `/s/*/recherche?`, their `everything`/`tout` tabs, the
+`/discovery/token` endpoint) and Omeka's browse filters (`/s/*/item?` and siblings, including
+the `?property[…]` link every metadata value carries), with `?page=` allowed. The landing
+pages, clean pagination and every sitemap URL stay crawlable; `InstanceConfigTest` asserts
+it. A URL Google indexed before the rule appeared keeps its entry until it drops out: if
+Search Console lists such URLs as "Indexed, though blocked by robots.txt", remove the rule
+for that pattern until their `noindex` has been seen, then restore it.
 
 ## Sitemap and queue
 
@@ -140,7 +154,11 @@ status remains missing; editors should resolve catalogue gaps rather than guess 
 | Blog post | Blog title, full date and original source URL |
 
 CSL-JSON is the richest interchange format. The `.bib` export supports BibLaTeX fields
-and types (`date`, `periodical`, generic `thesis`); legacy BibTeX styles may ignore them.
+and types (`date`, `langid`, `entrysubtype` for newspaper and magazine articles, `periodical`
+with the periodical as `title` and the issue as `issuetitle`, `unpublished` for talks, generic
+`thesis`); legacy BibTeX styles may ignore them. The accession number is filed as Zotero's
+call number and archive location in every download (RIS `CN`/`AN`, CSL `call-number`/
+`archive_location`), with the collection as the archive (RIS `DB`, CSL `archive`).
 RIS cannot represent a date interval losslessly as structured date parts, so its
 original interval is retained in a note. Corporate names in RIS and whole periodical
 issues in Zotero have importer-specific limitations: use CSL-JSON for structured

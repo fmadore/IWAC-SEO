@@ -8,11 +8,15 @@ use Omeka\Api\Representation\AbstractResourceRepresentation;
 /**
  * Canonical public URLs for a resource, guarded.
  *
- * `siteUrl()` throws when the resource is not assigned to the site (or the
- * route cannot be assembled), and every caller in this module wants "the URL,
- * or null" rather than an exception escaping into a page render, a sitemap or
- * an API listener. That try/catch used to be copied seven times; it lives here
- * now.
+ * `siteUrl()` can throw when the route cannot be assembled (no site slug in
+ * scope, a router without the site routes), and every caller in this module
+ * wants "the URL, or null" rather than an exception escaping into a page
+ * render, a sitemap or an API listener. That try/catch used to be copied seven
+ * times; it lives here now.
+ *
+ * It does not check site membership: Omeka 4.2 builds the URL for any site
+ * slug, and its public item page renders an item on any site. The hreflang
+ * alternate for a resource therefore always resolves.
  */
 final class ResourceUrl
 {

@@ -32,7 +32,7 @@ It is self-contained, with no third-party runtime Composer dependencies or theme
 | **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
-| **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
+| **robots.txt** | `/robots.txt` disallowing `/admin`, the query variants of the search and browse pages (facets, filters, sorts — clean pagination stays crawlable; `iwac_seo.robots`), and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
 | **Google Search Console** | Paste the verification snippet in the module config; the `<meta name="google-site-verification">` tag is injected site-wide. |
 | **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (durable, throttled batches and retries). |
 
@@ -372,7 +372,9 @@ helper, which returns:
   language, so the French site reads *Dans*, *sous la dir. de*, *7 décembre 2018*;
 - **downloads** at **`/cite/{item-id}/{format}`** — **BibTeX** (`.bib`), **RIS** (`.ris`) and
   **CSL-JSON** (`.json`), served by `CitationController` as an `attachment` whose filename is the
-  `iwac-` accession id; and
+  `iwac-` accession id. The panel's links carry `?site={slug}`, so a download from the English
+  site links the English page and reads in English (abstract, *Islam West Africa Collection*),
+  one from the French site in French (*Collection Islam Afrique de l'Ouest*); and
 - the **Zotero RDF** link (the `/unapi` endpoint above) for the Connector-eligible kinds.
 
 This is the single-item replacement for `Daniel-KM/Omeka-s-module-BulkExport`. All three
@@ -442,7 +444,7 @@ thumbnail — the page scan or cover) so Google Images can index the scans; disa
 Resource ids + modified timestamps are read with one lean DBAL query per type (public
 resources scoped to the site), avoiding representation hydration for each item. Output is
 cached under `files/iwac-seo-cache/` and served with `Cache-Control` / `Last-Modified`
-headers; the cache is invalidated when an item or page changes, and any cache failure falls
+headers; the cache is invalidated when an item, item set or page changes, and any cache failure falls
 back to live generation.
 
 ---
@@ -493,10 +495,13 @@ IwacSeo/
 │       ├── SitemapGenerator.php      # which URLs go in which sitemap
 │       ├── Sitemap/                  # SitemapRepository, UrlsetWriter, XmlCache, SitemapDocument
 │       ├── PageSeoStore.php          # per-page overrides (site setting)
-│       ├── PingQueue.php             # IndexNow queue: dedupe, flood cap, throttle
+│       ├── PingQueue.php             # IndexNow dispatch policy: enabled, throttle, batch size
+│       ├── PingRepository.php        # the durable outbox (PingOutboxInterface)
 │       ├── Pinger.php                # IndexNow submit
+│       ├── RobotsTxt.php             # robots.txt body + Google's longest-match check
 │       ├── SettingsGate.php          # typed reads over the iwac_seo_* settings
-│       ├── ResourceUrl.php, ViewLocale.php, Text.php  # small shared helpers
+│       ├── UrlPolicy.php             # canonical/query policy, pinned public origin
+│       ├── ResourceUrl.php, ViewLocale.php, MonthNames.php, Text.php  # small shared helpers
 │       └── *Factory.php
 ├── view/iwac-seo/admin/seo/{dashboard,pages}.phtml
 ├── asset/css/admin.css
@@ -510,7 +515,7 @@ IwacSeo/
 
 1. `curl -s https://islam.zmo.de/sitemap.xml | head` → a `<sitemapindex>`; the child sitemaps
    list `<url>` entries with `<lastmod>`.
-2. `curl -s https://islam.zmo.de/robots.txt` → `Disallow: /admin/` and a `Sitemap:` line.
+2. `curl -s https://islam.zmo.de/robots.txt` → `Disallow: /admin/`, the `/s/*/search?`-style query rules and a `Sitemap:` line.
 3. View-source an item page (`/s/afrique_ouest/item/2231`): confirm `<title>`, `description`,
    `og:*`, `twitter:*`, `<link rel="canonical">` and an `application/ld+json` block. Validate
    the JSON-LD with the [Rich Results Test](https://search.google.com/test/rich-results).

@@ -6,6 +6,7 @@ namespace IwacSeo\Controller;
 use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\UrlPolicy;
 use IwacSeo\Service\ZoteroRdf;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
@@ -84,9 +85,7 @@ class UnapiController extends AbstractActionController
      */
     private function resolveItem(string $id): ?ItemRepresentation
     {
-        $host = $this->getRequest()->getUri()->getHost();
-        $idHost = parse_url($id, PHP_URL_HOST);
-        if ($host === null || $idHost === null || strcasecmp($host, (string) $idHost) !== 0) {
+        if (!UrlPolicy::isOwnHost($id, $this->getRequest()->getUri()->getHost())) {
             return null;
         }
         if (!preg_match('#/item/(\d+)#', $id, $m)) {

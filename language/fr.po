@@ -25,8 +25,8 @@ msgstr "Ajoute aux pages de ressources des balises <meta> Highwire Press (citati
 msgid "Adds a /unapi endpoint and discovery tags to newspaper articles, periodical issues, documents, audiovisual items and photographs. Zotero prefers unAPI over the meta tags, so it imports a richer record — the call number (Cote) from the iwac- identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. Needs “Emit citation meta tags” for the fallback. Recommended."
 msgstr "Ajoute un point d’accès /unapi et des balises de découverte aux articles de presse, numéros de périodiques, documents, documents audiovisuels et photographies. Zotero privilégie unAPI par rapport aux balises meta et importe donc une notice plus riche : la cote (issue de l’identifiant iwac-), les auteurs institutionnels en un seul champ, ainsi que le Sujet et la Couverture spatiale comme marqueurs. Nécessite « Générer les balises meta de citation » comme solution de repli. Recommandé."
 
-msgid "Adds structured data (Person, Place, Organization, CreativeWork/Dataset, scholarly types …) to resource pages for richer search results and Google Dataset Search. Recommended."
-msgstr "Ajoute des données structurées (Person, Place, Organization, CreativeWork/Dataset, types savants…) aux pages de ressources, pour des résultats de recherche enrichis et pour Google Dataset Search. Recommandé."
+msgid "Adds schema.org structured data (Person, Place, Organization, NewsArticle, VideoObject, scholarly types …) to resource pages, so search engines can tell what each record is. Recommended."
+msgstr "Ajoute des données structurées schema.org (Person, Place, Organization, NewsArticle, VideoObject, types savants…) aux pages de ressources, afin que les moteurs de recherche identifient la nature de chaque notice. Recommandé."
 
 msgid "Bilingual (hreflang) coverage"
 msgstr "Couverture bilingue (hreflang)"
@@ -100,9 +100,6 @@ msgstr "Indexation"
 msgid "Invalid form submission."
 msgstr "Envoi du formulaire invalide."
 
-msgid "Keeps faceted and paginated browse URLs out of the index (they add little and dilute crawl budget) while still letting crawlers follow links to the resource pages. Recommended."
-msgstr "Empêche l’indexation des URL de navigation à facettes et paginées (peu utiles, elles diluent le budget d’exploration) tout en laissant les robots suivre les liens vers les pages de ressources. Recommandé."
-
 msgid "Meta description"
 msgstr "Méta-description"
 
@@ -118,11 +115,8 @@ msgstr "Aucun site trouvé."
 msgid "Noindex"
 msgstr "Ne pas indexer"
 
-msgid "Noindex filtered / paginated browse pages"
-msgstr "Ne pas indexer les pages de navigation filtrées ou paginées"
-
-msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item or page is added or edited, so it is crawled sooner. Throttled, and skipped during bulk syncs. Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
-msgstr "Avertit Bing et Yandex (ainsi que les autres moteurs compatibles IndexNow) lorsqu’un contenu ou une page publique est ajouté ou modifié, afin d’accélérer son exploration. La fréquence est limitée et les synchronisations en masse sont ignorées. Google n’est pas notifié (son point d’accès a été supprimé : Google s’appuie sur robots.txt et la Search Console)."
+msgid "Notifies Bing/Yandex (and other IndexNow engines) when a public item, item set or page is added or edited, so it is crawled sooner. Changes are queued and sent in throttled batches, bulk imports included; schedule scripts/drain-indexnow.php (see OPERATIONS.md). Google is not pinged (its ping endpoint was retired — Google uses robots.txt + Search Console instead)."
+msgstr "Avertit Bing et Yandex (ainsi que les autres moteurs compatibles IndexNow) lorsqu’un contenu, une collection ou une page publique est ajouté ou modifié, afin d’accélérer son exploration. Les modifications sont mises en file d’attente et envoyées par lots à fréquence limitée, imports en masse compris ; planifiez scripts/drain-indexnow.php (voir OPERATIONS.md). Google n’est pas notifié (son point d’accès a été supprimé : Google s’appuie sur robots.txt et la Search Console)."
 
 msgid "Off"
 msgstr "Désactivé"
@@ -169,9 +163,6 @@ msgstr "Image de partage"
 msgid "Site"
 msgstr "Site"
 
-msgid "Site-wide “discourage indexing” is ON — every page is marked noindex and robots.txt disallows everything. Turn it off in Configure for production."
-msgstr "L’option « ne pas indexer le site » est ACTIVÉE : chaque page porte la directive noindex et robots.txt interdit tout. Désactivez-la dans Configurer pour la mise en production."
-
 msgid "Sitemap"
 msgstr "Sitemap"
 
@@ -180,9 +171,6 @@ msgstr "Cache du sitemap vidé : il sera reconstruit à la prochaine requête."
 
 msgid "Sitemap cache lifetime (seconds)"
 msgstr "Durée de vie du cache du sitemap (secondes)"
-
-msgid "Staging switch. When on, every page gets robots \"noindex, nofollow\" and robots.txt disallows everything. Turn OFF in production."
-msgstr "Interrupteur pour les environnements de préproduction. Une fois activé, chaque page reçoit la directive robots « noindex, nofollow » et robots.txt interdit tout. À DÉSACTIVER en production."
 
 msgid "State"
 msgstr "État"
@@ -282,3 +270,42 @@ msgstr "Ne pas indexer les pages de navigation filtrées"
 
 msgid "Keeps search, filter and sort variants out of the index. Clean pagination remains indexable and tracking parameters are removed from canonical URLs."
 msgstr "Exclut de l’index les variantes de recherche, de filtre et de tri. La pagination reste indexable et les paramètres de suivi sont retirés des URL canoniques."
+
+msgid "The public origin (IWAC_SEO_PUBLIC_ORIGIN) is not an HTTP(S) origin without a path, so it is ignored: canonical, hreflang and sitemap URLs follow the incoming request. Fix the environment variable, for example https://islam.zmo.de."
+msgstr "L’origine publique (IWAC_SEO_PUBLIC_ORIGIN) n’est pas une origine HTTP(S) sans chemin : elle est donc ignorée, et les URL canoniques, hreflang et du plan du site suivent la requête reçue. Corrigez la variable d’environnement, par exemple https://islam.zmo.de."
+
+msgid "title"
+msgstr "titre"
+
+msgid "date"
+msgstr "date"
+
+msgid "container"
+msgstr "publication"
+
+msgid "book title"
+msgstr "titre de l’ouvrage"
+
+msgid "publisher"
+msgstr "éditeur"
+
+msgid "degree / thesis type"
+msgstr "diplôme / type de thèse"
+
+msgid "institution"
+msgstr "établissement"
+
+msgid "event"
+msgstr "événement"
+
+msgid "publisher / institution"
+msgstr "éditeur / établissement"
+
+msgid "archive"
+msgstr "fonds d’archives"
+
+msgid "call number"
+msgstr "cote"
+
+msgid "reviewed title"
+msgstr "titre de l’ouvrage recensé"

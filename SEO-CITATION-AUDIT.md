@@ -25,7 +25,7 @@ The architecture is a good foundation. The main weakness is semantic fidelity: s
 
 ### 1. Preserve date precision and ranges across all outputs — high priority
 
-Locations: [IssuedDate.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Citation/IssuedDate.php:33), [CitationExport.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationExport.php:51), [CitationData.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationData.php:62).
+Locations: [IssuedDate.php](src/Service/Citation/IssuedDate.php), [CitationExport.php](src/Service/CitationExport.php), [CitationData.php](src/Service/CitationData.php).
 
 `IssuedDate::parse()` searches for a date substring without anchoring or calendar validation. An interval becomes its first date; impossible dates such as `2021-02-30` become structured dates. BibTeX then emits only a year, and CSL export discards literal-only dates. This affects the identity of newspaper articles and combined periodical issues, not just punctuation.
 
@@ -33,7 +33,7 @@ Introduce a date value with start, optional end, precision, original literal and
 
 ### 2. Separate a complete periodical issue from an article — high priority
 
-Locations: [instance.config.php](C:/Users/frede/GitHub/IWAC-SEO/config/instance.config.php), [CitationKind.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationKind.php:73).
+Locations: [instance.config.php](config/instance.config.php), [CitationKind.php](src/Service/CitationKind.php).
 
 Class 60 is correctly `PublicationIssue` in JSON-LD but becomes `article-magazine`, RIS `MGZN` and Zotero `magazineArticle`. This is an interoperability approximation, not an exact description of the object. The formatter also quotes its title as an article title and ignores issue numbers in the periodical branches. `firstString(bibo:issue)` loses combined issue values, as item 10224 demonstrates.
 
@@ -41,7 +41,7 @@ Add an internal `PeriodicalIssue` kind, retain all issue values, and document ea
 
 ### 3. Select descriptions by language — high priority
 
-Locations: [HeadMetadata.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/HeadMetadata.php:316), [StructuredData.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/StructuredData.php:76), [ResourceValueReader.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Concern/ResourceValueReader.php).
+Locations: [HeadMetadata.php](src/Service/HeadMetadata.php), [StructuredData.php](src/Service/StructuredData.php), [ResourceValueReader.php](src/Service/Concern/ResourceValueReader.php).
 
 These paths choose the first value, disregarding `@language`. Live item 2231 confirms the effect despite an available English summary. Pass the page locale into a shared language-aware selector, with explicit fallbacks: exact language, compatible base language, untagged French according to IWAC conventions, then another available language. Keep the existing distinction between description priority and formal-abstract priority.
 
@@ -49,7 +49,7 @@ The work's language and the interface's language are separate: a French newspape
 
 ### 4. Do not manufacture video publication facts — high priority
 
-Locations: [Text.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Text.php), [StructuredData.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/StructuredData.php:265).
+Locations: [Text.php](src/Service/Text.php), [StructuredData.php](src/Service/StructuredData.php).
 
 The code derives `uploadDate` from the general document date and pads a year/month to the first day at midnight UTC. A recording date is not necessarily an upload date. Even a syntactically valid timestamp can therefore misrepresent the source. Google defines this field as when the video was first published; timezone information is recommended. [Google video requirements](https://developers.google.com/search/docs/appearance/structured-data/video).
 
@@ -59,7 +59,7 @@ Video indexing additionally depends on the rendered page actually being suitable
 
 ### 5. Complete type-specific citation fields and style rules — high priority
 
-Locations: [CitationFormatter.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationFormatter.php:120), [CitationRecord.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Citation/CitationRecord.php), [CitationExport.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationExport.php).
+Locations: [CitationFormatter.php](src/Service/CitationFormatter.php), [CitationRecord.php](src/Service/Citation/CitationRecord.php), [CitationExport.php](src/Service/CitationExport.php).
 
 The visible styles are intentionally hand-written and do not yet warrant a claim of complete Chicago/APA/MLA compliance:
 
@@ -77,7 +77,7 @@ Use a reviewed citation corpus as the acceptance standard. A CSL processor is a 
 
 ### 6. Reuse normalised creators and facts across metadata paths — medium priority
 
-Locations: [Creator.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Citation/Creator.php:46), [StructuredData.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/StructuredData.php:462), [CitationMeta.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/CitationMeta.php), [ZoteroRdf.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/ZoteroRdf.php).
+Locations: [Creator.php](src/Service/Citation/Creator.php), [StructuredData.php](src/Service/StructuredData.php), [CitationMeta.php](src/Service/CitationMeta.php), [ZoteroRdf.php](src/Service/ZoteroRdf.php).
 
 `CitationRecord` is shared by the formatter and three downloads, but Highwire, Zotero RDF and JSON-LD still extract their own facts. Corporate authors are correctly preserved in some citation paths but JSON-LD assigns `Person` to all authors/editors/contributors. Creator parsing guesses the last token is the surname even though authority records can carry `foaf:firstName` and `foaf:lastName`.
 
@@ -85,7 +85,7 @@ Prefer structured authority names, then explicitly inverted literals, then a doc
 
 ### 7. Exclude noindex pages from sitemap recommendations — medium priority
 
-Locations: [HeadMetadata.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/HeadMetadata.php:142), [SitemapGenerator.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/SitemapGenerator.php:80), [SeoController.php](C:/Users/frede/GitHub/IWAC-SEO/src/Controller/Admin/SeoController.php:162).
+Locations: [HeadMetadata.php](src/Service/HeadMetadata.php), [SitemapGenerator.php](src/Service/SitemapGenerator.php), [SeoController.php](src/Controller/Admin/SeoController.php).
 
 The page editor can set `noindex`, but sitemap generation reads all public pages without consulting SEO overrides. Saving overrides also does not invalidate the sitemap. The trigger is a public page explicitly marked noindex: HTML and sitemap then recommend conflicting treatment.
 
@@ -93,13 +93,13 @@ Introduce a shared page-indexability policy used by sitemap and HTML generation,
 
 ### 8. The staging switch blocks discovery of its own noindex — medium priority
 
-Locations: [SitemapController.php](C:/Users/frede/GitHub/IWAC-SEO/src/Controller/SitemapController.php:133), [HeadMetadata.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/HeadMetadata.php:219).
+Locations: [SitemapController.php](src/Controller/SitemapController.php), [HeadMetadata.php](src/Service/HeadMetadata.php).
 
 Enabling the master noindex emits both a page-level noindex and `Disallow: /`. A crawler prevented from fetching a previously indexed page cannot discover its new noindex. Use authentication for private staging; use crawlable noindex when the purpose is removal from indexing. Distinguish those modes in settings. [Google robots guidance](https://developers.google.com/search/docs/crawling-indexing/robots/intro).
 
 ### 9. Cache writes and database errors can produce misleading sitemap success — medium priority
 
-Locations: [XmlCache.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Sitemap/XmlCache.php:33), [SitemapRepository.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/Sitemap/SitemapRepository.php:89).
+Locations: [XmlCache.php](src/Service/Sitemap/XmlCache.php), [SitemapRepository.php](src/Service/Sitemap/SitemapRepository.php).
 
 Writers use `LOCK_EX`, but readers take no shared lock and writes replace the live file directly. A concurrent reader can read an empty or partial document. Build into a temporary file in the same directory and publish atomically, checking write success. Add a lock or single-flight policy for cold-cache regeneration and an invalidation generation token to prevent an older in-flight build repopulating a cleared cache.
 
@@ -107,7 +107,7 @@ Repository exceptions become `[]` or `0`, which can be cached and served as succ
 
 ### 10. IndexNow is neither an atomic queue nor a guaranteed delayed delivery mechanism — medium priority
 
-Locations: [PingQueue.php](C:/Users/frede/GitHub/IWAC-SEO/src/Service/PingQueue.php:58), [PingSearchEngines.php](C:/Users/frede/GitHub/IWAC-SEO/src/Job/PingSearchEngines.php).
+Locations: [PingQueue.php](src/Service/PingQueue.php), [PingSearchEngines.php](src/Job/PingSearchEngines.php).
 
 `push()` and `drain()` read and rewrite a settings array without atomicity. Concurrent saves can lose URLs; a drain can overwrite an intervening push. Failed submission is logged after the batch has been deleted. Edits within the 15-minute throttle window may remain pending indefinitely if no later edit triggers another dispatch.
 

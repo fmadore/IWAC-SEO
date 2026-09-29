@@ -21,6 +21,9 @@ class SiteResolver
     private ?SiteRepresentation $site = null;
     private bool $resolved = false;
 
+    /** @var array<string,?SiteRepresentation> public sites by slug, looked up once each */
+    private array $publicSites = [];
+
     public function __construct(
         private readonly ApiManager $api,
         private readonly Settings $settings,
@@ -56,8 +59,11 @@ class SiteResolver
 
     public function publicSite(string $slug): ?SiteRepresentation
     {
-        $sites = $this->api->search('sites', ['slug' => $slug, 'is_public' => true, 'limit' => 1])->getContent();
-        return $sites[0] ?? null;
+        if (!array_key_exists($slug, $this->publicSites)) {
+            $sites = $this->api->search('sites', ['slug' => $slug, 'is_public' => true, 'limit' => 1])->getContent();
+            $this->publicSites[$slug] = $sites[0] ?? null;
+        }
+        return $this->publicSites[$slug];
     }
 
     /**

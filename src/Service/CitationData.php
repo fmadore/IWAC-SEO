@@ -39,8 +39,14 @@ final class CitationData
 {
     use ResourceValueReader;
 
-    public function __construct(private readonly CitationKindMap $kinds)
-    {
+    /**
+     * @param array<string,string> $archiveNames language code => the holding
+     *   collection's name in it (`iwac_seo.citation.archive_names`)
+     */
+    public function __construct(
+        private readonly CitationKindMap $kinds,
+        private readonly array $archiveNames = [],
+    ) {
     }
 
     public function kind(?int $classId): CitationKind
@@ -70,6 +76,7 @@ final class CitationData
         // kind needs, mirroring CitationMeta's per-kind branches.
         $container = $this->firstLabel($item, 'dcterms:publisher');
         $abstract = MetadataValue::select($item, self::ABSTRACT_TERMS, $locale);
+        $accession = $this->cote($item);
 
         return new CitationRecord(
             id: $item->id(),
@@ -92,7 +99,7 @@ final class CitationData
             language: MetadataValue::language($this->firstLabel($item, 'dcterms:language')),
             abstract: $abstract !== null ? $this->clip($abstract) : null,
             keywords: $this->keywords($item),
-            accession: $this->cote($item),
+            accession: $accession,
             genre: $this->firstLabel($item, 'dcterms:type'),
             eventTitle: $kind === CitationKind::Communication ? $this->firstLabel($item, 'dcterms:isPartOf') : null,
             eventPlace: $kind === CitationKind::Communication ? $this->firstLabel($item, 'dcterms:spatial') : null,
@@ -101,7 +108,7 @@ final class CitationData
             number: $this->firstString($item, ['bibo:number']),
             edition: $this->firstString($item, ['bibo:edition']),
             reviewedTitle: $this->firstLabel($item, 'bibo:reviewOf'),
-            archive: $this->cote($item) !== null ? 'Islam West Africa Collection' : null,
+            archive: $accession !== null ? $this->archiveName($locale) : null,
             isbn: $this->firstString($item, ['bibo:isbn13', 'bibo:isbn10', 'bibo:isbn']),
             issn: $this->firstString($item, ['bibo:issn']),
         );
@@ -123,6 +130,17 @@ final class CitationData
             CitationKind::Photo, CitationKind::Document => 'publisher',
             default => 'container',
         };
+    }
+
+    /**
+     * The holding collection's name in the citation's language: the French
+     * site cites "Collection Islam Afrique de l'Ouest", the English one
+     * "Islam West Africa Collection". English, then any name, as fallbacks.
+     */
+    private function archiveName(?string $locale): ?string
+    {
+        $name = $this->archiveNames[$locale ?? ''] ?? $this->archiveNames['en'] ?? array_values($this->archiveNames)[0] ?? null;
+        return is_string($name) && $name !== '' ? $name : null;
     }
 
     // ─── Creators ────────────────────────────────────────────────────────────

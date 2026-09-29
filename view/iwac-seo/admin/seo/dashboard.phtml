@@ -16,6 +16,9 @@
  * @var bool $hreflangEnabled
  * @var array{unpaired:array<int,array{site:\Omeka\Api\Representation\SiteRepresentation,lang:string,pages:\Omeka\Api\Representation\SitePageRepresentation[]}>,broken:array<int,array{site:\Omeka\Api\Representation\SiteRepresentation,page:\Omeka\Api\Representation\SitePageRepresentation,targetSite:string,targetSlug:string}>} $hreflangCoverage
  * @var \Laminas\Form\Form $confirmForm
+ * @var array{kind:string,missing:string[],styles:array<string,array<string,string>>}|null $citationPreview
+ * @var array{pending:int,failed:int} $queueCounts
+ * @var string|null $originError
  */
 
 $this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'IwacSeo'));
@@ -28,6 +31,10 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
 <?php echo $this->pageTitle($this->translate('SEO'), 1); ?>
 
 <div class="active section" role="tabpanel">
+
+    <?php if ($originError !== null): ?>
+    <p class="messages"><span class="message error"><?php echo $this->translate('The public origin (IWAC_SEO_PUBLIC_ORIGIN) is not an HTTP(S) origin without a path, so it is ignored: canonical, hreflang and sitemap URLs follow the incoming request. Fix the environment variable, for example https://islam.zmo.de.'); ?></span></p>
+    <?php endif; ?>
 
     <?php if ($noindexSite): ?>
     <p class="messages"><span class="message warning"><?php echo $this->translate('Site-wide “discourage indexing” is ON. Crawlers can fetch pages to read noindex. Turn it off in Configure for production.'); ?></span></p>
@@ -85,15 +92,14 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
         <button type="submit"><?php echo $this->translate('Preview'); ?></button>
     </form>
     <?php if ($citationPreview !== null): ?>
-        <p><?php echo $this->escapeHtml($citationPreview->kind->value); ?></p>
-        <?php if ($citationMissing): ?>
-            <p><?php echo $this->translate('Missing catalogue fields:'); ?> <?php echo $this->escapeHtml(implode(', ', $citationMissing)); ?></p>
+        <p><?php echo $this->escapeHtml($citationPreview['kind']); ?></p>
+        <?php if ($citationPreview['missing']): ?>
+            <p><?php echo $this->translate('Missing catalogue fields:'); ?> <?php echo $this->escapeHtml(implode(', ', array_map(fn (string $label): string => $this->translate($label), $citationPreview['missing']))); ?></p>
         <?php endif; ?>
-        <?php $formatter = new \IwacSeo\Service\CitationFormatter(); ?>
-        <?php foreach (['en', 'fr'] as $locale): ?>
-            <?php foreach ($formatter::STYLES as $style): ?>
+        <?php foreach ($citationPreview['styles'] as $locale => $styles): ?>
+            <?php foreach ($styles as $style => $html): ?>
                 <p><strong><?php echo $this->escapeHtml(strtoupper($style) . ' (' . $locale . ')'); ?></strong><br>
-                    <?php echo $formatter->format($citationPreview, $style, $locale); ?></p>
+                    <?php echo $html; // escaped by CitationFormatter ?></p>
             <?php endforeach; ?>
         <?php endforeach; ?>
     <?php endif; ?>

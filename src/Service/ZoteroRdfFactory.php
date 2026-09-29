@@ -12,6 +12,6 @@ final class ZoteroRdfFactory implements FactoryInterface
     {
         // Shares the kind map with CitationData and CitationMeta, so all three
         // dispatch on the same IWAC resource-class conventions.
-        return new ZoteroRdf($container->get(CitationKindMap::class));
+        return new ZoteroRdf($container->get(CitationKindMap::class), $container->get(CitationData::class));
     }
 }

@@ -3,6 +3,20 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+- Fix formatted citations: APA no longer runs a volume-less issue into its periodical (`*Al Mawadda*(48–49)`), French APA dates read `(2018, 7 décembre)`, date intervals read as dates in every style (`May–August 2009`) instead of raw ISO, MLA abbreviates months and puts the issue number before the date, and page ranges take an en dash.
+- Fix exports: biblatex `@misc` keeps the publisher and a source-only URL, `@periodical` names the periodical as `title` and the issue as `issuetitle`, talks are `@unpublished` so `eventtitle`/`venue` print, known languages emit `langid`, and newspaper/magazine articles carry `entrysubtype`. RIS adds `CN` and `DB` and CSL-JSON `archive_location`, so every download files the accession as Zotero's call number.
+- Emit `citation_publication_date` in Google Scholar's documented `2010/5/12` form; an interval cites its start.
+- Invalidate the sitemap and queue IndexNow pings for item-set changes. Accept unAPI ids on `IWAC_SEO_PUBLIC_ORIGIN` behind a Host-rewriting proxy. The IndexNow cron script refuses non-CLI execution and no longer records an empty job when nothing is due.
+- Correct stale configuration help text (no Dataset markup is emitted; bulk changes are batched, not skipped) and prune obsolete French entries. Keep the audit record and Search Console manifest out of the release zip.
+- Disallow the query variants of the IwacSearch pages and of Omeka's browse routes in `robots.txt` (`iwac_seo.robots`), following Google's faceted-navigation guidance; landing pages, clean pagination and sitemap URLs stay crawlable.
+- Citations are bilingual by the reader's site: the collection is *Collection Islam Afrique de l'Ouest* on the French site (`iwac_seo.citation.archive_names`), and `/cite/{id}/{format}?site={slug}` downloads link the reader's site and read in its language.
+- A malformed `IWAC_SEO_PUBLIC_ORIGIN` no longer turns every public page into an error: it is logged and ignored, shown on the dashboard, and stops the IndexNow cron script. Media and site edits refresh the sitemap cache.
+- Internal: the settings-backed IndexNow queue path is removed behind a `PingOutboxInterface`; `ZoteroRdf` serialises from the shared `CitationRecord`; month names live in one table; dashboard citation previews are built per language by the controller, with translated field labels; the Google auth action in the Search Console workflow is pinned to a commit.
+
+See [REVIEW-2026-09.md](REVIEW-2026-09.md) for the review behind these fixes and the recommendations not yet acted on.
+
 ## 1.1.1 — 2026-09-10
 
 - Fix installation and upgrades failing with `Class "IwacSeo\Service\PingRepository" not found`. Load the lifecycle dependencies explicitly because Omeka has not registered an inactive module's service autoloader.

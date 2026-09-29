@@ -5,6 +5,7 @@ namespace IwacSeo\Controller;
 
 use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\Sitemap\SitemapDocument;
 use IwacSeo\Service\SitemapGenerator;
@@ -35,6 +36,7 @@ class SitemapController extends AbstractActionController
         private readonly SiteResolver $siteResolver,
         private readonly SettingsGate $settings,
         private readonly Hreflang $hreflang,
+        private readonly RobotsTxt $robots,
     ) {
     }
 
@@ -138,20 +140,11 @@ class SitemapController extends AbstractActionController
 
     public function robotsAction(): Response
     {
-        $lines = ['User-agent: *'];
-        // Crawlers must be able to fetch noindex; private staging requires authentication.
-        $lines[] = 'Disallow: /admin/';
-        $lines[] = 'Disallow: /login';
-        $lines[] = 'Disallow: /logout';
-        $lines[] = 'Disallow: /maintenance';
-
+        // Crawlers must be able to fetch noindex, so the staging switch adds no
+        // Disallow here; private staging requires authentication.
         $site = $this->resolveSite();
-        if ($this->sitemapEnabled() && $site) {
-            $lines[] = '';
-            $lines[] = 'Sitemap: ' . $this->hostUrl($site) . '/sitemap.xml';
-        }
-
-        return $this->text(implode("\n", $lines) . "\n");
+        $sitemap = $this->sitemapEnabled() && $site ? $this->hostUrl($site) . '/sitemap.xml' : null;
+        return $this->text($this->robots->render($sitemap));
     }
 
     public function indexNowKeyAction(): Response

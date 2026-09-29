@@ -4,11 +4,17 @@ declare(strict_types=1);
 namespace IwacSeo\Controller\Admin;
 
 use IwacSeo\Form\PageSeoForm;
+use IwacSeo\Service\CitationData;
+use IwacSeo\Service\CitationDiagnostics;
+use IwacSeo\Service\CitationFormatter;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\PingRepository;
+use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
+use IwacSeo\Service\UrlPolicy;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
@@ -27,8 +33,9 @@ class SeoController extends AbstractActionController
         private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
         private readonly Hreflang $hreflang,
-        private readonly \IwacSeo\Service\CitationData $citationData,
-        private readonly \IwacSeo\Service\PingRepository $pingRepository,
+        private readonly CitationData $citationData,
+        private readonly CitationFormatter $citationFormatter,
+        private readonly PingRepository $pingRepository,
     ) {
     }
 
@@ -41,8 +48,7 @@ class SeoController extends AbstractActionController
         $previewId = (int) $this->params()->fromQuery('item_id', 0);
         if ($previewId > 0 && $site !== null) {
             try {
-                $item = $this->api->read('items', $previewId)->getContent();
-                $preview = $this->citationData->build($item, \IwacSeo\Service\ResourceUrl::forSite($item, $site->slug()));
+                $preview = $this->citationPreview($this->api->read('items', $previewId)->getContent(), $site);
             } catch (\Omeka\Api\Exception\NotFoundException $error) {
                 $this->messenger()->addError('Item not found.'); // @translate
             }
@@ -51,7 +57,7 @@ class SeoController extends AbstractActionController
         $view = new ViewModel([
             'site'           => $site,
             'citationPreview' => $preview,
-            'citationMissing' => $preview !== null ? \IwacSeo\Service\CitationDiagnostics::missing($preview) : [],
+            'originError'    => UrlPolicy::originError(),
             'queueCounts' => $this->pingRepository->counts(),
             'gscConfigured'  => $this->settings->text('iwac_seo_gsc_verification') !== '',
             'jsonLdEnabled'  => $this->settings->isOn('iwac_seo_jsonld_enabled', true),
@@ -237,6 +243,35 @@ class SeoController extends AbstractActionController
             'revision'  => $this->pageSeoStore->revision(),
         ]);
         return $view->setTemplate('iwac-seo/admin/seo/pages');
+    }
+
+    /**
+     * The item cited in each style, as each language site would show it:
+     * that site's page URL, abstract and collection name. Null for an
+     * authority record, which is not a citable work.
+     *
+     * @return array{kind:string,missing:string[],styles:array<string,array<string,string>>}|null
+     *   styles: locale => style => formatted HTML
+     */
+    private function citationPreview(\Omeka\Api\Representation\ItemRepresentation $item, SiteRepresentation $defaultSite): ?array
+    {
+        $preview = null;
+        foreach (['en', 'fr'] as $locale) {
+            $slug = array_search($locale, $this->hreflang->sites(), true);
+            $record = $this->citationData->build(
+                $item,
+                ResourceUrl::forSite($item, is_string($slug) ? $slug : $defaultSite->slug()),
+                $locale
+            );
+            if ($record === null) {
+                return null;
+            }
+            $preview ??= ['kind' => $record->kind->value, 'missing' => CitationDiagnostics::missing($record), 'styles' => []];
+            foreach (CitationFormatter::STYLES as $style) {
+                $preview['styles'][$locale][$style] = $this->citationFormatter->format($record, $style, $locale);
+            }
+        }
+        return $preview;
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────

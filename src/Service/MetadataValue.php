@@ -76,6 +76,23 @@ final class MetadataValue
         return Creator::parse($label, false);
     }
 
+    /** The original URL of the item's first public PDF media, if any. */
+    public static function pdfUrl(AbstractResourceEntityRepresentation $resource): ?string
+    {
+        if (!$resource instanceof \Omeka\Api\Representation\ItemRepresentation) {
+            return null;
+        }
+        foreach ($resource->media() as $media) {
+            if ($media->isPublic() && $media->mediaType() === 'application/pdf') {
+                $url = $media->originalUrl();
+                if ($url) {
+                    return $url;
+                }
+            }
+        }
+        return null;
+    }
+
     public static function url(?string $url): ?string
     {
         return $url !== null && preg_match('~^https?://[^\s<>"{}]+$~iu', $url) && parse_url($url, PHP_URL_HOST)
