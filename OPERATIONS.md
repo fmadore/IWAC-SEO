@@ -19,6 +19,17 @@ Clean pagination has its own canonical and remains indexable. Tracking parameter
 self-canonical and `noindex, follow` when the existing browse setting is on. Resource
 pages retain their resource canonical even when a linked-record widget is paginated.
 
+`robots.txt` also disallows those query variants, following Google's faceted-navigation
+guidance: a `noindex` has to be crawled to be read, so it spends the crawl budget it is
+meant to save. The rules live in `iwac_seo.robots` (`config/instance.config.php`) and cover
+the IwacSearch pages (`/search?`, `/s/*/recherche?`, their `everything`/`tout` tabs, the
+`/discovery/token` endpoint) and Omeka's browse filters (`/s/*/item?` and siblings, including
+the `?property[…]` link every metadata value carries), with `?page=` allowed. The landing
+pages, clean pagination and every sitemap URL stay crawlable; `InstanceConfigTest` asserts
+it. A URL Google indexed before the rule appeared keeps its entry until it drops out: if
+Search Console lists such URLs as "Indexed, though blocked by robots.txt", remove the rule
+for that pattern until their `noindex` has been seen, then restore it.
+
 ## Sitemap and queue
 
 The index includes the other configured public language site's page sitemap, including

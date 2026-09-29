@@ -40,6 +40,37 @@ return [
                 'browse' => 'weekly',
             ],
         ],
+        'robots' => [
+            // Crawl control for query variants, which the pages themselves
+            // already mark noindex. Google recommends disallowing filter URLs
+            // that need not be indexed: a noindex has to be crawled to be read.
+            // Records are reached through the sitemap instead. `*` matches any
+            // characters; the longest matching rule wins.
+            'disallow' => [
+                // IwacSearch facets, queries and tabs (?q=, ?f.<field>=). The
+                // landing pages stay crawlable; results are rendered server-side
+                // and the client queries Typesense directly, so nothing the
+                // landing page needs to render is blocked.
+                '/search?',
+                '/search/everything?',
+                '/s/*/search?',
+                '/s/*/search/everything?',
+                '/s/*/recherche?',
+                '/s/*/recherche/tout?',
+                '/discovery/token', // IwacSearch's scoped-key endpoint
+                // Omeka browse filters and sorts — among them the
+                // ?property[…] link every metadata value carries on every page.
+                '/s/*/item?',
+                '/s/*/item-set?',
+                '/s/*/media?',
+            ],
+            'allow' => [
+                // Clean pagination stays crawlable, as it stays indexable.
+                '/s/*/item?page=',
+                '/s/*/item-set?page=',
+                '/s/*/media?page=',
+            ],
+        ],
         'structured_data' => [
             // schema.org @type per Omeka **resource class** id. IWAC dispatches
             // on class, not template: template 8 historically held both newspaper

@@ -13,6 +13,7 @@ use IwacSeo\Service\CitationMeta;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
+use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
@@ -68,6 +69,7 @@ final class WiringIntegrationTest extends TestCase
             SettingsGate::class,
             SiteResolver::class,
             Hreflang::class,
+            RobotsTxt::class,
             ZoteroRdf::class,
         ];
         foreach ($dependencies as $class) {

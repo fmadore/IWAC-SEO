@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Test\Config;
 
+use IwacSeo\Service\RobotsTxt;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -12,6 +13,7 @@ use PHPUnit\Framework\TestCase;
  *     sitemap:array{item_chunk_size:int},
  *     structured_data:array{class_types:array<int,string>},
  *     citation:array{class_kinds:array<int,string>},
+ *     robots:array{disallow:string[],allow:string[]},
  *     hreflang:array{
  *         sites:array<string,string>,
  *         x_default:string,
@@ -101,5 +103,54 @@ final class InstanceConfigTest extends TestCase
         $size = (int) $this->config['sitemap']['item_chunk_size'];
         $this->assertGreaterThan(0, $size);
         $this->assertLessThanOrEqual(50000, $size);
+    }
+
+    /**
+     * The crawl rules must block query variants of every search surface and
+     * browse route, and nothing that is meant to be indexed: not the landing
+     * pages, not clean pagination, not any URL shape the sitemap lists.
+     */
+    public function testRobotsRulesBlockQueryVariantsButNoIndexablePage(): void
+    {
+        $robots = new RobotsTxt($this->config['robots']['disallow'], $this->config['robots']['allow']);
+
+        $blocked = [
+            '/search?q=hadj',
+            '/search/everything?tab=entities',
+            '/s/westafrica/search?q=hajj&f.country_ss=Benin',
+            '/s/westafrica/search/everything?q=x',
+            '/s/afrique_ouest/recherche?f.country_ss=B%C3%A9nin',
+            '/s/afrique_ouest/recherche/tout?tab=entities',
+            '/s/afrique_ouest/item?property%5B0%5D%5Bproperty%5D=3&property%5B0%5D%5Btext%5D=Islam',
+            '/s/afrique_ouest/item?item_set_id=5',
+            '/s/afrique_ouest/item?sort_by=title&page=2',
+            '/s/westafrica/item-set?sort_by=created',
+            '/s/westafrica/media?resource_class_id=36',
+            '/discovery/token',
+        ];
+        foreach ($blocked as $path) {
+            self::assertFalse($robots->allows($path), $path);
+        }
+
+        $crawlable = [
+            '/search',
+            '/search/everything',
+            '/s/westafrica/search',
+            '/s/afrique_ouest/recherche',
+            '/s/afrique_ouest/recherche/tout',
+            '/s/afrique_ouest/item',
+            '/s/afrique_ouest/item?page=3',
+            '/s/westafrica/item-set?page=2',
+            // Every URL shape the sitemaps list.
+            '/s/afrique_ouest/item/2231',
+            '/s/westafrica/item-set/12',
+            '/s/afrique_ouest/page/accueil',
+            '/s/westafrica/page/home',
+            '/sitemap.xml',
+            '/files/large/abc.jpg',
+        ];
+        foreach ($crawlable as $path) {
+            self::assertTrue($robots->allows($path), $path);
+        }
     }
 }

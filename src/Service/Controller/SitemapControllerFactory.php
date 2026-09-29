@@ -5,6 +5,7 @@ namespace IwacSeo\Service\Controller;
 
 use IwacSeo\Controller\SitemapController;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\SettingsGate;
@@ -20,6 +21,7 @@ final class SitemapControllerFactory implements FactoryInterface
             $container->get(SiteResolver::class),
             $container->get(SettingsGate::class),
             $container->get(Hreflang::class),
+            $container->get(RobotsTxt::class),
         );
     }
 }

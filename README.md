@@ -32,7 +32,7 @@ It is self-contained, with no third-party runtime Composer dependencies or theme
 | **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
-| **robots.txt** | `/robots.txt` disallowing `/admin` and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
+| **robots.txt** | `/robots.txt` disallowing `/admin`, the query variants of the search and browse pages (facets, filters, sorts — clean pagination stays crawlable; `iwac_seo.robots`), and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
 | **Google Search Console** | Paste the verification snippet in the module config; the `<meta name="google-site-verification">` tag is injected site-wide. |
 | **IndexNow ping** | Optionally notifies Bing/Yandex when public content changes (durable, throttled batches and retries). |
 
@@ -510,7 +510,7 @@ IwacSeo/
 
 1. `curl -s https://islam.zmo.de/sitemap.xml | head` → a `<sitemapindex>`; the child sitemaps
    list `<url>` entries with `<lastmod>`.
-2. `curl -s https://islam.zmo.de/robots.txt` → `Disallow: /admin/` and a `Sitemap:` line.
+2. `curl -s https://islam.zmo.de/robots.txt` → `Disallow: /admin/`, the `/s/*/search?`-style query rules and a `Sitemap:` line.
 3. View-source an item page (`/s/afrique_ouest/item/2231`): confirm `<title>`, `description`,
    `og:*`, `twitter:*`, `<link rel="canonical">` and an `application/ld+json` block. Validate
    the JSON-LD with the [Rich Results Test](https://search.google.com/test/rich-results).
