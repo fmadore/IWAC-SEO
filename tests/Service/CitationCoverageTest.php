@@ -80,6 +80,16 @@ final class CitationCoverageTest extends TestCase
         self::assertStringContainsString('[Doctoral dissertation, University]', (new CitationFormatter())->format($known, 'apa'));
     }
 
+    public function testDiagnosticsOnlyReturnTranslatableLabels(): void
+    {
+        foreach (CitationKind::cases() as $kind) {
+            $missing = CitationDiagnostics::missing(new CitationRecord(1, $kind));
+            foreach ($missing as $label) {
+                self::assertContains($label, CitationDiagnostics::LABELS, $kind->value);
+            }
+        }
+    }
+
     public function testUnknownDateAndEditionAreLocalised(): void
     {
         $record = new CitationRecord(1, CitationKind::Book, 'Histoire du Sahel', edition: '2');

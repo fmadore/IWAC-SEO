@@ -52,12 +52,6 @@ final class VideoDescription
         ],
     ];
 
-    /** @var array<string,array<int,string>> */
-    private const MONTHS = [
-        'en' => [1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-        'fr' => [1 => 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
-    ];
-
     /**
      * @param array{
      *   authors?: string[],
@@ -153,7 +147,7 @@ final class VideoDescription
         if ($month < 1 || $month > 12) {
             return [$year, false];
         }
-        $name = self::MONTHS[$locale][$month];
+        $name = MonthNames::full($month, $locale);
         if ($day < 1 || $day > 31) {
             return [$name . ' ' . $year, false];
         }

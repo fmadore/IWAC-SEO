@@ -6,7 +6,6 @@ namespace IwacSeo\Service\Concern;
 use IwacSeo\Service\Citation\CitationRecord;
 use IwacSeo\Service\MetadataValue;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
-use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
 
 /**
@@ -123,21 +122,7 @@ trait ResourceValueReader
     /** The original URL of the item's first public PDF media, if any. */
     private function pdfUrl(AbstractResourceEntityRepresentation $resource): ?string
     {
-        if (!$resource instanceof ItemRepresentation) {
-            return null;
-        }
-        foreach ($resource->media() as $media) {
-            if (!$media->isPublic()) {
-                continue;
-            }
-            if ($media->mediaType() === 'application/pdf') {
-                $url = $media->originalUrl();
-                if ($url) {
-                    return $url;
-                }
-            }
-        }
-        return null;
+        return MetadataValue::pdfUrl($resource);
     }
 
     /**

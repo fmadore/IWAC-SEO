@@ -8,6 +8,26 @@ use IwacSeo\Service\Citation\CitationRecord;
 /** Catalogue gaps for editors; never fills unknown facts in a citation. */
 final class CitationDiagnostics
 {
+    /**
+     * Every label missing() can return. They are English msgids, translated
+     * where the dashboard shows them; one per line so the string extractor
+     * marks each for translation.
+     */
+    public const LABELS = [
+        'title', // @translate
+        'date', // @translate
+        'container', // @translate
+        'book title', // @translate
+        'publisher', // @translate
+        'degree / thesis type', // @translate
+        'institution', // @translate
+        'event', // @translate
+        'publisher / institution', // @translate
+        'archive', // @translate
+        'call number', // @translate
+        'reviewed title', // @translate
+    ];
+
     /** @return string[] */
     public static function missing(CitationRecord $record): array
     {

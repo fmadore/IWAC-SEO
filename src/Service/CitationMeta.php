@@ -80,22 +80,32 @@ class CitationMeta
         $headMeta = $view->headMeta();
         $kind = $this->kinds->forResource($resource);
 
+        // Read once, written to both vocabularies.
+        $abstract = $this->firstString($resource, self::ABSTRACT_TERMS);
+        $shared = [
+            'date'     => $this->firstString($resource, MetadataValue::DATE_TERMS),
+            'keywords' => $this->keywords($resource),
+            'abstract' => $abstract !== null ? $this->clip($abstract) : null,
+        ];
+
         // Dublin Core for every resource.
-        $this->dublinCore($headMeta, $resource, $canonical);
+        $this->dublinCore($headMeta, $resource, $canonical, $shared);
 
         // Highwire only for citable works.
         if (!$kind->isAuthorityRecord()) {
-            $this->highwire($headMeta, $resource, $kind, $canonical);
+            $this->highwire($headMeta, $resource, $kind, $canonical, $shared);
         }
     }
 
     // ─── Highwire Press (citation_*) + kind-specific typing ──────────────────
 
+    /** @param array{date:?string,keywords:string[],abstract:?string} $shared */
     private function highwire(
         \Laminas\View\Helper\HeadMeta $headMeta,
         AbstractResourceEntityRepresentation $resource,
         CitationKind $kind,
-        ?string $canonical
+        ?string $canonical,
+        array $shared
     ): void {
         $this->single($headMeta, 'citation_title', $this->firstString($resource, ['dcterms:title']));
 
@@ -108,19 +118,14 @@ class CitationMeta
             $headMeta->appendName('citation_editor', $editor);
         }
 
-        $this->single($headMeta, 'citation_publication_date', $this->scholarDate($this->firstString($resource, MetadataValue::DATE_TERMS)));
+        $this->single($headMeta, 'citation_publication_date', $this->scholarDate($shared['date']));
         $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
-        $keywords = $this->keywords($resource);
-        if ($keywords) {
-            $this->single($headMeta, 'citation_keywords', implode('; ', $keywords));
+        if ($shared['keywords']) {
+            $this->single($headMeta, 'citation_keywords', implode('; ', $shared['keywords']));
         }
-
-        $abstract = $this->firstString($resource, self::ABSTRACT_TERMS);
-        if ($abstract !== null) {
-            $this->single($headMeta, 'citation_abstract', $this->clip($abstract));
-        }
+        $this->single($headMeta, 'citation_abstract', $shared['abstract']);
         if ($canonical) {
             $this->single($headMeta, 'citation_public_url', $canonical);
         }
@@ -190,16 +195,18 @@ class CitationMeta
 
     // ─── Dublin Core (DC.*) ─────────────────────────────────────────────────
 
+    /** @param array{date:?string,keywords:string[],abstract:?string} $shared */
     private function dublinCore(
         \Laminas\View\Helper\HeadMeta $headMeta,
         AbstractResourceEntityRepresentation $resource,
-        ?string $canonical
+        ?string $canonical,
+        array $shared
     ): void {
         $this->single($headMeta, 'DC.title', $this->firstString($resource, ['dcterms:title']));
         foreach ($this->people($resource, ['dcterms:creator', 'bibo:authorList']) as $creator) {
             $headMeta->appendName('DC.creator', $creator);
         }
-        $this->single($headMeta, 'DC.date', $this->firstString($resource, MetadataValue::DATE_TERMS));
+        $this->single($headMeta, 'DC.date', $shared['date']);
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
         $this->single($headMeta, 'DC.type', ResourceUrl::classLabel($resource));
         $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));
@@ -213,13 +220,10 @@ class CitationMeta
         // Embedded Metadata translator turns dc:subject into the item's tags (via
         // its RDF backend), so both descriptive subjects and spatial coverage are
         // captured as tags. See keywords().
-        foreach ($this->keywords($resource) as $subject) {
+        foreach ($shared['keywords'] as $subject) {
             $headMeta->appendName('DC.subject', $subject);
         }
-        $description = $this->firstString($resource, self::ABSTRACT_TERMS);
-        if ($description !== null) {
-            $this->single($headMeta, 'DC.description', $this->clip($description));
-        }
+        $this->single($headMeta, 'DC.description', $shared['abstract']);
     }
 
     // ─── Value readers ──────────────────────────────────────────────────────

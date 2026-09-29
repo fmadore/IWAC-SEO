@@ -56,15 +56,6 @@ final class CitationFormatter
         ],
     ];
 
-    /** @var array<string,array<int,string>> */
-    private const MONTHS = [
-        'en' => [1 => 'January', 'February', 'March', 'April', 'May', 'June', 'July', 'August', 'September', 'October', 'November', 'December'],
-        'fr' => [1 => 'janvier', 'février', 'mars', 'avril', 'mai', 'juin', 'juillet', 'août', 'septembre', 'octobre', 'novembre', 'décembre'],
-    ];
-
-    /** @var array<int,string> MLA works-cited month abbreviations (MLA 9, English). */
-    private const MLA_MONTHS_EN = [1 => 'Jan.', 'Feb.', 'Mar.', 'Apr.', 'May', 'June', 'July', 'Aug.', 'Sept.', 'Oct.', 'Nov.', 'Dec.'];
-
     public function format(CitationRecord $record, string $style, string $locale = 'en'): string
     {
         $style = in_array($style, self::STYLES, true) ? $style : 'chicago';
@@ -766,10 +757,7 @@ final class CitationFormatter
     /** MLA abbreviates English month names longer than four letters ("Sept."). */
     private function monthName(int $month, string $locale, string $style): string
     {
-        if ($style === 'mla' && $locale === 'en') {
-            return self::MLA_MONTHS_EN[$month] ?? (string) $month;
-        }
-        return self::MONTHS[$locale][$month] ?? self::MONTHS['en'][$month] ?? (string) $month;
+        return $style === 'mla' && $locale === 'en' ? MonthNames::mla($month) : MonthNames::full($month, $locale);
     }
 
     // ─── Primitives ──────────────────────────────────────────────────────────

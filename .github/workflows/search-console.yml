@@ -49,7 +49,9 @@ jobs:
             cp previous/inspection.json monitor-results/inspection.json
           fi
       - id: auth
-        uses: google-github-actions/auth@v3
+        # Pinned to a commit: this step mints Google credentials (id-token: write).
+        # Dependabot updates the SHA and the version comment together.
+        uses: google-github-actions/auth@7c6bc770dae815cd3e89ee6cdf493a5fab2cc093 # v3.0.0
         with:
           workload_identity_provider: ${{ vars.GSC_WORKLOAD_IDENTITY_PROVIDER }}
           service_account: ${{ vars.GSC_SERVICE_ACCOUNT }}

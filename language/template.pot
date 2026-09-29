@@ -310,6 +310,10 @@ msgid "The og:image / Twitter card image used when a page (or an item with no me
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
+msgid "The public origin (IWAC_SEO_PUBLIC_ORIGIN) is not an HTTP(S) origin without a path, so it is ignored: canonical, hreflang and sitemap URLs follow the incoming request. Fix the environment variable, for example https://islam.zmo.de."
+msgstr ""
+
+#: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "The sitemap is cached. Clear the cache to rebuild it immediately after a large content change."
 msgstr ""
 
@@ -341,6 +345,38 @@ msgstr ""
 msgid "Yes"
 msgstr ""
 
+#: src/Service/CitationDiagnostics.php
+msgid "archive"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "book title"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "call number"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "container"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "date"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "degree / thesis type"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "event"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "institution"
+msgstr ""
+
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail"
 msgstr ""
@@ -357,7 +393,23 @@ msgstr ""
 msgid "points to %s, which is not a public page"
 msgstr ""
 
+#: src/Service/CitationDiagnostics.php
+msgid "publisher"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "publisher / institution"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "reviewed title"
+msgstr ""
+
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "schema.org JSON-LD"
+msgstr ""
+
+#: src/Service/CitationDiagnostics.php
+msgid "title"
 msgstr ""
 

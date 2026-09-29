@@ -49,13 +49,6 @@ final class SettingsGate
         return $value === null || $value === '' ? $default : (int) $value;
     }
 
-    /** @return array<int,string> */
-    public function list(string $key): array
-    {
-        $value = $this->settings->get($key, []);
-        return is_array($value) ? array_values(array_filter($value, 'is_string')) : [];
-    }
-
     /** @param mixed $value */
     public function set(string $key, $value): void
     {

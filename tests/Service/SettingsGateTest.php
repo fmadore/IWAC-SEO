@@ -61,11 +61,4 @@ final class SettingsGateTest extends TestCase
         // An explicit zero is a real value, not "unset" — a 0 TTL disables caching.
         $this->assertSame(0, $this->gate(['ttl' => 0])->int('ttl', 86400));
     }
-
-    public function testListIgnoresNonListValues(): void
-    {
-        $this->assertSame(['a', 'b'], $this->gate(['q' => ['a', 'b']])->list('q'));
-        $this->assertSame([], $this->gate(['q' => 'not-a-list'])->list('q'));
-        $this->assertSame([], $this->gate([])->list('q'));
-    }
 }

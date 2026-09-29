@@ -7,27 +7,26 @@ use IwacSeo\Job\PingSearchEngines;
 use Omeka\Job\Dispatcher;
 
 /**
- * Dispatch policy over the durable outbox injected by PingQueueFactory.
- * The optional settings-backed adapter and drain/isBulk methods are retained
- * for constructor compatibility; production jobs use claim/finish exclusively.
+ * IndexNow dispatch policy over the durable outbox: whether pinging is
+ * configured, how often a save may start a drain job, and the batch size a
+ * job leases. The outbox itself (dedupe, leases, retries) is
+ * {@see PingRepository}; the five-minute cron drains it independently of
+ * saves (scripts/drain-indexnow.php).
  */
 class PingQueue
 {
-    /**
-     * Maximum leased batch size; also the legacy settings adapter's flood cap.
-     */
+    /** URLs leased per job. */
     public const CAP = 200;
 
-    /** How often (seconds) a drain job may be dispatched. */
+    /** How often (seconds) a save may dispatch a drain job. */
     private const DISPATCH_INTERVAL = 900;
 
-    private const PENDING = 'iwac_seo_ping_pending';
     private const LAST_DISPATCH = 'iwac_seo_ping_last';
 
     public function __construct(
         private readonly SettingsGate $settings,
         private readonly Dispatcher $dispatcher,
-        private readonly ?PingRepository $repository = null,
+        private readonly PingOutboxInterface $outbox,
     ) {
     }
 
@@ -43,22 +42,10 @@ class PingQueue
         return $this->settings->text('iwac_seo_indexnow_key');
     }
 
-    /** Queue a URL for submission, de-duplicated and capped. */
+    /** Queue a URL for submission. */
     public function push(string $url): void
     {
-        if ($this->repository !== null) {
-            $this->repository->push($url);
-            return;
-        }
-        if ($url === '') {
-            return;
-        }
-        $pending = $this->settings->list(self::PENDING);
-        if (count($pending) >= self::CAP || in_array($url, $pending, true)) {
-            return;
-        }
-        $pending[] = $url;
-        $this->settings->set(self::PENDING, $pending);
+        $this->outbox->push($url);
     }
 
     /**
@@ -82,39 +69,18 @@ class PingQueue
     }
 
     /**
-     * Claim the queue: return its de-duplicated contents and empty it in the
-     * same breath, so a second job cannot submit the same batch.
+     * Lease the next batch.
      *
-     * @return string[]
+     * @return array<int,array<string,mixed>>
      */
-    public function drain(): array
-    {
-        $pending = $this->settings->list(self::PENDING);
-        $this->settings->set(self::PENDING, []);
-        return array_values(array_unique(array_filter($pending)));
-    }
-
-    /** @return array<int,array<string,mixed>> */
     public function claim(): array
     {
-        return $this->repository?->claim(self::CAP) ?? [];
+        return $this->outbox->claim(self::CAP);
     }
 
     /** @param array<int,array<string,mixed>> $rows */
     public function finish(array $rows, bool $success): void
     {
-        $this->repository?->finish($rows, $success);
-    }
-
-    /**
-     * Whether a drained batch is a bulk change rather than editorial work.
-     * Such batches are skipped: the sitemap covers their discovery, and
-     * IndexNow is reserved for genuine incremental edits.
-     *
-     * @param string[] $urls
-     */
-    public function isBulk(array $urls): bool
-    {
-        return count($urls) >= self::CAP;
+        $this->outbox->finish($rows, $success);
     }
 }

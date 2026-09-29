@@ -7,7 +7,7 @@ use Doctrine\DBAL\Connection;
 use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 
 /** Durable outbox. Versioned leases make acknowledgement safe during concurrent edits. */
-final class PingRepository
+final class PingRepository implements PingOutboxInterface
 {
     public function __construct(private readonly Connection $connection)
     {

@@ -270,3 +270,42 @@ msgstr "Ne pas indexer les pages de navigation filtrées"
 
 msgid "Keeps search, filter and sort variants out of the index. Clean pagination remains indexable and tracking parameters are removed from canonical URLs."
 msgstr "Exclut de l’index les variantes de recherche, de filtre et de tri. La pagination reste indexable et les paramètres de suivi sont retirés des URL canoniques."
+
+msgid "The public origin (IWAC_SEO_PUBLIC_ORIGIN) is not an HTTP(S) origin without a path, so it is ignored: canonical, hreflang and sitemap URLs follow the incoming request. Fix the environment variable, for example https://islam.zmo.de."
+msgstr "L’origine publique (IWAC_SEO_PUBLIC_ORIGIN) n’est pas une origine HTTP(S) sans chemin : elle est donc ignorée, et les URL canoniques, hreflang et du plan du site suivent la requête reçue. Corrigez la variable d’environnement, par exemple https://islam.zmo.de."
+
+msgid "title"
+msgstr "titre"
+
+msgid "date"
+msgstr "date"
+
+msgid "container"
+msgstr "publication"
+
+msgid "book title"
+msgstr "titre de l’ouvrage"
+
+msgid "publisher"
+msgstr "éditeur"
+
+msgid "degree / thesis type"
+msgstr "diplôme / type de thèse"
+
+msgid "institution"
+msgstr "établissement"
+
+msgid "event"
+msgstr "événement"
+
+msgid "publisher / institution"
+msgstr "éditeur / établissement"
+
+msgid "archive"
+msgstr "fonds d’archives"
+
+msgid "call number"
+msgstr "cote"
+
+msgid "reviewed title"
+msgstr "titre de l’ouvrage recensé"

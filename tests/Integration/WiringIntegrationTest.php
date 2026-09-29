@@ -64,6 +64,7 @@ final class WiringIntegrationTest extends TestCase
         $dependencies = [
             CitationData::class,
             CitationExport::class,
+            \IwacSeo\Service\CitationFormatter::class,
             SitemapGenerator::class,
             PageSeoStore::class,
             SettingsGate::class,
@@ -99,10 +100,23 @@ final class WiringIntegrationTest extends TestCase
         $events = new SharedEventManager();
         (new \IwacSeo\Module())->attachListeners($events);
 
-        foreach (['ItemAdapter', 'ItemSetAdapter', 'SitePageAdapter'] as $adapter) {
-            foreach (['api.create.post', 'api.update.post', 'api.delete.post'] as $event) {
-                $listeners = $events->getListeners(['Omeka\\Api\\Adapter\\' . $adapter], $event);
-                self::assertNotEmpty($listeners, $adapter . ' ' . $event);
+        $handlers = static function (string $adapter, string $event) use ($events): array {
+            $out = [];
+            foreach ($events->getListeners(['Omeka\\Api\\Adapter\\' . $adapter], $event) as $byPriority) {
+                foreach ($byPriority as $listener) {
+                    $out[] = is_array($listener) ? $listener[1] : null;
+                }
+            }
+            return $out;
+        };
+        foreach (['api.create.post', 'api.update.post', 'api.delete.post'] as $event) {
+            // Sitemap URLs of their own: invalidate and ping.
+            foreach (['ItemAdapter', 'ItemSetAdapter', 'SitePageAdapter'] as $adapter) {
+                self::assertSame(['handleContentChange'], $handlers($adapter, $event), $adapter . ' ' . $event);
+            }
+            // Media visibility and site navigation reshape a sitemap: invalidate only.
+            foreach (['MediaAdapter', 'SiteAdapter'] as $adapter) {
+                self::assertSame(['handleSitemapChange'], $handlers($adapter, $event), $adapter . ' ' . $event);
             }
         }
     }

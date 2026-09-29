@@ -32,6 +32,26 @@ final class UrlPolicyTest extends TestCase
         }
     }
 
+    public function testPublicOriginRewritesUrlsAndAMalformedOneIsIgnoredNotThrown(): void
+    {
+        $url = 'http://omeka.internal:8080/s/westafrica/item/1?page=2';
+        self::assertSame($url, UrlPolicy::publicUrl($url));
+        self::assertNull(UrlPolicy::originError());
+
+        putenv('IWAC_SEO_PUBLIC_ORIGIN=https://islam.zmo.de/');
+        try {
+            self::assertSame('https://islam.zmo.de/s/westafrica/item/1?page=2', UrlPolicy::publicUrl($url));
+            self::assertNull(UrlPolicy::originError());
+
+            // A path makes it no origin: the page keeps rendering on Omeka's own URL.
+            putenv('IWAC_SEO_PUBLIC_ORIGIN=https://islam.zmo.de/s/afrique_ouest');
+            self::assertSame($url, UrlPolicy::publicUrl($url));
+            self::assertNotNull(UrlPolicy::originError());
+        } finally {
+            putenv('IWAC_SEO_PUBLIC_ORIGIN');
+        }
+    }
+
     public function testFiltersAreNotMadeIndexableByPagination(): void
     {
         self::assertTrue(UrlPolicy::isFiltered('https://example.test/items?page=2&search=islam'));

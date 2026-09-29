@@ -6,19 +6,21 @@ namespace IwacSeo\Test\Service;
 use IwacSeo\Job\PingSearchEngines;
 use IwacSeo\Service\PingQueue;
 use IwacSeo\Service\SettingsGate;
+use IwacSeo\Test\Double\InMemoryPingOutbox;
 use Omeka\Job\Dispatcher;
 use Omeka\Settings\Settings;
 use PHPUnit\Framework\TestCase;
 
 /**
- * The IndexNow queue policy — dedupe, flood cap, throttle window. This logic
- * used to live inside Module::handleContentChange() and could not be reached
- * without firing an Omeka API event.
+ * The IndexNow dispatch policy — configured-ness, throttle window, batch
+ * size — over an in-memory outbox. The durable outbox itself (dedupe, leases,
+ * retries) is exercised against a real database in PingRepositoryTest.
  */
 final class PingQueueTest extends TestCase
 {
     private Settings $settings;
     private Dispatcher $dispatcher;
+    private InMemoryPingOutbox $outbox;
     private PingQueue $queue;
 
     /** @param array<string,mixed> $values */
@@ -26,7 +28,8 @@ final class PingQueueTest extends TestCase
     {
         $this->settings = new Settings($values);
         $this->dispatcher = new Dispatcher();
-        $this->queue = new PingQueue(new SettingsGate($this->settings), $this->dispatcher);
+        $this->outbox = new InMemoryPingOutbox();
+        $this->queue = new PingQueue(new SettingsGate($this->settings), $this->dispatcher, $this->outbox);
     }
 
     protected function setUp(): void
@@ -52,49 +55,24 @@ final class PingQueueTest extends TestCase
         $this->assertFalse($this->queue->isEnabled());
     }
 
-    public function testPushDeduplicates(): void
+    public function testPushGoesToTheOutboxNotToSettings(): void
     {
         $this->queue->push('https://example.org/item/1');
-        $this->queue->push('https://example.org/item/2');
-        $this->queue->push('https://example.org/item/1');
 
-        $this->assertSame(
-            ['https://example.org/item/1', 'https://example.org/item/2'],
-            $this->settings->get('iwac_seo_ping_pending')
-        );
-    }
-
-    public function testPushIgnoresEmptyUrls(): void
-    {
-        $this->queue->push('');
+        $this->assertSame(['https://example.org/item/1'], $this->outbox->pushed);
         $this->assertNull($this->settings->get('iwac_seo_ping_pending'));
     }
 
-    public function testQueueStopsGrowingAtTheFloodCap(): void
+    public function testClaimLeasesOneCappedBatchAndFinishPassesThrough(): void
     {
-        for ($i = 0; $i < PingQueue::CAP + 25; $i++) {
-            $this->queue->push('https://example.org/item/' . $i);
-        }
-        $this->assertCount(PingQueue::CAP, $this->settings->get('iwac_seo_ping_pending'));
-    }
+        $this->outbox->rows = array_map(static fn (int $i): array => ['url' => 'u' . $i], range(1, PingQueue::CAP + 5));
 
-    public function testDrainClaimsAndEmpties(): void
-    {
-        $this->queue->push('https://example.org/item/1');
-        $this->queue->push('https://example.org/item/2');
+        $batch = $this->queue->claim();
+        $this->assertSame(PingQueue::CAP, $this->outbox->lastLimit);
+        $this->assertCount(PingQueue::CAP, $batch);
 
-        $this->assertSame(
-            ['https://example.org/item/1', 'https://example.org/item/2'],
-            $this->queue->drain()
-        );
-        // A second job must not resubmit the same batch.
-        $this->assertSame([], $this->queue->drain());
-    }
-
-    public function testBulkBatchesAreRecognised(): void
-    {
-        $this->assertFalse($this->queue->isBulk(['a', 'b']));
-        $this->assertTrue($this->queue->isBulk(array_fill(0, PingQueue::CAP, 'u')));
+        $this->queue->finish($batch, false);
+        $this->assertSame([['rows' => $batch, 'success' => false]], $this->outbox->finished);
     }
 
     public function testDispatchIsThrottledAndStamped(): void

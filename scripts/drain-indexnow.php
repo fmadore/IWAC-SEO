@@ -18,6 +18,13 @@ if (!is_readable($omeka . '/bootstrap.php')) {
 require $omeka . '/bootstrap.php';
 $application = \Omeka\Mvc\Application::init(require $omeka . '/application/config/application.config.php');
 $services = $application->getServiceManager();
+// Pages fall back to Omeka's own URLs when the origin is malformed; a cron run
+// is where to say so, since the outbox would otherwise fill with those URLs.
+$originError = \IwacSeo\Service\UrlPolicy::originError();
+if ($originError !== null) {
+    fwrite(STDERR, $originError . "\n");
+    exit(2);
+}
 $repository = new \IwacSeo\Service\PingRepository($services->get('Omeka\Connection'));
 if (in_array('--retry-failed', $argv, true)) {
     $repository->retryFailed();

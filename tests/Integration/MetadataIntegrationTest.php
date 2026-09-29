@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Test\Integration;
 
+use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationKindMap;
 use IwacSeo\Service\CitationMeta;
 use IwacSeo\Service\HeadMetadata;
@@ -69,7 +70,7 @@ final class MetadataIntegrationTest extends TestCase
 
     public function testZoteroRdfUsesRealOmekaItemAndValueContracts(): void
     {
-        $rdf = (new ZoteroRdf($this->kinds))->render($this->item(), self::CANONICAL);
+        $rdf = (new ZoteroRdf($this->kinds, new CitationData($this->kinds)))->render($this->item(), self::CANONICAL);
 
         self::assertNotNull($rdf);
         self::assertStringContainsString('<z:itemType>newspaperArticle</z:itemType>', $rdf);
@@ -96,7 +97,7 @@ final class MetadataIntegrationTest extends TestCase
             new StructuredData([], 'CreativeWork'),
             new CitationMeta($this->kinds),
             new Hreflang(['enabled' => false]),
-            new ZoteroRdf($this->kinds),
+            new ZoteroRdf($this->kinds, new CitationData($this->kinds)),
         );
 
         $body = $metadata->applyResource($view, $this->item(), $this->site());
@@ -655,7 +656,7 @@ final class MetadataIntegrationTest extends TestCase
             $this->structuredData(),
             new CitationMeta($this->kinds),
             new Hreflang(['enabled' => false]),
-            new ZoteroRdf($this->kinds),
+            new ZoteroRdf($this->kinds, new CitationData($this->kinds)),
         );
     }
 
@@ -813,7 +814,7 @@ final class MetadataIntegrationTest extends TestCase
             new StructuredData([], 'CreativeWork'),
             new CitationMeta($this->kinds),
             new Hreflang(['enabled' => false]),
-            new ZoteroRdf($this->kinds),
+            new ZoteroRdf($this->kinds, new CitationData($this->kinds)),
         );
     }
 
