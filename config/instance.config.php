@@ -150,6 +150,12 @@ return [
             // `iwacCitation` view helper; downloads are served by CitationController.
             // Chicago (notes–bibliography) leads for the history / area-studies
             // audience; APA + MLA are switchable. Formats mirror CitationExport.
+            // The holding collection as a citation names it, in the language of
+            // the site the citation is read on (the archive's own two titles).
+            'archive_names' => [
+                'fr' => "Collection Islam Afrique de l'Ouest",
+                'en' => 'Islam West Africa Collection',
+            ],
             'default_style' => 'chicago',
             'styles'        => ['chicago' => 'Chicago', 'apa' => 'APA', 'mla' => 'MLA'],
             'formats'       => ['bibtex', 'ris', 'csljson'],

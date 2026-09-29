@@ -78,6 +78,7 @@ final class WiringIntegrationTest extends TestCase
         $services->setService('EventManager', new EventManager());
         $services->setService('ControllerPluginManager', new ControllerPluginManager($services));
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
+        $services->setService('Omeka\Settings\Site', $this->withoutConstructor(\Omeka\Settings\SiteSettings::class));
         $services->setService('Omeka\Connection', \Doctrine\DBAL\DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]));
 
         $controllers = new ControllerManager($services, $this->config['controllers']);

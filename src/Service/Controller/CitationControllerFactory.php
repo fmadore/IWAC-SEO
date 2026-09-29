@@ -21,6 +21,7 @@ final class CitationControllerFactory implements FactoryInterface
             $container->get('Omeka\ApiManager'),
             $container->get(SettingsGate::class),
             $container->get(SiteResolver::class),
+            $container->get('Omeka\Settings\Site'),
         );
     }
 }

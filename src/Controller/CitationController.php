@@ -9,10 +9,13 @@ use IwacSeo\Controller\Concern\SendsResponses;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SiteResolver;
+use IwacSeo\Service\ViewLocale;
 use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
+use Omeka\Api\Representation\SiteRepresentation;
+use Omeka\Settings\SiteSettings;
 
 /**
  * /cite/:id/:format — single-item citation downloads (BibTeX, RIS, CSL-JSON).
@@ -23,6 +26,11 @@ use Omeka\Api\Representation\ItemRepresentation;
  * BulkExport block. Zotero RDF stays on the sibling /unapi endpoint (it drives
  * the Connector). Only public, citable items resolve — authority records and
  * non-public items 404.
+ *
+ * Bilingual: `?site={slug}` names the site the reader is on, so the record
+ * links that site's page and reads in its language (abstract, collection
+ * name). Without it, or with a slug that is not a public site, the default
+ * site answers — the route itself is unchanged.
  */
 class CitationController extends AbstractActionController
 {
@@ -34,6 +42,7 @@ class CitationController extends AbstractActionController
         private readonly ApiManager $api,
         private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
+        private readonly SiteSettings $siteSettings,
     ) {
     }
 
@@ -54,7 +63,12 @@ class CitationController extends AbstractActionController
             return $this->status(404);
         }
 
-        $record = $this->citationData->build($item, $this->itemUrl($item));
+        $site = $this->readerSite();
+        $record = $this->citationData->build(
+            $item,
+            ResourceUrl::forSite($item, $site?->slug()),
+            $site !== null ? $this->siteLocale($site) : null
+        );
         if ($record === null) {
             return $this->status(404); // authority record — not a citable work
         }
@@ -86,10 +100,25 @@ class CitationController extends AbstractActionController
         return $this->citationData->isCitable(ResourceUrl::classId($item)) ? $item : null;
     }
 
-    /** The default site's public page URL — the citation's stable canonical. */
-    private function itemUrl(ItemRepresentation $item): ?string
+    /** The public site named by ?site=, else the default site. */
+    private function readerSite(): ?SiteRepresentation
     {
-        return ResourceUrl::forSite($item, $this->siteResolver->defaultSlug());
+        $slug = $this->params()->fromQuery('site');
+        $site = is_string($slug) && $slug !== '' ? $this->siteResolver->publicSite($slug) : null;
+        return $site ?? $this->siteResolver->defaultSite();
+    }
+
+    /**
+     * The site's own locale setting — what the page's translator uses, so a
+     * download reads in the language of the page it came from.
+     */
+    private function siteLocale(SiteRepresentation $site): string
+    {
+        $locale = $this->siteSettings->get('locale', null, $site->id());
+        if (!is_string($locale) || $locale === '') {
+            $locale = $this->settings->text('locale');
+        }
+        return ViewLocale::narrow($locale);
     }
 
     private function enabled(): bool

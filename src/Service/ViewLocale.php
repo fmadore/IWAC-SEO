@@ -49,6 +49,12 @@ final class ViewLocale
      */
     public static function forCitation(PhpRenderer $view): string
     {
-        return str_starts_with(strtolower(self::resolve($view)), 'fr') ? 'fr' : 'en';
+        return self::narrow(self::resolve($view));
+    }
+
+    /** Any locale ("fr", "fr_FR", "en-GB") narrowed to French or English. */
+    public static function narrow(string $locale): string
+    {
+        return str_starts_with(strtolower($locale), 'fr') ? 'fr' : 'en';
     }
 }

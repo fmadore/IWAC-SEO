@@ -372,7 +372,9 @@ helper, which returns:
   language, so the French site reads *Dans*, *sous la dir. de*, *7 décembre 2018*;
 - **downloads** at **`/cite/{item-id}/{format}`** — **BibTeX** (`.bib`), **RIS** (`.ris`) and
   **CSL-JSON** (`.json`), served by `CitationController` as an `attachment` whose filename is the
-  `iwac-` accession id; and
+  `iwac-` accession id. The panel's links carry `?site={slug}`, so a download from the English
+  site links the English page and reads in English (abstract, *Islam West Africa Collection*),
+  one from the French site in French (*Collection Islam Afrique de l'Ouest*); and
 - the **Zotero RDF** link (the `/unapi` endpoint above) for the Connector-eligible kinds.
 
 This is the single-item replacement for `Daniel-KM/Omeka-s-module-BulkExport`. All three
