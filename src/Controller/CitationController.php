@@ -6,6 +6,8 @@ namespace IwacSeo\Controller;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Controller\Concern\SendsResponses;
+use IwacSeo\Service\PageCitationData;
+use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SiteResolver;
@@ -14,6 +16,7 @@ use Laminas\Http\Response;
 use Laminas\Mvc\Controller\AbstractActionController;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\ItemRepresentation;
+use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Settings\SiteSettings;
 
@@ -31,6 +34,12 @@ use Omeka\Settings\SiteSettings;
  * links that site's page and reads in its language (abstract, collection
  * name). Without it, or with a slug that is not a public site, the default
  * site answers — the route itself is unchanged.
+ *
+ * /cite/page/:id/:format — the same downloads for a static site page (an
+ * online exhibit), built by {@see PageCitationData}. A page belongs to one
+ * site, so no ?site= is read: the page's own site fixes its URL and language.
+ * Only a public page of a public site that carries the "How to cite this page"
+ * block resolves.
  */
 class CitationController extends AbstractActionController
 {
@@ -43,6 +52,8 @@ class CitationController extends AbstractActionController
         private readonly SettingsGate $settings,
         private readonly SiteResolver $siteResolver,
         private readonly SiteSettings $siteSettings,
+        private readonly PageCitationData $pageCitationData,
+        private readonly PageSeoStore $pageSeoStore,
     ) {
     }
 
@@ -82,7 +93,56 @@ class CitationController extends AbstractActionController
         return $this->fileResponse($body, $contentType, $this->citationExport->filename($record, $format));
     }
 
+    public function pageAction(): Response
+    {
+        if (!$this->enabled()) {
+            return $this->status(404);
+        }
+
+        $id = (int) $this->params()->fromRoute('id', 0);
+        $format = (string) $this->params()->fromRoute('format', '');
+        if ($id <= 0 || !isset(CitationExport::FORMATS[$format])) {
+            return $this->status(404);
+        }
+
+        $page = $this->resolvePage($id);
+        if ($page === null) {
+            return $this->status(404);
+        }
+
+        $site = $page->site();
+        $this->pageSeoStore->setSite($site->id());
+        $record = $this->pageCitationData->build(
+            $page,
+            ResourceUrl::forSite($page, $site->slug()),
+            $this->siteLocale($site),
+            $this->pageSeoStore->get($page->id())
+        );
+
+        $body = $this->citationExport->serialize($record, $format);
+        if ($body === null) {
+            return $this->status(404);
+        }
+
+        [, $contentType] = CitationExport::FORMATS[$format];
+        return $this->fileResponse($body, $contentType, $this->citationExport->filename($record, $format));
+    }
+
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /** A public, citable page of a public site, else null. */
+    private function resolvePage(int $id): ?SitePageRepresentation
+    {
+        try {
+            $page = $this->api->read('site_pages', $id)->getContent();
+        } catch (\Omeka\Api\Exception\NotFoundException | \Omeka\Api\Exception\PermissionDeniedException $e) {
+            return null;
+        }
+        if (!$page instanceof SitePageRepresentation || !$page->isPublic() || !$page->site()->isPublic()) {
+            return null;
+        }
+        return PageCitationData::isCitable($page) ? $page : null;
+    }
 
     private function resolveItem(int $id): ?ItemRepresentation
     {

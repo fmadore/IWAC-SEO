@@ -5,6 +5,8 @@ namespace IwacSeo\Service\ViewHelper;
 
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationFormatter;
+use IwacSeo\Service\PageCitationData;
+use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\ZoteroRdf;
 use IwacSeo\View\Helper\Citation;
@@ -30,6 +32,8 @@ final class CitationFactory implements FactoryInterface
             $config['styles'] ?? ['chicago' => 'Chicago', 'apa' => 'APA', 'mla' => 'MLA'],
             $config['formats'] ?? ['bibtex', 'ris', 'csljson'],
             $enabled,
+            $container->get(PageCitationData::class),
+            $container->get(PageSeoStore::class),
         );
     }
 }

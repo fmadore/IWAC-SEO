@@ -309,3 +309,36 @@ msgstr "cote"
 
 msgid "reviewed title"
 msgstr "titre de l’ouvrage recensé"
+
+msgid "How to cite this page"
+msgstr "Comment citer cette page"
+
+msgid "Shows this page’s citation in Chicago, APA and MLA, with BibTeX, RIS and CSL-JSON downloads. The author, title and date default to the configured author, the page title and the day the page was created; change them in:"
+msgstr "Affiche la référence de cette page selon les styles Chicago, APA et MLA, avec des téléchargements BibTeX, RIS et CSL-JSON. L’auteur, le titre et la date sont par défaut l’auteur configuré, le titre de la page et le jour de sa création ; vous pouvez les modifier dans :"
+
+msgid "SEO → Static pages"
+msgstr "SEO → Pages statiques"
+
+msgid "The citation fields are read by the “How to cite this page” block: add that block to a page to make it citable. Authors go one per line, as “First Last” or “Last, First”; put an institution in braces, {Like This}. The date is YYYY, YYYY-MM or YYYY-MM-DD. Blank fields fall back to the configured author, the page title and the day the page was created."
+msgstr "Les champs de citation sont lus par le bloc « Comment citer cette page » : ajoutez ce bloc à une page pour la rendre citable. Indiquez un auteur par ligne, sous la forme « Prénom Nom » ou « Nom, Prénom » ; placez une institution entre accolades, {Comme ceci}. La date s’écrit AAAA, AAAA-MM ou AAAA-MM-JJ. Les champs laissés vides reprennent l’auteur configuré, le titre de la page et le jour de sa création."
+
+msgid "Citation"
+msgstr "Citation"
+
+msgid "Citable"
+msgstr "Citable"
+
+msgid "No “How to cite” block"
+msgstr "Pas de bloc « Comment citer »"
+
+msgid "Citation authors"
+msgstr "Auteurs de la citation"
+
+msgid "Citation title"
+msgstr "Titre de la citation"
+
+msgid "Citation date"
+msgstr "Date de la citation"
+
+msgid "Citation date not saved, because it is not YYYY, YYYY-MM or YYYY-MM-DD: %s"
+msgstr "Date de citation non enregistrée, car elle n’est pas au format AAAA, AAAA-MM ou AAAA-MM-JJ : %s"

@@ -51,6 +51,13 @@ enum CitationKind: string
     case Communication = 'communication';
     case Post = 'post';
 
+    /**
+     * A static site page — an online exhibit, cited as a page of the
+     * collection's website. Never reached through the class map: site pages
+     * have no resource class, so {@see PageCitationData} assigns it directly.
+     */
+    case Webpage = 'webpage';
+
     /** The fallback for a resource class with no mapping. */
     case Item = 'item';
 
@@ -76,7 +83,7 @@ enum CitationKind: string
     {
         return match ($this) {
             self::Newspaper, self::Magazine, self::Article, self::Review,
-            self::Chapter, self::Post, self::Communication => true,
+            self::Chapter, self::Post, self::Communication, self::Webpage => true,
             default => false,
         };
     }
@@ -95,6 +102,7 @@ enum CitationKind: string
             self::Thesis => 'thesis',
             self::Report => 'report',
             self::Post => 'post-weblog',
+            self::Webpage => 'webpage',
             self::Av => 'motion_picture',
             self::Audio => 'song',
             self::Communication => 'speech',
@@ -116,7 +124,7 @@ enum CitationKind: string
             // biblatex's type for "the script of a talk", and the one whose
             // standard drivers print eventtitle, eventdate and venue.
             self::Communication => 'unpublished',
-            self::Post => 'online',
+            self::Post, self::Webpage => 'online',
             default => 'misc',
         };
     }
@@ -135,6 +143,7 @@ enum CitationKind: string
             self::Report => 'RPRT',
             self::Communication => 'GEN',
             self::Post => 'BLOG',
+            self::Webpage => 'ELEC',
             self::Av => 'VIDEO',
             self::Audio => 'SOUND',
             self::Photo => 'ART',
@@ -155,6 +164,7 @@ enum CitationKind: string
             self::Magazine => 'magazineArticle',
             self::PeriodicalIssue => 'document',
             self::Post => 'blogPost',
+            self::Webpage => 'webpage',
             self::Av => 'videoRecording',
             self::Audio => 'audioRecording',
             self::Communication => 'presentation',

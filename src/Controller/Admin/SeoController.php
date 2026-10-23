@@ -8,6 +8,7 @@ use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationDiagnostics;
 use IwacSeo\Service\CitationFormatter;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\PingRepository;
 use IwacSeo\Service\ResourceUrl;
@@ -36,6 +37,8 @@ class SeoController extends AbstractActionController
         private readonly CitationData $citationData,
         private readonly CitationFormatter $citationFormatter,
         private readonly PingRepository $pingRepository,
+        /** @var string[] iwac_seo.citation.page.authors */
+        private readonly array $defaultPageAuthors = [],
     ) {
     }
 
@@ -198,26 +201,41 @@ class SeoController extends AbstractActionController
         $this->pageSeoStore->setSite($site->id());
         $form = $this->getForm(PageSeoForm::class);
         $pages = $this->api->search('site_pages', ['site_id' => $site->id()])->getContent();
-        $pageIds = array_map(static fn ($page) => $page->id(), $pages);
+        $pageTitles = [];
+        foreach ($pages as $page) {
+            $pageTitles[$page->id()] = (string) $page->title();
+        }
 
         if ($this->getRequest()->isPost()) {
             $post = $this->params()->fromPost();
             $form->setData($post);
             if ($form->isValid()) {
                 $map = [];
+                $badDates = [];
                 foreach ((array) ($post['pages'] ?? []) as $pageId => $fields) {
-                    if (!is_array($fields) || !in_array((int) $pageId, $pageIds, true)) {
+                    if (!is_array($fields) || !isset($pageTitles[(int) $pageId])) {
                         continue;
                     }
                     $robots = (string) ($fields['robots'] ?? '');
                     if (!in_array($robots, \IwacSeo\Service\PageIndexability::ROBOTS, true)) {
                         $robots = '';
                     }
+                    // A date the citation could not read would silently fall
+                    // back to the creation date; drop it and say so instead.
+                    $date = trim((string) ($fields['citation_date'] ?? ''));
+                    if ($date !== '' && !PageCitationData::isValidDate($date)) {
+                        $badDates[] = $pageTitles[(int) $pageId];
+                        $date = '';
+                    }
+                    $authors = preg_split('/\R/u', (string) ($fields['citation_authors'] ?? '')) ?: [];
                     $overrides = array_filter([
                         'title'       => trim((string) ($fields['title'] ?? '')),
                         'description' => trim((string) ($fields['description'] ?? '')),
                         'image'       => (int) ($fields['image'] ?? 0) ?: null,
                         'robots'      => $robots,
+                        'citation_authors' => implode("\n", array_filter(array_map('trim', $authors), static fn ($a) => $a !== '')),
+                        'citation_title'   => trim((string) ($fields['citation_title'] ?? '')),
+                        'citation_date'    => $date,
                     ], static fn ($v) => $v !== null && $v !== '');
                     if ($overrides !== []) {
                         $map[(int) $pageId] = $overrides;
@@ -229,6 +247,12 @@ class SeoController extends AbstractActionController
                 }
                 $this->generator->clearCache();
                 $this->messenger()->addSuccess('Static-page SEO saved.'); // @translate
+                if ($badDates) {
+                    $this->messenger()->addWarning(sprintf(
+                        $this->translate('Citation date not saved, because it is not YYYY, YYYY-MM or YYYY-MM-DD: %s'), // @translate
+                        implode(', ', $badDates)
+                    ));
+                }
                 return $this->redirect()->toRoute('admin/iwac-seo/pages', [], ['query' => ['site_id' => $site->id()]]);
             }
             $this->messenger()->addError('Invalid form submission.'); // @translate
@@ -239,6 +263,7 @@ class SeoController extends AbstractActionController
             'sites'     => $sites,
             'pages'     => $pages,
             'overrides' => $this->pageSeoStore->all(),
+            'defaultAuthors' => $this->defaultAuthors(),
             'form'      => $form,
             'revision'  => $this->pageSeoStore->revision(),
         ]);
@@ -275,6 +300,12 @@ class SeoController extends AbstractActionController
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /** The configured page-citation authors, as the Authors field shows them. */
+    private function defaultAuthors(): string
+    {
+        return implode("\n", array_filter($this->defaultPageAuthors, 'is_string'));
+    }
 
     /**
      * The site with the given id from an already-loaded list, or null.

@@ -34,7 +34,8 @@ final class CitationDiagnostics
         $fields = ['title' => $record->title, 'date' => $record->issued->iso() ?? $record->issued->literal];
         $fields += match ($record->kind) {
             CitationKind::Article, CitationKind::Review, CitationKind::Newspaper,
-            CitationKind::Magazine, CitationKind::PeriodicalIssue, CitationKind::Post => ['container' => $record->container],
+            CitationKind::Magazine, CitationKind::PeriodicalIssue, CitationKind::Post,
+            CitationKind::Webpage => ['container' => $record->container],
             CitationKind::Chapter => ['book title' => $record->bookTitle, 'publisher' => $record->publisher],
             CitationKind::Thesis => ['degree / thesis type' => $record->genre, 'institution' => $record->publisher],
             CitationKind::Communication => ['event' => $record->eventTitle],

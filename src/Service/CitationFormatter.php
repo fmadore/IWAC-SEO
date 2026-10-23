@@ -23,7 +23,9 @@ use IwacSeo\Service\Citation\IssuedDate;
  *     blog post, communication) — title in quotes (Chicago/MLA) or plain (APA),
  *     container in italics;
  *   • standalone works (book, thesis, report, audiovisual, photograph, document)
- *     — title in italics.
+ *     — title in italics;
+ *   • a site page (an online exhibit) — quoted in Chicago/MLA with the website
+ *     roman (Chicago) or italic (MLA); italic in APA, with the website plain.
  *
  * Coverage is precise for the common kinds; rarer kinds fall back to a sensible
  * "author. title. container/publisher, year. url" shape. Author lists follow
@@ -38,7 +40,7 @@ final class CitationFormatter
 
     /** Kinds whose citation carries a full publication date, not just a year. */
     private const PERIODICAL_KINDS = [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::PeriodicalIssue,
-        CitationKind::Post, CitationKind::Av, CitationKind::Audio, CitationKind::Communication];
+        CitationKind::Post, CitationKind::Av, CitationKind::Audio, CitationKind::Communication, CitationKind::Webpage];
 
     /** @var array<string,array<string,string>> Connectives per locale. */
     private const STR = [
@@ -156,6 +158,15 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
+            case CitationKind::Webpage:
+                // CMOS 14.206: the website roman, then its owner and the date.
+                $parts[] = $this->terminate($this->esc($record->container));
+                $parts[] = $this->terminate(implode(', ', array_filter([
+                    $this->esc($record->publisher),
+                    $this->fullDate($record, $locale, 'chicago'),
+                ])));
+                break;
+
             default: // book, report, av, photo, document, item
                 $py = $this->publisherYear($record);
                 if ($py !== '') {
@@ -259,6 +270,11 @@ final class CitationFormatter
                 // Degree and institution are attached to the title in APA.
                 break;
 
+            case CitationKind::Webpage:
+                // A page on a website: the site's name, plain, and no publisher.
+                $parts[] = $this->terminate($this->esc($record->container));
+                break;
+
             default: // book, report, av, photo, document, communication, item
                 if ($this->esc($record->publisher) !== '') {
                     $parts[] = $this->terminate($this->esc($record->publisher));
@@ -350,6 +366,16 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
+            case CitationKind::Webpage:
+                // The website is the container: italic, then publisher and date.
+                $elements = array_filter([$this->esc($record->publisher), $this->fullDate($record, $locale, 'mla')]);
+                $seg = $this->italic($record->container);
+                if ($elements) {
+                    $seg = $seg !== '' ? $seg . ', ' . implode(', ', $elements) : implode(', ', $elements);
+                }
+                $parts[] = $this->terminate($seg);
+                break;
+
             default: // book, thesis, report, av, photo, document, communication, item
                 $py = $this->publisherYear($record);
                 if ($py !== '') {
@@ -375,8 +401,10 @@ final class CitationFormatter
 
         if ($style === 'apa') {
             // APA: only standalone works are italic; parts stay plain. A thesis
-            // is not a "part", so it italicises — correct for APA.
-            $segment = $kind->isPartOfWork() && $kind !== CitationKind::Communication ? $this->esc($title) : $this->italic($title);
+            // is not a "part", so it italicises — correct for APA, as is a web
+            // page, which APA treats as a work of its own on a site.
+            $plain = $kind->isPartOfWork() && $kind !== CitationKind::Communication && $kind !== CitationKind::Webpage;
+            $segment = $plain ? $this->esc($title) : $this->italic($title);
             $medium = $record->medium ?? match ($kind) {
                 CitationKind::Av => $this->str($locale, 'video'),
                 CitationKind::Audio => $this->str($locale, 'audio'),

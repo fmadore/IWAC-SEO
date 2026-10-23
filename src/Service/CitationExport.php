@@ -45,12 +45,16 @@ final class CitationExport
         };
     }
 
-    /** Download filename stem — the accession id (Cote) if present, else item-<id>. */
+    /**
+     * Download filename stem — the accession id (Cote) if present, else the
+     * record's key (a site page's slug), else item-<id>.
+     */
     public function filename(CitationRecord $record, string $format): string
     {
         [$ext] = self::FORMATS[$format] ?? ['txt', ''];
-        $stem = $record->accession !== null
-            ? preg_replace('/[^A-Za-z0-9._-]+/', '-', $record->accession)
+        $base = $record->accession ?? $record->key;
+        $stem = $base !== null
+            ? preg_replace('/[^A-Za-z0-9._-]+/', '-', $base)
             : 'item-' . $record->id;
         return trim((string) $stem, '-') . '.' . $ext;
     }
@@ -116,6 +120,12 @@ final class CitationExport
             case CitationKind::Book:
                 $this->addField($fields, 'publisher', $record->publisher);
                 break;
+            case CitationKind::Webpage:
+                // @online has no publisher or website field; `organization`
+                // is the one biblatex prints for "who published it online",
+                // and the website reads more usefully there than its host.
+                $this->addField($fields, 'organization', $record->container ?? $record->publisher);
+                break;
             default:
                 // @misc has no publisher field: audiovisual, photograph and
                 // document records carry their publisher here, or lose it.
@@ -178,7 +188,7 @@ final class CitationExport
 
     private function citeKey(CitationRecord $record): string
     {
-        $base = $record->accession ?? ('item-' . $record->id);
+        $base = $record->accession ?? $record->key ?? ('item-' . $record->id);
         return preg_replace('/[^A-Za-z0-9:_-]+/', '', $base) ?: 'iwac';
     }
 
@@ -315,7 +325,7 @@ final class CitationExport
     private function cslJson(CitationRecord $record): string
     {
         $item = [
-            'id'   => $record->accession ?? ('iwac-' . $record->id),
+            'id'   => $record->accession ?? $record->key ?? ('iwac-' . $record->id),
             'type' => $record->cslType(),
         ];
         if ($record->title !== null) {

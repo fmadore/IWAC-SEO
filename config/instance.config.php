@@ -156,6 +156,18 @@ return [
                 'fr' => "Collection Islam Afrique de l'Ouest",
                 'en' => 'Islam West Africa Collection',
             ],
+            // Static site pages (online exhibits) cited as web pages, through
+            // the "How to cite this page" block. Omeka pages record no author,
+            // so these are the defaults the static-page SEO table overrides
+            // per page; see PageCitationData. Authors take the Authors field's
+            // syntax: "First Last", "Last, First", or {Institution}.
+            'page' => [
+                'authors'   => ['Frédérick Madore'],
+                'publisher' => [
+                    'fr' => 'Leibniz-Zentrum Moderner Orient',
+                    'en' => 'Leibniz-Zentrum Moderner Orient',
+                ],
+            ],
             'default_style' => 'chicago',
             'styles'        => ['chicago' => 'Chicago', 'apa' => 'APA', 'mla' => 'MLA'],
             'formats'       => ['bibtex', 'ris', 'csljson'],

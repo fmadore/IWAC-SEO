@@ -7,6 +7,8 @@ use IwacSeo\Controller\CitationController;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationKindMap;
+use IwacSeo\Service\PageCitationData;
+use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Service\SiteResolver;
 use Laminas\Http\PhpEnvironment\Request;
@@ -88,6 +90,8 @@ final class CitationControllerTest extends TestCase
             new SettingsGate($settings),
             $resolver,
             $siteSettings,
+            new PageCitationData(),
+            new PageSeoStore($siteSettings),
         );
         $controller->setPluginManager(new PluginManager(new ServiceManager()));
         $event = new MvcEvent();

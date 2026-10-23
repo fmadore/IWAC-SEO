@@ -28,6 +28,7 @@ return $instance + [
             Service\CitationKindMap::class  => Service\CitationKindMapFactory::class,
             Service\CitationMeta::class     => Service\CitationMetaFactory::class,
             Service\CitationData::class     => Service\CitationDataFactory::class,
+            Service\PageCitationData::class => Service\PageCitationDataFactory::class,
             Service\ZoteroRdf::class        => Service\ZoteroRdfFactory::class,
             Service\SitemapGenerator::class => Service\SitemapGeneratorFactory::class,
             Service\PageSeoStore::class     => Service\PageSeoStoreFactory::class,
@@ -70,6 +71,18 @@ return $instance + [
     'resource_page_block_layouts' => [
         'invokables' => [
             'iwacCitation' => Site\ResourcePageBlockLayout\Citation::class,
+        ],
+    ],
+
+    // "How to cite this page" page block. Placing it on a static page (an
+    // online exhibit) is what makes the page citable: the block renders the
+    // theme's citation partial for the page, and /cite/page/{id}/{format}
+    // serves downloads only for pages that carry it.
+    'block_layouts' => [
+        'invokables' => [
+            // PageCitationData::BLOCK_LAYOUT, spelled out like 'iwacCitation'
+            // above; tests/Config/InstanceConfigTest.php holds the two equal.
+            'iwacPageCitation' => Site\BlockLayout\PageCitation::class,
         ],
     ],
 
@@ -150,6 +163,17 @@ return $instance + [
                     'route'       => '/cite/:id/:format',
                     'constraints' => ['id' => '\d+', 'format' => '[a-z]+'],
                     'defaults'    => ['controller' => Controller\CitationController::class, 'action' => 'index'],
+                ],
+            ],
+            // Site-page citation downloads: /cite/page/{page-id}/{format}. A
+            // page belongs to one site, so its id alone fixes the URL and the
+            // language. `page` can never match the item route's \d+ id.
+            'iwac-seo-cite-page' => [
+                'type'    => Segment::class,
+                'options' => [
+                    'route'       => '/cite/page/:id/:format',
+                    'constraints' => ['id' => '\d+', 'format' => '[a-z]+'],
+                    'defaults'    => ['controller' => Controller\CitationController::class, 'action' => 'page'],
                 ],
             ],
             // IndexNow ownership key at /{key}.txt. Constrained to a hex key so

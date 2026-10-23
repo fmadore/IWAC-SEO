@@ -5,6 +5,7 @@ All notable changes to the IWAC SEO module. Versions follow
 
 ## Unreleased
 
+- Cite static site pages: a new **"How to cite this page"** page block makes an online exhibit citable — Chicago / APA / MLA as a web page, BibTeX (`@online`) / RIS (`ELEC`) / CSL-JSON (`webpage`) at `/cite/page/{id}/{format}`, each language version citing its own title, URL and collection name. Authors, title and date are new *Citation* fields in Admin → SEO → Static pages, defaulting to `iwac_seo.citation.page.authors`, the page title and the page's creation day. The theme's `common/citation` partial needs IWAC-theme with the "How to cite this page" heading.
 - Fix formatted citations: APA no longer runs a volume-less issue into its periodical (`*Al Mawadda*(48–49)`), French APA dates read `(2018, 7 décembre)`, date intervals read as dates in every style (`May–August 2009`) instead of raw ISO, MLA abbreviates months and puts the issue number before the date, and page ranges take an en dash.
 - Fix exports: biblatex `@misc` keeps the publisher and a source-only URL, `@periodical` names the periodical as `title` and the issue as `issuetitle`, talks are `@unpublished` so `eventtitle`/`venue` print, known languages emit `langid`, and newspaper/magazine articles carry `entrysubtype`. RIS adds `CN` and `DB` and CSL-JSON `archive_location`, so every download files the accession as Zotero's call number.
 - Emit `citation_publication_date` in Google Scholar's documented `2010/5/12` form; an interval cites its start.

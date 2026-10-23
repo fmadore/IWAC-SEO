@@ -26,6 +26,7 @@ final class SeoControllerFactory implements FactoryInterface
             $container->get(\IwacSeo\Service\CitationData::class),
             $container->get(\IwacSeo\Service\CitationFormatter::class),
             new \IwacSeo\Service\PingRepository($container->get('Omeka\Connection')),
+            (array) ($container->get('Config')['iwac_seo']['citation']['page']['authors'] ?? []),
         );
     }
 }

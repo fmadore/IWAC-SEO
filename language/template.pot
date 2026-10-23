@@ -53,12 +53,36 @@ msgstr ""
 msgid "Broken alternate links"
 msgstr ""
 
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "Citable"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "Citation"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "Citation authors"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "Citation date"
+msgstr ""
+
+#: src/Controller/Admin/SeoController.php
+msgid "Citation date not saved, because it is not YYYY, YYYY-MM or YYYY-MM-DD: %s"
+msgstr ""
+
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Citation preview"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "Citation tags (Zotero / Scholar)"
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "Citation title"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
@@ -122,6 +146,10 @@ msgstr ""
 msgid "How to cite"
 msgstr ""
 
+#: src/Site/BlockLayout/PageCitation.php
+msgid "How to cite this page"
+msgstr ""
+
 #: view/iwac-seo/admin/seo/pages.phtml
 msgid "Index, follow"
 msgstr ""
@@ -176,6 +204,10 @@ msgstr ""
 
 #: src/Controller/Admin/SeoController.php
 msgid "No site found."
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "No “How to cite” block"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml
@@ -236,6 +268,10 @@ msgstr ""
 msgid "SEO"
 msgstr ""
 
+#: src/Site/BlockLayout/PageCitation.php
+msgid "SEO → Static pages"
+msgstr ""
+
 #: view/iwac-seo/admin/seo/pages.phtml
 msgid "Save"
 msgstr ""
@@ -250,6 +286,10 @@ msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml
 msgid "Share image"
+msgstr ""
+
+#: src/Site/BlockLayout/PageCitation.php
+msgid "Shows this page’s citation in Chicago, APA and MLA, with BibTeX, RIS and CSL-JSON downloads. The author, title and date default to the configured author, the page title and the day the page was created; change them in:"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml
@@ -303,6 +343,10 @@ msgstr ""
 
 #: src/Form/ConfigForm.php
 msgid "The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16."
+msgstr ""
+
+#: view/iwac-seo/admin/seo/pages.phtml
+msgid "The citation fields are read by the “How to cite this page” block: add that block to a page to make it citable. Authors go one per line, as “First Last” or “Last, First”; put an institution in braces, {Like This}. The date is YYYY, YYYY-MM or YYYY-MM-DD. Blank fields fall back to the configured author, the page title and the day the page was created."
 msgstr ""
 
 #: src/Form/ConfigForm.php

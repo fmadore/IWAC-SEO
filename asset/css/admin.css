@@ -54,3 +54,9 @@
     color: #6a6a6a;
     font-size: 0.85em;
 }
+
+/* The citation cell stacks its badge and three fields. */
+#content table.tablesaw td.iwac-seo-citation > * {
+    display: block;
+    margin: 0 0 0.35rem;
+}

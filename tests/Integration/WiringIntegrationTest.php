@@ -11,6 +11,7 @@ use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationMeta;
 use IwacSeo\Service\HeadMetadata;
+use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\RobotsTxt;
@@ -56,6 +57,19 @@ final class WiringIntegrationTest extends TestCase
         self::assertInstanceOf(ZoteroRdf::class, $services->get(ZoteroRdf::class));
         self::assertInstanceOf(HeadMetadata::class, $services->get(HeadMetadata::class));
         self::assertSame($services->get(HeadMetadata::class), $services->get(HeadMetadata::class));
+        self::assertInstanceOf(PageCitationData::class, $services->get(PageCitationData::class));
+    }
+
+    /**
+     * The page block is registered under the name PageCitationData looks
+     * for — the config spells it out, so the two are held equal here — and
+     * is a real Omeka block layout.
+     */
+    public function testThePageCitationBlockIsRegisteredUnderTheNameThatMarksAPageCitable(): void
+    {
+        $layouts = $this->config['block_layouts']['invokables'];
+        self::assertArrayHasKey(PageCitationData::BLOCK_LAYOUT, $layouts);
+        self::assertTrue(is_subclass_of($layouts[PageCitationData::BLOCK_LAYOUT], \Omeka\Site\BlockLayout\BlockLayoutInterface::class));
     }
 
     public function testControllersResolveThroughRealControllerManager(): void
@@ -65,6 +79,7 @@ final class WiringIntegrationTest extends TestCase
             CitationData::class,
             CitationExport::class,
             \IwacSeo\Service\CitationFormatter::class,
+            PageCitationData::class,
             SitemapGenerator::class,
             PageSeoStore::class,
             SettingsGate::class,
@@ -76,6 +91,7 @@ final class WiringIntegrationTest extends TestCase
         foreach ($dependencies as $class) {
             $services->setService($class, $this->withoutConstructor($class));
         }
+        $services->setService('Config', $this->config);
         $services->setService('EventManager', new EventManager());
         $services->setService('ControllerPluginManager', new ControllerPluginManager($services));
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
@@ -133,6 +149,7 @@ final class WiringIntegrationTest extends TestCase
             '/robots.txt' => [SitemapController::class, 'robots'],
             '/unapi' => [UnapiController::class, 'index'],
             '/cite/42/ris' => [CitationController::class, 'index'],
+            '/cite/page/7/bibtex' => [CitationController::class, 'page'],
         ];
         foreach ($cases as $path => [$controller, $action]) {
             $request = new Request();

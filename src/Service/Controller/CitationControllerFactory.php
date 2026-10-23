@@ -6,6 +6,8 @@ namespace IwacSeo\Service\Controller;
 use IwacSeo\Controller\CitationController;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
+use IwacSeo\Service\PageCitationData;
+use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\SettingsGate;
 use Laminas\ServiceManager\Factory\FactoryInterface;
@@ -22,6 +24,8 @@ final class CitationControllerFactory implements FactoryInterface
             $container->get(SettingsGate::class),
             $container->get(SiteResolver::class),
             $container->get('Omeka\Settings\Site'),
+            $container->get(PageCitationData::class),
+            $container->get(PageSeoStore::class),
         );
     }
 }

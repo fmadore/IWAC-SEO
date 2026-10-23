@@ -40,6 +40,12 @@ namespace Omeka\Job {
     }
 }
 
+namespace Omeka\Site\BlockLayout {
+    abstract class AbstractBlockLayout
+    {
+    }
+}
+
 namespace Omeka\Site\ResourcePageBlockLayout {
     interface ResourcePageBlockLayoutInterface
     {

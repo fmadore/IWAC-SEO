@@ -65,6 +65,11 @@ final class CitationRecord
         public readonly ?string $archive = null,
         public readonly ?string $isbn = null,
         public readonly ?string $issn = null,
+        /**
+         * A stable key for a record with no accession number — a site page's
+         * slug. Names the BibTeX entry, the CSL id and the download file.
+         */
+        public readonly ?string $key = null,
     ) {
     }
 
@@ -139,7 +144,7 @@ final class CitationRecord
             'genre' => $this->genre, 'eventTitle' => $this->eventTitle, 'eventPlace' => $this->eventPlace,
             'sourceUrl' => $this->sourceUrl, 'medium' => $this->medium, 'number' => $this->number,
             'edition' => $this->edition, 'reviewedTitle' => $this->reviewedTitle, 'archive' => $this->archive,
-            'isbn' => $this->isbn, 'issn' => $this->issn,
+            'isbn' => $this->isbn, 'issn' => $this->issn, 'key' => $this->key,
         ], static fn ($v) => $v !== null);
     }
 
@@ -192,6 +197,7 @@ final class CitationRecord
             archive: $string('archive'),
             isbn: $string('isbn'),
             issn: $string('issn'),
+            key: $string('key'),
         );
     }
 }

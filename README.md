@@ -29,6 +29,7 @@ It is self-contained, with no third-party runtime Composer dependencies or theme
 | **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` on the home page and `BreadcrumbList` on resource pages. |
 | **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
 | **unAPI (Zotero RDF)** | Primary-source items also advertise a `/unapi` endpoint serving **Zotero RDF**. Zotero prefers unAPI over the meta tags, so it imports a fuller record — the call number (*Cote*) from the `iwac-` identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. |
+| **Page citation tools** | A **"How to cite this page"** page block for static pages (online exhibits): the same panel and downloads (`/cite/page/{id}/{format}`), cited as a web page, with author, title and date set in the static-page table. See [Static-page citations](#static-page-citations--how-to-cite-this-page). |
 | **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
@@ -125,6 +126,9 @@ Because IWAC publishes the collection as two Omeka sites (`afrique_ouest`/fr and
 switches between them — overrides are stored per site, so the English pages
 (`home`, `about`, …) are edited on the `westafrica` site and the French ones on
 `afrique_ouest`.
+
+The same table carries each page's **citation** fields — authors, title and date — read by the
+"How to cite this page" block; see [Static-page citations](#static-page-citations--how-to-cite-this-page).
 
 ### Admin dashboard
 
@@ -385,6 +389,32 @@ formatters and serialisers read **one** normalized record from `CitationData`, w
 `null` and the panel is hidden. The panel and downloads share the citation kill-switch with the
 meta tags (the `iwac_seo_citation_meta` setting).
 
+### Static-page citations — "How to cite this page"
+
+IWAC's online exhibits (*Hajj in Burkina Faso*, …) are ordinary Omeka site pages, and a page records
+no author or publication date. The module registers a **"How to cite this page"** page block
+(`block_layouts`, name `iwacPageCitation`): **placing it on a page is what makes the page citable**,
+and it renders the same theme partial as the item panel, through **`iwacCitation($page)`** (the
+helper takes an item or a page). Each language version carries its own block and cites itself — its
+own title, its own URL, its language's collection name and date format.
+
+The record is a `webpage` kind (CSL `webpage`, BibTeX `@online`, RIS `ELEC`), built by
+`PageCitationData`. Each field has an override in **Admin → SEO → Static pages** (*Citation*
+column) and a default:
+
+| Field | Override | Default |
+|---|---|---|
+| Authors | one per line, `First Last` or `Last, First`; `{Institution}` in braces stays one field | `iwac_seo.citation.page.authors` (Frédérick Madore) |
+| Title | *Citation title* | the page title |
+| Date | `YYYY`, `YYYY-MM` or `YYYY-MM-DD` (anything else is refused on save) | the day the page was created |
+| Website | — | `iwac_seo.citation.archive_names` for the page's language, else the site title |
+| Publisher | — | `iwac_seo.citation.page.publisher` (Leibniz-Zentrum Moderner Orient) |
+
+The page's meta description, if set, travels as the exports' abstract. Downloads are served at
+**`/cite/page/{page-id}/{format}`** — no `?site=`, because a page belongs to one site — and only for
+a public page of a public site that carries the block, so the route never cites a page nobody made
+citable. A page has no unAPI identity, so the panel shows no Zotero RDF link.
+
 ---
 
 ## Bilingual SEO (hreflang)
@@ -472,13 +502,14 @@ IwacSeo/
 │   ├── Controller/
 │   │   ├── SitemapController.php     # /sitemap*.xml, /robots.txt, /{key}.txt
 │   │   ├── UnapiController.php       # /unapi -> Zotero RDF
-│   │   ├── CitationController.php    # /cite/{id}/{format} -> BibTeX/RIS/CSL-JSON
+│   │   ├── CitationController.php    # /cite/{id}/{format}, /cite/page/{id}/{format} -> BibTeX/RIS/CSL-JSON
 │   │   ├── Admin/SeoController.php   # dashboard + static-page table
 │   │   └── Concern/SendsResponses.php  # shared XML/text/file response plumbing
 │   ├── Form/{ConfigForm,PageSeoForm}.php
 │   ├── Job/PingSearchEngines.php
 │   ├── View/Helper/Citation.php      # iwacCitation() -> "How to cite" view-model
 │   ├── Site/ResourcePageBlockLayout/Citation.php  # "How to cite" resource page block
+│   ├── Site/BlockLayout/PageCitation.php          # "How to cite this page" page block
 │   └── Service/
 │       ├── HeadMetadata.php          # decides every <head> SEO signal
 │       ├── HeadWriter.php            # writes them; tracks what the request has set
@@ -488,6 +519,7 @@ IwacSeo/
 │       ├── CitationMeta.php          # Highwire + Dublin Core citation tags
 │       ├── ZoteroRdf.php             # Zotero RDF (served via unAPI)
 │       ├── CitationData.php          # builds a CitationRecord from an item
+│       ├── PageCitationData.php      # builds one from a static site page
 │       ├── Citation/                 # CitationRecord, Creator, IssuedDate (the record)
 │       ├── CitationFormatter.php     # Chicago / APA / MLA text (hand-rolled, bilingual)
 │       ├── CitationExport.php        # BibTeX / RIS / CSL-JSON serialisers
