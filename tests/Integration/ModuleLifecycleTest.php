@@ -26,6 +26,34 @@ final class ModuleLifecycleTest extends TestCase
         $this->runLifecycle(false);
     }
 
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testLifecycleLoaderResolvesAnyModuleClassFromSrc(): void
+    {
+        require_once dirname(__DIR__, 2) . '/Module.php';
+        // Anything that reaches the blocker means the module's loader missed it.
+        $blocker = static function (string $class): void {
+            if (str_starts_with($class, 'IwacSeo\\') && $class !== 'IwacSeo\\Missing') {
+                throw new \RuntimeException('Inactive module cannot autoload ' . $class);
+            }
+        };
+        spl_autoload_register($blocker, true, true);
+        try {
+            $module = new \IwacSeo\Module();
+            (new \ReflectionMethod($module, 'loadLifecycleDependencies'))->invoke($module);
+            // Not only the classes install/upgrade name today: any file under src/.
+            foreach (['Service\\PingOutboxInterface', 'Service\\Text', 'Service\\Citation\\CitationRecord'] as $class) {
+                self::assertTrue(
+                    class_exists('IwacSeo\\' . $class) || interface_exists('IwacSeo\\' . $class),
+                    $class
+                );
+            }
+            self::assertFalse(class_exists('IwacSeo\\Missing'));
+        } finally {
+            spl_autoload_unregister($blocker);
+        }
+    }
+
     private function runLifecycle(bool $upgrade): void
     {
         require_once dirname(__DIR__, 2) . '/Module.php';

@@ -121,9 +121,25 @@ class Module extends AbstractModule
     {
         // Omeka invokes install/upgrade while this module is inactive: its src/
         // namespace and services have not been registered for the request yet.
-        require_once __DIR__ . '/src/Service/MetadataValue.php';
-        require_once __DIR__ . '/src/Service/PingOutboxInterface.php';
-        require_once __DIR__ . '/src/Service/PingRepository.php';
+        // A PSR-4 loader scoped to IwacSeo\ resolves whatever the lifecycle
+        // touches, so a new interface or helper cannot fall off a hand list
+        // (1.1.0 shipped missing PingRepository, 1.2.0 nearly PingOutboxInterface).
+        static $registered = false;
+        if ($registered) {
+            return;
+        }
+        $registered = true;
+        $src = __DIR__ . '/src/';
+        spl_autoload_register(static function (string $class) use ($src): void {
+            if (!str_starts_with($class, __NAMESPACE__ . '\\')) {
+                return;
+            }
+            $relative = substr($class, strlen(__NAMESPACE__) + 1);
+            $file = $src . str_replace('\\', '/', $relative) . '.php';
+            if (is_file($file)) {
+                require $file;
+            }
+        }, true, true);
     }
 
     public function uninstall(ServiceLocatorInterface $services): void
