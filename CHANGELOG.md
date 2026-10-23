@@ -3,6 +3,12 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.2.1 — 2026-10-23
+
+- Install and upgrade load the module's classes through a PSR-4 loader scoped to `IwacSeo\`, instead of a hand-kept `require_once` list that a new dependency could fall off.
+
+If an upgrade fails with `Interface "IwacSeo\Service\PingOutboxInterface" not found`, PHP is still running a previous release's `Module.php` (typically from OPcache with timestamp validation off): replace the whole module folder with this release, restart PHP, and retry **Upgrade**. Keep the module installed.
+
 ## 1.2.0 — 2026-10-23
 
 - Cite static site pages: a new **"How to cite this page"** page block makes an online exhibit citable — Chicago / APA / MLA as a web page, BibTeX (`@online`) / RIS (`ELEC`) / CSL-JSON (`webpage`) at `/cite/page/{id}/{format}`, each language version citing its own title, URL and collection name. Authors, title and date are new *Citation* fields in Admin → SEO → Static pages, defaulting to `iwac_seo.citation.page.authors`, the page title and the page's creation day. The panel's "How to cite this page" heading needs IWAC-theme 2.29.0.
