@@ -16,14 +16,14 @@ final class ModuleLifecycleTest extends TestCase
     #[PreserveGlobalState(false)]
     public function testUpgradeWithoutActiveModuleAutoloading(): void
     {
-        $this->runLifecycle(true);
+        $this->runModuleLifecycle(true);
     }
 
     #[RunInSeparateProcess]
     #[PreserveGlobalState(false)]
     public function testInstallWithoutActiveModuleAutoloading(): void
     {
-        $this->runLifecycle(false);
+        $this->runModuleLifecycle(false);
     }
 
     #[RunInSeparateProcess]
@@ -54,7 +54,7 @@ final class ModuleLifecycleTest extends TestCase
         }
     }
 
-    private function runLifecycle(bool $upgrade): void
+    private function runModuleLifecycle(bool $upgrade): void
     {
         require_once dirname(__DIR__, 2) . '/Module.php';
         self::assertFalse(class_exists('IwacSeo\\Service\\PingRepository', false));

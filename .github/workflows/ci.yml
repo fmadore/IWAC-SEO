@@ -22,11 +22,11 @@ jobs:
     timeout-minutes: 10
     strategy:
       fail-fast: false
-      # 8.2 is the floor declared in composer.json; 8.5 is what islam.zmo.de
+      # 8.4 is the floor declared in composer.json; 8.5 is what islam.zmo.de
       # actually runs, so leaving it out meant never testing the deployed
       # version. Both ends of the supported range need to stay covered.
       matrix:
-        php: ['8.2', '8.3', '8.4', '8.5']
+        php: ['8.4', '8.5']
     name: PHP ${{ matrix.php }}
     steps:
       - uses: actions/checkout@v7
@@ -60,8 +60,8 @@ jobs:
         run: vendor/bin/phpunit
 
   # The other half of `composer check`. Kept off the matrix: PSR-12 compliance
-  # and the PHPStan result do not vary across 8.2–8.5, so running them four
-  # times would quadruple the wall clock for no extra signal.
+  # and the PHPStan result do not vary across 8.4–8.5, so running them twice
+  # would double the wall clock for no extra signal.
   quality:
     runs-on: ubuntu-latest
     timeout-minutes: 10
@@ -69,13 +69,13 @@ jobs:
     steps:
       - uses: actions/checkout@v7
 
-      # 8.2 is the module's declared floor, and phpstan.neon.dist sets no
+      # 8.4 is the module's declared floor, and phpstan.neon.dist sets no
       # phpVersion — PHPStan reports against the version it runs on, so
       # analysing at the floor is what would catch a violation of it. The
       # matrix above is what covers 8.5, the deployed version.
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           coverage: none
 
       - name: Validate Composer metadata

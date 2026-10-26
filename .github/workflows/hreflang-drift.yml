@@ -58,7 +58,7 @@ jobs:
       # and nothing else, so there is nothing to install or cache.
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           coverage: none
 
       - name: Check page_pairs against the live installation
@@ -80,7 +80,7 @@ jobs:
 
       - uses: shivammathur/setup-php@v2
         with:
-          php-version: '8.2'
+          php-version: '8.4'
           coverage: none
 
       - name: Regenerate the table from the module's mapping

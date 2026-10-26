@@ -87,7 +87,7 @@ No web-server changes are needed: nginx's `try_files … /index.php` already rou
 There are no third-party dependencies, so `composer install` is **not** required — Omeka
 autoloads the `IwacSeo\` namespace from `src/`.
 
-**Requirements:** Omeka S `^4.2.0`, PHP `>= 8.2`.
+**Requirements:** Omeka S `^4.2.0`, PHP `>= 8.4`.
 
 ---
 
@@ -590,8 +590,8 @@ composer check
 The suite covers the pure logic that regresses most silently — the Chicago/APA/MLA
 formatter, the BibTeX/RIS/CSL-JSON serialisers, hreflang resolution and the text
 utilities, plus sitemap policy and IWAC's instance-configuration contracts. GitHub Actions
-(`.github/workflows/ci.yml`) runs syntax checks and PHPUnit on PHP 8.2–8.5, then checks
-Composer metadata, translations, PSR-12 and PHPStan at the declared PHP 8.2 floor. A
+(`.github/workflows/ci.yml`) runs syntax checks and PHPUnit on PHP 8.4 and 8.5, then checks
+Composer metadata, translations, PSR-12 and PHPStan at the declared PHP 8.4 floor. A
 separate PHP 8.5 job installs Omeka S 4.2.1 and exercises `CitationMeta`, `ZoteroRdf`,
 `HeadMetadata`, the service/controller managers and public routes against the real Omeka
 and Laminas classes. It intentionally does not add framework dependencies to this module
