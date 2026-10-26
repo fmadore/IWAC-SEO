@@ -3,6 +3,11 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.3.0 — 2026-10-26
+
+- Requires PHP 8.4 or later (was 8.2). The live server runs 8.5; CI now tests 8.4 and 8.5, and lints and analyses at the 8.4 floor.
+- Development dependencies move to PHPUnit 13 and PHPStan 2.3.2. The Omeka lifecycle integration test's helper is renamed, because PHPUnit 13 declares a final `TestCase::runLifecycle()`.
+
 ## 1.2.1 — 2026-10-23
 
 - Install and upgrade load the module's classes through a PSR-4 loader scoped to `IwacSeo\`, instead of a hand-kept `require_once` list that a new dependency could fall off.
