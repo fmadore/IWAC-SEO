@@ -13,6 +13,8 @@ All notable changes to the IWAC SEO module. Versions follow
 - IndexNow answers are told apart. An accepted batch is acknowledged as before, and a transient failure (no response, 408, 429, 5xx) still backs off and retries; any other refusal (403 key not verified, 422 URLs not of the host) is no longer resent four more times but counted as failed on the dashboard at once, with a warning in the job log naming the status and the key location. `scripts/drain-indexnow.php --retry-failed` re-queues those URLs once the cause is fixed. A 3xx, previously taken as success, is now a refusal.
 - Nothing is queued or sent while the IndexNow key is malformed: the configuration form, the dashboard, the queue and the job now share one key definition (8–128 hexadecimal characters, the shape `/{key}.txt` serves).
 - The dashboard's IndexNow line reads "failed (refused, or out of retries)" rather than "exhausted retries".
+- The release workflow tests the tag before building it: strict Composer validation, the translation-template check, PSR-12, PHPStan and PHPUnit on PHP 8.4, as CI does. It no longer builds a zip from a commit whose checks fail, which is how 1.0.3 shipped before CI went red.
+- Releases carry a SHA-256 checksum, `IwacSeo-<version>.zip.sha256`, beside the zip; the release notes say how to check it.
 
 ## 1.3.0 — 2026-10-26
 

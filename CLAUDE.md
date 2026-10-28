@@ -66,7 +66,10 @@ revealing them a re-run at a time.
 A local run is now a genuine gate rather than a rehearsal, but it is one PHP
 version. CI is what covers the 8.4 floor and production 8.5, and it boots Omeka on
 8.5 where the local integration tree runs 8.2. Watch it before tagging: a tag
-is not retractable, and the release workflow builds straight from it.
+is not retractable. The release workflow now runs the `quality` gates and
+PHPUnit on the tag before it builds the zip (and publishes a `.sha256` beside
+it), but only at the 8.4 floor and without the integration suite — it is a last
+gate, not a substitute for a green CI run.
 
 `phpstan-baseline.neon` records 59 findings that predate enforcement — 56
 missing array value types plus three judgement calls. Level 6 applies in full

@@ -67,6 +67,9 @@ folder name has to match the namespace).
 Download `IwacSeo-<version>.zip` from the
 [latest release](https://github.com/fmadore/IWAC-SEO/releases/latest) and unzip it into
 `modules/` — it already unpacks to a correctly named folder and contains only the runtime.
+Each release also carries `IwacSeo-<version>.zip.sha256`; with both files in one directory,
+`sha256sum -c IwacSeo-<version>.zip.sha256` verifies the download. The zip is built only
+after the tagged commit has passed the lint, analysis, translation and unit-test checks.
 **Do not use GitHub's "Source code" archives:** they unpack to `IWAC-SEO-<version>/`, which
 the namespace will not resolve. Cloning works too, provided you name the target directory:
 

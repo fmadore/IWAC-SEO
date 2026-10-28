@@ -7,10 +7,15 @@ name: Release
 # honours the export-ignore rules in .gitattributes *and* names the top-level
 # directory correctly, with no copy-and-prune step to drift out of step.
 #
+# The tag is tested before anything is built. v1.0.3 shipped with two stale
+# test expectations because this job built the zip from the tag while CI was
+# still running, and went red only after the release was public; a tag is not
+# retractable. The checks below are CI's `quality` gates plus PHPUnit, at the
+# 8.4 floor — the CI matrix is what covers production 8.5.
+#
 # Push a tag to publish:  git tag v0.9.0 && git push origin v0.9.0
-# Run manually to rehearse: builds and uploads the zip as an artefact, publishes
-# nothing. Worth using — this module is developed without PHP, so a packaging
-# mistake would otherwise surface only once a tag is already public.
+# Run manually to rehearse: runs the same checks, builds the zip and its
+# checksum and uploads them as an artefact, and publishes nothing.
 
 on:
   push:
@@ -23,7 +28,7 @@ permissions:
 jobs:
   release:
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    timeout-minutes: 15
     permissions:
       contents: write
     steps:
@@ -56,11 +61,49 @@ jobs:
 
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
-      - name: Build the module zip
+      # 8.4 is the floor declared in composer.json, as in CI's quality job.
+      - uses: shivammathur/setup-php@v2
+        with:
+          php-version: '8.4'
+          coverage: none
+
+      - name: Validate Composer metadata
+        run: composer validate --strict
+
+      - name: Install dependencies
+        run: composer install --prefer-dist --no-interaction --no-progress
+
+      # As in CI, each check runs even when an earlier one fails, so a bad tag
+      # reports every category at once. Any failure still stops the build: the
+      # steps after these run only when all of them passed.
+      - name: Translation template is current
+        run: composer i18n:check
+
+      - name: Coding standard (PSR-12)
+        if: ${{ !cancelled() }}
+        run: composer lint
+
+      - name: Static analysis (PHPStan level 6)
+        if: ${{ !cancelled() }}
+        run: composer analyse
+
+      - name: Run tests
+        if: ${{ !cancelled() }}
+        run: vendor/bin/phpunit
+
+      - name: Test Search Console monitor without credentials
+        if: ${{ !cancelled() }}
+        run: python3 -m unittest discover -s tests -p 'test_*.py'
+
+      # The checksum is written beside the zip under the zip's own name, so
+      # `sha256sum -c` run in the download directory verifies it as is.
+      - name: Build the module zip and its checksum
         run: |
           set -euo pipefail
-          git archive --prefix=IwacSeo/ --format=zip \
-            -o "IwacSeo-${{ steps.version.outputs.version }}.zip" HEAD
+          zip="IwacSeo-${{ steps.version.outputs.version }}.zip"
+          git archive --prefix=IwacSeo/ --format=zip -o "$zip" HEAD
+          sha256sum "$zip" > "$zip.sha256"
+          cat "$zip.sha256"
 
       # export-ignore is silent when it is wrong: a rule that stops matching
       # (a renamed dev file, a new tool config) leaks without any error. These
@@ -86,12 +129,16 @@ jobs:
             fi
           done
 
+          sha256sum -c "$zip.sha256"
+
       - name: Upload the rehearsal build
         if: ${{ github.ref_type != 'tag' }}
         uses: actions/upload-artifact@v7
         with:
           name: module-zip
-          path: IwacSeo-*.zip
+          path: |
+            IwacSeo-*.zip
+            IwacSeo-*.zip.sha256
           if-no-files-found: error
 
       # Notes come from the matching CHANGELOG section, so the release page and
@@ -114,19 +161,26 @@ jobs:
             exit 1
           fi
 
+          # Quoted delimiter: the backticks below are Markdown, not commands.
+          # The version is filled in afterwards.
           cat >> notes.md <<'EOF'
 
           ## Installing
 
-          Download `IwacSeo-*.zip` below and unzip it into your Omeka S
+          Download `IwacSeo-@VERSION@.zip` below and unzip it into your Omeka S
           `modules/` directory — it already unpacks to a correctly named
           `IwacSeo/` folder. Then **Admin → Modules → IWAC SEO → Install**.
+          To check the download first, save `IwacSeo-@VERSION@.zip.sha256`
+          beside it and run `sha256sum -c IwacSeo-@VERSION@.zip.sha256`
+          (on macOS, `shasum -a 256 -c IwacSeo-@VERSION@.zip.sha256`).
 
           Do not use the "Source code" archives: they unpack to a folder named
           after the repository, which the namespace will not resolve.
           EOF
+          sed -i "s/@VERSION@/$VERSION/g" notes.md
 
           gh release create "$GITHUB_REF_NAME" \
             --title "$VERSION" \
             --notes-file notes.md \
-            "IwacSeo-$VERSION.zip"
+            "IwacSeo-$VERSION.zip" \
+            "IwacSeo-$VERSION.zip.sha256"
