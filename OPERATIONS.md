@@ -51,12 +51,16 @@ Install this cron entry as the Omeka operating-system user, adjusting both paths
 
 The existing content-save dispatch remains throttled to 15 minutes; cron drains the
 remaining work independently of another edit. Each job leases up to 200 URLs, groups
-them by origin and acknowledges only accepted submissions. Failed submissions retry
-with exponential backoff; abandoned leases expire after ten minutes. A newer edit
-survives an older job's acknowledgement. Bulk queues are processed in batches rather
-than discarded. Five failed attempts leave the URL visible in the dashboard's exhausted
-count. After fixing the transport/key problem, run the same command with
-`--retry-failed` once. No Google Indexing API or retired sitemap-ping endpoint is used.
+them by origin and acknowledges only accepted (2xx) submissions. A transient failure —
+no response, 408, 429 or a 5xx — retries with exponential backoff; abandoned leases
+expire after ten minutes. Five failed attempts leave the URL in the dashboard's failed
+count. Any other answer is a refusal that would recur on every attempt (403: the key at
+`/{key}.txt` could not be verified; 422: the URLs are not of the submitted host; 400),
+so those URLs go to the failed count at once and the job log carries a warning naming
+the status and the key location. A newer edit survives an older job's acknowledgement
+or refusal. Bulk queues are processed in batches rather than discarded. After fixing
+the transport, key or host problem, run the same command with `--retry-failed` once.
+No Google Indexing API or retired sitemap-ping endpoint is used.
 
 ## Search Console in GitHub Actions
 

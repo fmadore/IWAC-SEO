@@ -163,7 +163,7 @@ msgid "IndexNow ping"
 msgstr ""
 
 #: view/iwac-seo/admin/seo/dashboard.phtml
-msgid "IndexNow queue: %1$d pending; %2$d exhausted retries."
+msgid "IndexNow queue: %1$d pending; %2$d failed (refused, or out of retries)."
 msgstr ""
 
 #: view/iwac-seo/admin/seo/pages.phtml

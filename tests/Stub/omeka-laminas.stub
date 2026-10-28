@@ -12,7 +12,8 @@
  * the job and the view helper out of analysis entirely. Declaring the
  * supertypes here keeps all of them analysed.
  *
- * Deliberately memberless. The point is to make the inheritance resolvable,
+ * Deliberately memberless, bar AbstractJob's constructor (see there). The
+ * point is to make the inheritance resolvable,
  * not to re-describe Omeka's API — a stub that guessed at signatures would
  * invent errors rather than remove them. Calls to inherited methods surface
  * as method.notFound, which phpstan.neon.dist ignores as boundary noise.
@@ -37,6 +38,14 @@ namespace Omeka\Module {
 namespace Omeka\Job {
     abstract class AbstractJob
     {
+        /**
+         * The one member stubbed, copied from Omeka 4.2.1 rather than
+         * guessed: without it, the integration test that runs the IndexNow
+         * job directly reads as instantiating a constructor-less class.
+         */
+        public function __construct(\Omeka\Entity\Job $job, \Laminas\ServiceManager\ServiceLocatorInterface $serviceLocator)
+        {
+        }
     }
 }
 

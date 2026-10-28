@@ -13,6 +13,7 @@ use IwacSeo\Service\CitationMeta;
 use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\IndexNowKey;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
@@ -70,6 +71,17 @@ final class WiringIntegrationTest extends TestCase
         $layouts = $this->config['block_layouts']['invokables'];
         self::assertArrayHasKey(PageCitationData::BLOCK_LAYOUT, $layouts);
         self::assertTrue(is_subclass_of($layouts[PageCitationData::BLOCK_LAYOUT], \Omeka\Site\BlockLayout\BlockLayoutInterface::class));
+    }
+
+    /**
+     * The /{key}.txt route serves exactly the keys the form accepts and the
+     * drain job sends with — the config spells the pattern out, so the two
+     * are held equal here.
+     */
+    public function testTheIndexNowKeyRouteMatchesTheKeyDefinition(): void
+    {
+        $route = $this->config['router']['routes']['iwac-seo-indexnow'];
+        self::assertSame(IndexNowKey::PATTERN, $route['options']['constraints']['key']);
     }
 
     public function testControllersResolveThroughRealControllerManager(): void

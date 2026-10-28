@@ -247,8 +247,8 @@ msgstr "L’option « décourager l’indexation » est activée pour tout le si
 msgid "A verification tag does not confirm Google account access or enable the GitHub Search Console monitor."
 msgstr "Une balise de vérification ne confirme pas l’accès au compte Google et n’active pas le suivi Search Console dans GitHub."
 
-msgid "IndexNow queue: %1$d pending; %2$d exhausted retries."
-msgstr "File IndexNow : %1$d en attente ; %2$d ayant épuisé les tentatives."
+msgid "IndexNow queue: %1$d pending; %2$d failed (refused, or out of retries)."
+msgstr "File IndexNow : %1$d en attente ; %2$d en échec (refus ou tentatives épuisées)."
 
 msgid "Citation preview"
 msgstr "Aperçu des références"

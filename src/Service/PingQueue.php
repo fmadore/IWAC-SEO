@@ -30,10 +30,15 @@ class PingQueue
     ) {
     }
 
-    /** Pinging is configured: switched on *and* carrying an ownership key. */
+    /**
+     * Pinging is configured: switched on *and* carrying a well-formed ownership
+     * key. A malformed key can never be verified (its /{key}.txt is not
+     * served), so queueing under one would only fill the outbox with work
+     * that fails; the dashboard flags such a key instead.
+     */
     public function isEnabled(): bool
     {
-        return $this->settings->isOn('iwac_seo_ping_enabled') && $this->key() !== '';
+        return $this->settings->isOn('iwac_seo_ping_enabled') && IndexNowKey::isValid($this->key());
     }
 
     /** The IndexNow ownership key, or '' when unset. */
@@ -79,8 +84,8 @@ class PingQueue
     }
 
     /** @param array<int,array<string,mixed>> $rows */
-    public function finish(array $rows, bool $success): void
+    public function finish(array $rows, PingOutcome $outcome): void
     {
-        $this->outbox->finish($rows, $success);
+        $this->outbox->finish($rows, $outcome);
     }
 }

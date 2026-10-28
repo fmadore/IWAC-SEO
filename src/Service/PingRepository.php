@@ -9,6 +9,13 @@ use Doctrine\DBAL\Exception\UniqueConstraintViolationException;
 /** Durable outbox. Versioned leases make acknowledgement safe during concurrent edits. */
 final class PingRepository implements PingOutboxInterface
 {
+    /**
+     * Attempts after which a URL stops being sent: it is "failed" on the
+     * dashboard until retryFailed() re-queues it. Retryable failures reach it
+     * through backoff; a refusal is set to it at once.
+     */
+    public const MAX_ATTEMPTS = 5;
+
     public function __construct(private readonly Connection $connection)
     {
     }
@@ -47,8 +54,8 @@ final class PingRepository implements PingOutboxInterface
     {
         $now ??= time();
         $rows = $this->connection->fetchAllAssociative('SELECT * FROM iwac_seo_ping
-            WHERE available_at <= :now AND lease_until <= :now AND attempts < 5
-            ORDER BY available_at, id LIMIT ' . max(1, min($limit, 200)), ['now' => $now]);
+            WHERE available_at <= :now AND lease_until <= :now AND attempts < :cap
+            ORDER BY available_at, id LIMIT ' . max(1, min($limit, 200)), ['now' => $now, 'cap' => self::MAX_ATTEMPTS]);
         $claimed = [];
         foreach ($rows as $row) {
             $token = bin2hex(random_bytes(16));
@@ -65,19 +72,27 @@ final class PingRepository implements PingOutboxInterface
         return $claimed;
     }
 
-    /** @param array<int,array<string,mixed>> $rows */
-    public function finish(array $rows, bool $success, ?int $now = null): void
+    /**
+     * Every write is conditioned on the lease's token and the row's version,
+     * so a URL edited again while its batch was in flight keeps the newer
+     * edit's fresh state whatever the outcome of the older submission.
+     *
+     * @param array<int,array<string,mixed>> $rows
+     */
+    public function finish(array $rows, PingOutcome $outcome, ?int $now = null): void
     {
         $now ??= time();
         foreach ($rows as $row) {
             $where = ['id' => $row['id'], 'token' => $row['token'], 'version' => $row['version']];
-            if ($success) {
+            if ($outcome === PingOutcome::Accepted) {
                 $this->connection->delete('iwac_seo_ping', $where);
-            } else {
-                $attempts = (int) $row['attempts'] + 1;
-                $this->connection->update('iwac_seo_ping', ['token' => '', 'lease_until' => 0,
-                    'attempts' => $attempts, 'available_at' => $now + min(86400, 60 * (2 ** $attempts))], $where);
+                continue;
             }
+            $attempts = $outcome === PingOutcome::Refused
+                ? self::MAX_ATTEMPTS
+                : (int) $row['attempts'] + 1;
+            $this->connection->update('iwac_seo_ping', ['token' => '', 'lease_until' => 0,
+                'attempts' => $attempts, 'available_at' => $now + min(86400, 60 * (2 ** $attempts))], $where);
         }
     }
 
@@ -86,20 +101,30 @@ final class PingRepository implements PingOutboxInterface
     {
         $now ??= time();
         return (bool) $this->connection->fetchOne(
-            'SELECT 1 FROM iwac_seo_ping WHERE available_at <= :now AND lease_until <= :now AND attempts < 5 LIMIT 1',
-            ['now' => $now]
+            'SELECT 1 FROM iwac_seo_ping WHERE available_at <= :now AND lease_until <= :now AND attempts < :cap LIMIT 1',
+            ['now' => $now, 'cap' => self::MAX_ATTEMPTS]
         );
     }
 
-    /** @return array{pending:int,failed:int} */
+    /**
+     * `failed` covers both ways a URL stops being sent: retries exhausted, and
+     * a submission IndexNow refused.
+     *
+     * @return array{pending:int,failed:int}
+     */
     public function counts(): array
     {
-        return ['pending' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM iwac_seo_ping WHERE attempts < 5'),
-            'failed' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM iwac_seo_ping WHERE attempts >= 5')];
+        $cap = ['cap' => self::MAX_ATTEMPTS];
+        return ['pending' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM iwac_seo_ping WHERE attempts < :cap', $cap),
+            'failed' => (int) $this->connection->fetchOne('SELECT COUNT(*) FROM iwac_seo_ping WHERE attempts >= :cap', $cap)];
     }
 
+    /** Re-queue every failed URL — after fixing whatever made it fail. */
     public function retryFailed(): void
     {
-        $this->connection->executeStatement('UPDATE iwac_seo_ping SET attempts = 0, available_at = 0 WHERE attempts >= 5');
+        $this->connection->executeStatement(
+            'UPDATE iwac_seo_ping SET attempts = 0, available_at = 0 WHERE attempts >= :cap',
+            ['cap' => self::MAX_ATTEMPTS]
+        );
     }
 }

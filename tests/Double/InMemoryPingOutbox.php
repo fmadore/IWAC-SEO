@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Double;
 
 use IwacSeo\Service\PingOutboxInterface;
+use IwacSeo\Service\PingOutcome;
 
 /** Records what the queue asks of the outbox, for dispatch-policy tests. */
 final class InMemoryPingOutbox implements PingOutboxInterface
@@ -16,7 +17,7 @@ final class InMemoryPingOutbox implements PingOutboxInterface
 
     public ?int $lastLimit = null;
 
-    /** @var array<int,array{rows:array<int,array<string,mixed>>,success:bool}> */
+    /** @var array<int,array{rows:array<int,array<string,mixed>>,outcome:PingOutcome}> */
     public array $finished = [];
 
     public function push(string $url): void
@@ -30,8 +31,8 @@ final class InMemoryPingOutbox implements PingOutboxInterface
         return array_slice($this->rows, 0, $limit);
     }
 
-    public function finish(array $rows, bool $success): void
+    public function finish(array $rows, PingOutcome $outcome): void
     {
-        $this->finished[] = ['rows' => $rows, 'success' => $success];
+        $this->finished[] = ['rows' => $rows, 'outcome' => $outcome];
     }
 }

@@ -84,7 +84,7 @@ $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' 
     </table>
 
     <p><?php echo $this->translate('A verification tag does not confirm Google account access or enable the GitHub Search Console monitor.'); ?></p>
-    <p><?php echo sprintf($this->translate('IndexNow queue: %1$d pending; %2$d exhausted retries.'), $queueCounts['pending'], $queueCounts['failed']); ?></p>
+    <p><?php echo sprintf($this->translate('IndexNow queue: %1$d pending; %2$d failed (refused, or out of retries).'), $queueCounts['pending'], $queueCounts['failed']); ?></p>
     <h2><?php echo $this->translate('Citation preview'); ?></h2>
     <form method="get">
         <label for="citation-item-id"><?php echo $this->translate('Item ID'); ?></label>

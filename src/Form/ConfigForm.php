@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Form;
 
+use IwacSeo\Service\IndexNowKey;
 use Laminas\Form\Element;
 use Laminas\Form\Form;
 use Omeka\Form\Element\Asset;
@@ -190,7 +191,7 @@ class ConfigForm extends Form
                 [
                     'name'    => 'Regex',
                     'options' => [
-                        'pattern'  => '/^[A-Fa-f0-9]{8,128}$/',
+                        'pattern'  => IndexNowKey::regex(),
                         'messages' => [
                             \Laminas\Validator\Regex::NOT_MATCH => 'The IndexNow key must be 8–128 hexadecimal characters (0-9, a-f). Generate one with: openssl rand -hex 16.', // @translate
                         ],

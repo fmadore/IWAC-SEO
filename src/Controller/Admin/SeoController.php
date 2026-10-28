@@ -8,6 +8,7 @@ use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationDiagnostics;
 use IwacSeo\Service\CitationFormatter;
 use IwacSeo\Service\Hreflang;
+use IwacSeo\Service\IndexNowKey;
 use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\PingRepository;
@@ -71,8 +72,7 @@ class SeoController extends AbstractActionController
             'indexNowKey'    => $indexNowKey,
             // The /{key}.txt route only matches a hex key; a non-hex key can
             // never be served, so IndexNow verification would fail silently.
-            'indexNowKeyValid' => $indexNowKey === ''
-                || (bool) preg_match('/^[A-Fa-f0-9]{8,128}$/', $indexNowKey),
+            'indexNowKeyValid' => $indexNowKey === '' || IndexNowKey::isValid($indexNowKey),
             'sitemapUrl'     => $hostUrl ? $hostUrl . '/sitemap.xml' : '',
             'robotsUrl'      => $hostUrl ? $hostUrl . '/robots.txt' : '',
             'counts'         => $site ? $this->generator->counts($site->id()) : ['items' => 0, 'itemSets' => 0, 'pages' => 0],

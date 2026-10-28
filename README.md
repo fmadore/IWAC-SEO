@@ -481,7 +481,7 @@ back to live generation.
 
 ## IndexNow ping
 
-Public content changes enter a durable outbox: a public item, item set or static page created or edited, a record just made private, and a record deleted, so engines recrawl the URL and drop it. Items and item sets are pinged on the default site, a page on its own site. Background jobs send leased batches of up to 200 URLs, grouped by origin, and acknowledge only accepted submissions. Failed work retries with backoff; leases expire after worker failure. Schedule the independent five-minute drain so pending work does not depend on another edit. See [operations](OPERATIONS.md) for migration, cron, retries and the optional GitHub Search Console monitor.
+Public content changes enter a durable outbox: a public item, item set or static page created or edited, a record just made private, and a record deleted, so engines recrawl the URL and drop it. Items and item sets are pinged on the default site, a page on its own site. Background jobs send leased batches of up to 200 URLs, grouped by origin, and settle each batch by IndexNow's answer: accepted (2xx) is acknowledged; no answer, 408, 429 or a 5xx retries with backoff; any other refusal (403 key not verified, 422 URLs not of the host) is not resent but counted as failed on the dashboard straight away, since it would fail the same way again. Leases expire after worker failure, and nothing is sent or queued while the key is not 8–128 hexadecimal characters. Schedule the independent five-minute drain so pending work does not depend on another edit. See [operations](OPERATIONS.md) for migration, cron, retries and the optional GitHub Search Console monitor.
 
 Google is **not** pinged: its sitemap-ping endpoint was retired in 2023. Google discovers
 content via the robots.txt `Sitemap:` line and Search Console.
@@ -529,7 +529,9 @@ IwacSeo/
 │       ├── PageSeoStore.php          # per-page overrides (site setting)
 │       ├── PingQueue.php             # IndexNow dispatch policy: enabled, throttle, batch size
 │       ├── PingRepository.php        # the durable outbox (PingOutboxInterface)
-│       ├── Pinger.php                # IndexNow submit
+│       ├── Pinger.php                # IndexNow submit; returns the HTTP status
+│       ├── PingOutcome.php           # accepted / retry / refused, from that status
+│       ├── IndexNowKey.php           # the one definition of a well-formed key
 │       ├── RobotsTxt.php             # robots.txt body + Google's longest-match check
 │       ├── SettingsGate.php          # typed reads over the iwac_seo_* settings
 │       ├── UrlPolicy.php             # canonical/query policy, pinned public origin

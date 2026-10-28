@@ -10,6 +10,9 @@ All notable changes to the IWAC SEO module. Versions follow
 - An update that makes a record private is pinged too, so engines recrawl and drop it; its earlier visibility is noted at `api.hydrate.pre`.
 - A static page is pinged on its own site, and not at all when that site is private, instead of at a default-site URL that does not exist.
 - A failure to queue is logged with the URL and the exception, not only its message.
+- IndexNow answers are told apart. An accepted batch is acknowledged as before, and a transient failure (no response, 408, 429, 5xx) still backs off and retries; any other refusal (403 key not verified, 422 URLs not of the host) is no longer resent four more times but counted as failed on the dashboard at once, with a warning in the job log naming the status and the key location. `scripts/drain-indexnow.php --retry-failed` re-queues those URLs once the cause is fixed. A 3xx, previously taken as success, is now a refusal.
+- Nothing is queued or sent while the IndexNow key is malformed: the configuration form, the dashboard, the queue and the job now share one key definition (8–128 hexadecimal characters, the shape `/{key}.txt` serves).
+- The dashboard's IndexNow line reads "failed (refused, or out of retries)" rather than "exhausted retries".
 
 ## 1.3.0 — 2026-10-26
 

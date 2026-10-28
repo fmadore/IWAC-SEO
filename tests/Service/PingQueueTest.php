@@ -4,6 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Service;
 
 use IwacSeo\Job\PingSearchEngines;
+use IwacSeo\Service\PingOutcome;
 use IwacSeo\Service\PingQueue;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Test\Double\InMemoryPingOutbox;
@@ -53,6 +54,12 @@ final class PingQueueTest extends TestCase
         // A key of whitespace is not a key.
         $this->build(['iwac_seo_ping_enabled' => '1', 'iwac_seo_indexnow_key' => '   ']);
         $this->assertFalse($this->queue->isEnabled());
+
+        // Nor is one IndexNow could never verify: /{key}.txt only serves hex.
+        $this->build(['iwac_seo_ping_enabled' => '1', 'iwac_seo_indexnow_key' => 'not-a-hex-key']);
+        $this->assertFalse($this->queue->isEnabled(), 'malformed key');
+        $this->build(['iwac_seo_ping_enabled' => '1', 'iwac_seo_indexnow_key' => 'abc123']);
+        $this->assertFalse($this->queue->isEnabled(), 'too short');
     }
 
     public function testPushGoesToTheOutboxNotToSettings(): void
@@ -71,8 +78,8 @@ final class PingQueueTest extends TestCase
         $this->assertSame(PingQueue::CAP, $this->outbox->lastLimit);
         $this->assertCount(PingQueue::CAP, $batch);
 
-        $this->queue->finish($batch, false);
-        $this->assertSame([['rows' => $batch, 'success' => false]], $this->outbox->finished);
+        $this->queue->finish($batch, PingOutcome::Refused);
+        $this->assertSame([['rows' => $batch, 'outcome' => PingOutcome::Refused]], $this->outbox->finished);
     }
 
     public function testDispatchIsThrottledAndStamped(): void
