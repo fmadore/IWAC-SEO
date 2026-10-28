@@ -24,6 +24,9 @@ class SiteResolver
     /** @var array<string,?SiteRepresentation> public sites by slug, looked up once each */
     private array $publicSites = [];
 
+    /** @var SiteRepresentation[]|null every public site, looked up once */
+    private ?array $allPublicSites = null;
+
     public function __construct(
         private readonly ApiManager $api,
         private readonly Settings $settings,
@@ -64,6 +67,17 @@ class SiteResolver
             $this->publicSites[$slug] = $sites[0] ?? null;
         }
         return $this->publicSites[$slug];
+    }
+
+    /**
+     * Every public site, in Omeka's default order — for checks that hold per
+     * site (IWAC's French and English sites each carry their own settings).
+     *
+     * @return SiteRepresentation[]
+     */
+    public function publicSites(): array
+    {
+        return $this->allPublicSites ??= $this->api->search('sites', ['is_public' => true])->getContent();
     }
 
     /**

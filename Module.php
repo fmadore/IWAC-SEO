@@ -456,7 +456,30 @@ class Module extends AbstractModule
         }
         $form->setData($data);
 
-        return $renderer->formCollection($form, false);
+        return $this->omekaJsonLdWarning($renderer) . $renderer->formCollection($form, false);
+    }
+
+    /**
+     * A warning above the form naming each public site whose pages still
+     * carry Omeka's own JSON-LD embed — the 2–4 MB block that broke Search
+     * Console's parsing in 1.0.1, which only a per-site checkbox removes.
+     */
+    private function omekaJsonLdWarning(PhpRenderer $renderer): string
+    {
+        $sites = $this->getServiceLocator()->get(Service\OmekaJsonLdEmbed::class)->sitesStillEmbedding();
+        if ($sites === []) {
+            return '';
+        }
+        $names = implode(', ', array_map(
+            static fn (SiteRepresentation $site): string => '<em>' . $renderer->escapeHtml($site->title()) . '</em>',
+            $sites
+        ));
+        // Escaped before the titles go in, so each part is escaped once.
+        $message = sprintf(
+            $renderer->escapeHtml($renderer->translate('Omeka still embeds its own JSON-LD in the record and browse pages of %s: the whole API representation of each resource, 2–4 MB on an authority record, which search engines truncate and report as unparsable structured data beside this module’s schema.org block. On each of these sites, tick “Disable JSON-LD embed” under Sites → the site → Settings → General.')), // @translate
+            $names
+        );
+        return '<ul class="messages"><li class="warning">' . $message . '</li></ul>';
     }
 
     public function handleConfigForm(AbstractController $controller)

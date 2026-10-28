@@ -14,6 +14,7 @@ use IwacSeo\Service\HeadMetadata;
 use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\Hreflang;
 use IwacSeo\Service\IndexNowKey;
+use IwacSeo\Service\OmekaJsonLdEmbed;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
@@ -59,6 +60,10 @@ final class WiringIntegrationTest extends TestCase
         self::assertInstanceOf(HeadMetadata::class, $services->get(HeadMetadata::class));
         self::assertSame($services->get(HeadMetadata::class), $services->get(HeadMetadata::class));
         self::assertInstanceOf(PageCitationData::class, $services->get(PageCitationData::class));
+
+        $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
+        $services->setService('Omeka\Settings\Site', $this->withoutConstructor(\Omeka\Settings\SiteSettings::class));
+        self::assertInstanceOf(OmekaJsonLdEmbed::class, $services->get(OmekaJsonLdEmbed::class));
     }
 
     /**

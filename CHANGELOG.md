@@ -15,6 +15,7 @@ All notable changes to the IWAC SEO module. Versions follow
 - The dashboard's IndexNow line reads "failed (refused, or out of retries)" rather than "exhausted retries".
 - The release workflow tests the tag before building it: strict Composer validation, the translation-template check, PSR-12, PHPStan and PHPUnit on PHP 8.4, as CI does. It no longer builds a zip from a commit whose checks fail, which is how 1.0.3 shipped before CI went red.
 - Releases carry a SHA-256 checksum, `IwacSeo-<version>.zip.sha256`, beside the zip; the release notes say how to check it.
+- The configuration form warns when this module's JSON-LD is on and a public site still carries Omeka's own JSON-LD embed — the 2–4 MB block on authority records whose truncation Search Console reported in 1.0.1 — and names each such site, so a new site or a reset setting no longer reintroduces it unnoticed. The fix is still Omeka's per-site **Disable JSON-LD embed** box.
 
 ## 1.3.0 — 2026-10-26
 

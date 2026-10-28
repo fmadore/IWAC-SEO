@@ -226,6 +226,10 @@ msgstr ""
 msgid "Off"
 msgstr ""
 
+#: Module.php
+msgid "Omeka still embeds its own JSON-LD in the record and browse pages of %s: the whole API representation of each resource, 2–4 MB on an authority record, which search engines truncate and report as unparsable structured data beside this module’s schema.org block. On each of these sites, tick “Disable JSON-LD embed” under Sites → the site → Settings → General."
+msgstr ""
+
 #: view/iwac-seo/admin/seo/dashboard.phtml
 msgid "On"
 msgstr ""

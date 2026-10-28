@@ -178,7 +178,9 @@ follow`. `og:url` mirrors whichever canonical was written, so a share never disa
 > `@reverse` lists all ~13,000 items linking to it; Google truncates it and reports
 > unparsable structured data. Disable it per site under **Admin → Sites → … → Settings →
 > General → "Disable JSON-LD embed"**. The data stays available at `/api/items/{id}`, and
-> Zotero import here uses unAPI and the citation meta tags above, not the embed.
+> Zotero import here uses unAPI and the citation meta tags above, not the embed. While this
+> module's JSON-LD is on, its configuration form opens with a warning naming every public
+> site that still embeds.
 
 ### schema.org `@type` map
 
@@ -537,6 +539,7 @@ IwacSeo/
 │       ├── IndexNowKey.php           # the one definition of a well-formed key
 │       ├── RobotsTxt.php             # robots.txt body + Google's longest-match check
 │       ├── SettingsGate.php          # typed reads over the iwac_seo_* settings
+│       ├── OmekaJsonLdEmbed.php      # public sites still carrying Omeka's own JSON-LD
 │       ├── UrlPolicy.php             # canonical/query policy, pinned public origin
 │       ├── ResourceUrl.php, ViewLocale.php, MonthNames.php, Text.php  # small shared helpers
 │       └── *Factory.php

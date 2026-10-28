@@ -38,6 +38,7 @@ return $instance + [
             Service\SiteResolver::class     => Service\SiteResolverFactory::class,
             Service\SettingsGate::class    => Service\SettingsGateFactory::class,
             Service\RobotsTxt::class       => Service\RobotsTxtFactory::class,
+            Service\OmekaJsonLdEmbed::class => Service\OmekaJsonLdEmbedFactory::class,
         ],
         // Dependency-free (no bundled vendor/): plain instantiation. Shared,
         // like every service-manager entry — HeadWriter relies on that: its

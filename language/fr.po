@@ -121,6 +121,9 @@ msgstr "Avertit Bing et Yandex (ainsi que les autres moteurs compatibles IndexNo
 msgid "Off"
 msgstr "Désactivé"
 
+msgid "Omeka still embeds its own JSON-LD in the record and browse pages of %s: the whole API representation of each resource, 2–4 MB on an authority record, which search engines truncate and report as unparsable structured data beside this module’s schema.org block. On each of these sites, tick “Disable JSON-LD embed” under Sites → the site → Settings → General."
+msgstr "Omeka intègre encore son propre JSON-LD aux pages de notice et de liste de %s : la représentation API complète de chaque ressource, de 2 à 4 Mo pour une notice d’autorité, que les moteurs de recherche tronquent et signalent comme des données structurées illisibles, à côté du bloc schema.org de ce module. Sur chacun de ces sites, cochez « Désactiver la diffusion intégrée des ressources en JSON-LD » dans Sites → le site → Paramètres → Général."
+
 msgid "On"
 msgstr "Activé"
 
