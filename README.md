@@ -481,7 +481,7 @@ back to live generation.
 
 ## IndexNow ping
 
-Public content changes enter a durable outbox. Background jobs send leased batches of up to 200 URLs, grouped by origin, and acknowledge only accepted submissions. Failed work retries with backoff; leases expire after worker failure. Schedule the independent five-minute drain so pending work does not depend on another edit. See [operations](OPERATIONS.md) for migration, cron, retries and the optional GitHub Search Console monitor.
+Public content changes enter a durable outbox: a public item, item set or static page created or edited, a record just made private, and a record deleted, so engines recrawl the URL and drop it. Items and item sets are pinged on the default site, a page on its own site. Background jobs send leased batches of up to 200 URLs, grouped by origin, and acknowledge only accepted submissions. Failed work retries with backoff; leases expire after worker failure. Schedule the independent five-minute drain so pending work does not depend on another edit. See [operations](OPERATIONS.md) for migration, cron, retries and the optional GitHub Search Console monitor.
 
 Google is **not** pinged: its sitemap-ping endpoint was retired in 2023. Google discovers
 content via the robots.txt `Sitemap:` line and Search Console.

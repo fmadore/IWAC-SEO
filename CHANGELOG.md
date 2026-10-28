@@ -3,6 +3,14 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+- Fix IndexNow never queueing a URL. The `api.*.post` events carry the Doctrine entity, which has no `siteUrl()` (Omeka turns the response into a representation only after they run), so every save was skipped. The URL is now built from the adapter's representation.
+- A deleted record is pinged at the URL it had before the deletion: by `api.delete.post` Doctrine has cleared its id, so it is read at `api.delete.pre` and queued once the delete succeeds.
+- An update that makes a record private is pinged too, so engines recrawl and drop it; its earlier visibility is noted at `api.hydrate.pre`.
+- A static page is pinged on its own site, and not at all when that site is private, instead of at a default-site URL that does not exist.
+- A failure to queue is logged with the URL and the exception, not only its message.
+
 ## 1.3.0 — 2026-10-26
 
 - Requires PHP 8.4 or later (was 8.2). The live server runs 8.5; CI now tests 8.4 and 8.5, and lints and analyses at the 8.4 floor.

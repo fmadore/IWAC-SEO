@@ -135,6 +135,15 @@ final class WiringIntegrationTest extends TestCase
                 self::assertSame(['handleSitemapChange'], $handlers($adapter, $event), $adapter . ' ' . $event);
             }
         }
+        // The pinged types note, before the change, what the post-event cannot read.
+        foreach (['api.hydrate.pre' => 'noteVisibility', 'api.delete.pre' => 'noteDeletion'] as $event => $handler) {
+            foreach (['ItemAdapter', 'ItemSetAdapter', 'SitePageAdapter'] as $adapter) {
+                self::assertSame([$handler], $handlers($adapter, $event), $adapter . ' ' . $event);
+            }
+            foreach (['MediaAdapter', 'SiteAdapter'] as $adapter) {
+                self::assertSame([], $handlers($adapter, $event), $adapter . ' ' . $event);
+            }
+        }
     }
 
     public function testPublicRoutesMatchTheirConfiguredControllers(): void

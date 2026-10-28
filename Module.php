@@ -39,6 +39,7 @@ use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
+use Omeka\Api\Request as ApiRequest;
 use Omeka\Module\AbstractModule;
 use Omeka\Permissions\Acl;
 
@@ -79,6 +80,26 @@ class Module extends AbstractModule
         'iwac_seo_noindex_browse'  => '1',
         'iwac_seo_sitemap_ttl'     => '86400',
     ];
+
+    /**
+     * What an API request's pre-events noted for its post-event, which can no
+     * longer read it: whether the record an update changes was public before,
+     * and the URL of a record a delete removes. Keyed by the request object, so
+     * an entry lives exactly as long as its request (batch operations finalize
+     * each sub-request separately).
+     *
+     * @var \WeakMap<ApiRequest,bool>
+     */
+    private \WeakMap $wasPublic;
+
+    /** @var \WeakMap<ApiRequest,string> */
+    private \WeakMap $deletedUrls;
+
+    public function __construct()
+    {
+        $this->wasPublic = new \WeakMap();
+        $this->deletedUrls = new \WeakMap();
+    }
 
     public function getConfig(): array
     {
@@ -216,12 +237,17 @@ class Module extends AbstractModule
         // included: the URL leaves the sitemap, and IndexNow is also the
         // fastest way to tell engines a URL vanished (they recrawl → 404).
         // Item sets have their own child sitemap, so their edits count too.
+        // The pre-events note what the post-events can no longer read: the
+        // visibility a record had before an update, and the URL of a record
+        // being deleted.
         $contentAdapters = [
             'Omeka\Api\Adapter\ItemAdapter',
             'Omeka\Api\Adapter\ItemSetAdapter',
             'Omeka\Api\Adapter\SitePageAdapter',
         ];
         foreach ($contentAdapters as $adapter) {
+            $sharedEventManager->attach($adapter, 'api.hydrate.pre', [$this, 'noteVisibility']);
+            $sharedEventManager->attach($adapter, 'api.delete.pre', [$this, 'noteDeletion']);
             $sharedEventManager->attach($adapter, 'api.create.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.update.post', [$this, 'handleContentChange']);
             $sharedEventManager->attach($adapter, 'api.delete.post', [$this, 'handleContentChange']);
@@ -311,14 +337,70 @@ class Module extends AbstractModule
 
     // ─── API listener: queue IndexNow pings ─────────────────────────────────
 
+    /**
+     * Note whether a record was public before an update changes it, so an
+     * edit that makes it private can be pinged too. api.hydrate.pre is the
+     * last point at which the entity still holds its stored visibility.
+     */
+    public function noteVisibility(EventInterface $event): void
+    {
+        $request = $event->getParam('request');
+        $entity = $event->getParam('entity');
+        if (
+            !$request instanceof ApiRequest
+            || $request->getOperation() !== ApiRequest::UPDATE
+            || !is_object($entity) || !method_exists($entity, 'isPublic')
+        ) {
+            return;
+        }
+        $this->wasPublic[$request] = (bool) $entity->isPublic();
+    }
+
+    /**
+     * Note the URL of a record about to be deleted. By api.delete.post
+     * Doctrine has cleared the entity's id, so the URL can no longer be built.
+     * The ping itself waits for the post-event: a delete that fails pings
+     * nothing.
+     */
+    public function noteDeletion(EventInterface $event): void
+    {
+        $request = $event->getParam('request');
+        $adapter = $event->getTarget();
+        if (
+            !$request instanceof ApiRequest
+            || !is_object($adapter) || !method_exists($adapter, 'findEntity')
+            || !$this->getServiceLocator()->get(PingQueue::class)->isEnabled()
+        ) {
+            return;
+        }
+        try {
+            $entity = $adapter->findEntity($request->getId(), $request);
+        } catch (\Throwable $e) {
+            return;
+        }
+        $url = is_object($entity) ? $this->publicUrl($adapter, $entity) : null;
+        if ($url !== null) {
+            $this->deletedUrls[$request] = $url;
+        }
+    }
+
     public function handleContentChange(EventInterface $event): void
     {
         $services = $this->getServiceLocator();
 
         $response = $event->getParam('response');
-        $resource = $response ? $response->getContent() : null;
-        if (!$resource) {
+        $entity = $response ? $response->getContent() : null;
+        if (!is_object($entity)) {
             return;
+        }
+        // Read what the request's pre-events noted, whether or not a ping follows.
+        $request = $event->getParam('request');
+        $wasPublic = false;
+        $deletedUrl = null;
+        if ($request instanceof ApiRequest) {
+            $wasPublic = $this->wasPublic[$request] ?? false;
+            $deletedUrl = $this->deletedUrls[$request] ?? null;
+            unset($this->wasPublic[$request], $this->deletedUrls[$request]);
         }
 
         $this->invalidateSitemap();
@@ -327,16 +409,16 @@ class Module extends AbstractModule
         if (!$queue->isEnabled()) {
             return;
         }
-        // Creates/updates announce a public URL; a delete is pinged regardless
-        // of visibility so engines recrawl and drop it. (A public→private
-        // *update* is not pinged — the previous state isn't in the event — but
-        // the sitemap invalidation above already stops advertising it.)
-        $isDelete = (string) $event->getName() === 'api.delete.post';
-        if (!$isDelete && method_exists($resource, 'isPublic') && !$resource->isPublic()) {
-            return;
+        // Creates and updates announce a public URL, and so does an update
+        // that has just made a record private, so engines recrawl and drop it.
+        // A delete is pinged regardless of visibility, at the URL noted before
+        // the deletion.
+        if ((string) $event->getName() === 'api.delete.post') {
+            $url = $deletedUrl;
+        } else {
+            $isPublic = !method_exists($entity, 'isPublic') || $entity->isPublic();
+            $url = $isPublic || $wasPublic ? $this->publicUrl($event->getTarget(), $entity) : null;
         }
-
-        $url = $this->resourcePublicUrl($resource);
         if ($url === null) {
             return;
         }
@@ -345,7 +427,10 @@ class Module extends AbstractModule
             $queue->push($url);
             $queue->dispatchIfDue();
         } catch (\Throwable $error) {
-            $services->get('Omeka\Logger')->err('IwacSeo: failed to queue URL: ' . $error->getMessage());
+            $services->get('Omeka\Logger')->err('IwacSeo: failed to queue an IndexNow URL.', [
+                'url' => $url,
+                'exception' => $error,
+            ]);
         }
     }
 
@@ -459,11 +544,45 @@ class Module extends AbstractModule
         }
     }
 
-    private function resourcePublicUrl(object $resource): ?string
+    /**
+     * The URL a record is pinged at. Items and item sets are pinged on the
+     * default site; a page exists only on its own site, so it is pinged there,
+     * and not at all when that site is private.
+     */
+    private function publicUrl(mixed $adapter, object $entity): ?string
     {
+        $resource = $this->representation($adapter, $entity);
+        if ($resource instanceof SitePageRepresentation) {
+            $site = $resource->site();
+            return $site->isPublic() ? ResourceUrl::forSite($resource, $site->slug()) : null;
+        }
+        if ($resource === null) {
+            return null;
+        }
         return ResourceUrl::forSite(
             $resource,
             $this->getServiceLocator()->get(SiteResolver::class)->defaultSlug()
         );
+    }
+
+    /**
+     * The API representation of an entity. The api.* events carry the
+     * Doctrine entity, which has no siteUrl() — the API manager turns the
+     * response into a representation only after the post-events have run —
+     * so it is built from the adapter.
+     */
+    private function representation(mixed $adapter, object $entity): ?object
+    {
+        if ($entity instanceof AbstractResourceEntityRepresentation || $entity instanceof SitePageRepresentation) {
+            return $entity;
+        }
+        if (!is_object($adapter) || !method_exists($adapter, 'getRepresentation')) {
+            return null;
+        }
+        try {
+            return $adapter->getRepresentation($entity);
+        } catch (\Throwable $e) {
+            return null;
+        }
     }
 }
