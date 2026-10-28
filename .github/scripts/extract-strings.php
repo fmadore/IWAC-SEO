@@ -34,10 +34,17 @@ $iterator = new RecursiveIteratorIterator(
         // .integration holds the Omeka S checkout the integration suite runs
         // against — gitignored, and created by CI's own integration job. Its
         // several thousand translatable strings are Omeka's, not this module's.
+        // .claude is where Claude Code keeps local git worktrees: each holds a
+        // full copy of the module, so scanning it would add every string again
+        // under a second path and fail --check on a clean tree.
         static function (SplFileInfo $file): bool {
             $name = $file->getFilename();
             if ($file->isDir()) {
-                return !in_array($name, ['vendor', '.git', 'node_modules', '.github', 'tests', '.integration'], true);
+                return !in_array(
+                    $name,
+                    ['vendor', '.git', 'node_modules', '.github', 'tests', '.integration', '.claude'],
+                    true
+                );
             }
             return in_array($file->getExtension(), ['php', 'phtml'], true);
         }
