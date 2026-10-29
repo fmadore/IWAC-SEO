@@ -26,6 +26,9 @@ use Omeka\Api\Representation\ItemRepresentation;
  * present the Connector imports this RDF instead of scraping the meta tags,
  * which is what lets us set the call number (Cote) and single-field creators.
  *
+ * The RDF and both format lists carry an ETag and may be cached for five
+ * minutes; the RDF also carries the item's last change as Last-Modified.
+ *
  * @see \IwacSeo\Service\ZoteroRdf
  */
 class UnapiController extends AbstractActionController
@@ -73,7 +76,7 @@ class UnapiController extends AbstractActionController
         if ($rdf === null) {
             return $this->status(404);
         }
-        return $this->body($rdf, 'application/rdf+xml; charset=utf-8');
+        return $this->body($rdf, 'application/rdf+xml; charset=utf-8', 200, self::modified($item));
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
@@ -120,9 +123,20 @@ class UnapiController extends AbstractActionController
         return $this->settings->isOn('iwac_seo_unapi', true);
     }
 
-    private function body(string $content, string $contentType, int $status = 200): Response
+    private function body(string $content, string $contentType, int $status = 200, ?\DateTimeInterface $modified = null): Response
     {
-        return $this->respond($content, $contentType, $status);
+        return $this->respondCacheable($content, $contentType, $modified, $status);
+    }
+
+    /** When the item last changed, else when it was made, for Last-Modified. */
+    private static function modified(ItemRepresentation $item): ?\DateTimeInterface
+    {
+        try {
+            $date = $item->modified() ?? $item->created();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return $date instanceof \DateTimeInterface ? $date : null;
     }
 
     private function status(int $code): Response

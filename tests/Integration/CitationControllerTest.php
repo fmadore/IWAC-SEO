@@ -7,6 +7,7 @@ use IwacSeo\Controller\CitationController;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationKindMap;
+use IwacSeo\Service\HttpCache;
 use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\SettingsGate;
@@ -57,18 +58,93 @@ final class CitationControllerTest extends TestCase
         self::assertSame('https://islam.zmo.de/s/afrique_ouest/item/42', $this->download(['site' => 'staging'])['URL']);
     }
 
+    public function testADownloadCarriesCacheValidatorsFromItsBodyAndTheItemsLastChange(): void
+    {
+        $response = $this->dispatch(['site' => 'westafrica']);
+
+        self::assertSame(200, $response->getStatusCode());
+        self::assertSame(HttpCache::etag($response->getContent()), $this->header($response, 'ETag'));
+        self::assertSame('Wed, 01 Oct 2025 08:00:00 GMT', $this->header($response, 'Last-Modified'), 'the modified date, in GMT');
+        self::assertSame('max-age=300, public', $this->header($response, 'Cache-Control'));
+        self::assertSame('noindex', $this->header($response, 'X-Robots-Tag'));
+    }
+
+    public function testACurrentCopyIsAnswered304WithoutTheFile(): void
+    {
+        $etag = $this->header($this->dispatch(['site' => 'westafrica']), 'ETag');
+
+        $byTag = $this->dispatch(['site' => 'westafrica'], ['If-None-Match' => '"stale", ' . $etag]);
+        $byDate = $this->dispatch(['site' => 'westafrica'], ['If-Modified-Since' => 'Wed, 01 Oct 2025 08:00:00 GMT']);
+
+        foreach ([$byTag, $byDate] as $response) {
+            self::assertSame(304, $response->getStatusCode());
+            self::assertSame('', $response->getContent());
+            self::assertSame($etag, $this->header($response, 'ETag'));
+            self::assertSame('max-age=300, public', $this->header($response, 'Cache-Control'));
+            self::assertNull($this->header($response, 'Content-Disposition'), 'no file, so no attachment');
+        }
+    }
+
+    public function testAStaleCopyGetsTheFileAndIfNoneMatchOutranksIfModifiedSince(): void
+    {
+        $older = $this->dispatch(['site' => 'westafrica'], ['If-Modified-Since' => 'Wed, 01 Oct 2025 07:59:59 GMT']);
+        $otherTag = $this->dispatch(['site' => 'westafrica'], [
+            'If-None-Match' => '"stale"',
+            'If-Modified-Since' => 'Thu, 02 Oct 2025 08:00:00 GMT',
+        ]);
+        // The French download is another file, so its validator is no
+        // match for the English one.
+        $etag = $this->header($this->dispatch(['site' => 'westafrica']), 'ETag');
+        $french = $this->dispatch([], ['If-None-Match' => $etag]);
+
+        self::assertSame(200, $older->getStatusCode());
+        self::assertSame(200, $otherTag->getStatusCode(), 'If-None-Match is evaluated alone when present');
+        self::assertSame(200, $french->getStatusCode());
+        self::assertNotSame('', $french->getContent());
+    }
+
+    public function testOnlyAGetIsAnswered304(): void
+    {
+        $etag = $this->header($this->dispatch(['site' => 'westafrica']), 'ETag');
+
+        self::assertSame(200, $this->dispatch(['site' => 'westafrica'], ['If-None-Match' => $etag], 'POST')->getStatusCode());
+    }
+
     /**
      * @param array<string,string> $query
      * @return array<string,mixed> the single CSL-JSON item served
      */
     private function download(array $query): array
     {
+        $response = $this->dispatch($query);
+        self::assertSame(200, $response->getStatusCode());
+        return json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)[0];
+    }
+
+    private function header(Response $response, string $name): ?string
+    {
+        $header = $response->getHeaders()->get($name);
+        return $header ? $header->getFieldValue() : null;
+    }
+
+    /**
+     * @param array<string,string> $query
+     * @param array<string,string> $headers request headers
+     */
+    private function dispatch(array $query, array $headers = [], string $method = 'GET'): Response
+    {
         $config = require dirname(__DIR__, 2) . '/config/instance.config.php';
         $citation = $config['iwac_seo']['citation'];
         $kinds = new CitationKindMap($citation['class_kinds'], 'item');
 
-        $api = $this->createMock(ApiManager::class);
-        $api->method('read')->with('items', 42)->willReturn(new ApiResponse($this->item()));
+        $item = $this->item();
+        $api = $this->createStub(ApiManager::class);
+        $api->method('read')->willReturnCallback(static function (string $resource, $id) use ($item): ApiResponse {
+            if ($resource !== 'items' || (int) $id !== 42) {
+                throw new \Omeka\Api\Exception\NotFoundException();
+            }
+            return new ApiResponse($item);
+        });
 
         $sites = ['afrique_ouest' => $this->site(1, 'afrique_ouest'), 'westafrica' => $this->site(2, 'westafrica')];
         $resolver = $this->getMockBuilder(SiteResolver::class)->disableOriginalConstructor()
@@ -99,12 +175,15 @@ final class CitationControllerTest extends TestCase
         $controller->setEvent($event);
 
         $request = new Request();
+        $request->setMethod($method);
         $request->setQuery(new Parameters($query));
+        foreach ($headers as $name => $value) {
+            $request->getHeaders()->addHeaderLine($name, $value);
+        }
         $response = $controller->dispatch($request, new Response());
 
         self::assertInstanceOf(Response::class, $response);
-        self::assertSame(200, $response->getStatusCode());
-        return json_decode($response->getContent(), true, 512, JSON_THROW_ON_ERROR)[0];
+        return $response;
     }
 
     private function item(): ItemRepresentation
@@ -120,7 +199,7 @@ final class CitationControllerTest extends TestCase
         $class->method('label')->willReturn('Article');
 
         $item = $this->getMockBuilder(ItemRepresentation::class)->disableOriginalConstructor()
-            ->onlyMethods(['id', 'isPublic', 'value', 'media', 'resourceClass', 'siteUrl'])->getMock();
+            ->onlyMethods(['id', 'isPublic', 'value', 'media', 'resourceClass', 'siteUrl', 'modified', 'created'])->getMock();
         $item->method('id')->willReturn(42);
         $item->method('isPublic')->willReturn(true);
         $item->method('value')->willReturnCallback(
@@ -128,6 +207,8 @@ final class CitationControllerTest extends TestCase
         );
         $item->method('media')->willReturn([]);
         $item->method('resourceClass')->willReturn($class);
+        $item->method('modified')->willReturn(new \DateTime('2025-10-01 10:00:00', new \DateTimeZone('Europe/Berlin')));
+        $item->method('created')->willReturn(new \DateTime('2020-01-01 00:00:00'));
         $item->method('siteUrl')->willReturnCallback(
             static fn (?string $slug = null, bool $canonical = false): string => 'https://islam.zmo.de/s/' . $slug . '/item/42'
         );

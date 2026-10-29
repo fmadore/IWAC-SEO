@@ -8,6 +8,7 @@ use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationExport;
 use IwacSeo\Service\CitationFormatter;
 use IwacSeo\Service\CitationKindMap;
+use IwacSeo\Service\HttpCache;
 use IwacSeo\Service\PageCitationData;
 use IwacSeo\Service\PageCitationDataFactory;
 use IwacSeo\Service\PageSeoStore;
@@ -92,6 +93,28 @@ final class PageCitationControllerTest extends TestCase
         self::assertStringStartsWith('@online{hajj-bf,', $this->download(10, 'bibtex')->getContent());
     }
 
+    public function testAPageCitationDatesFromThePagesOwnChange(): void
+    {
+        $edited = $this->download(10, 'ris');
+        $neverEdited = $this->download(11, 'ris');
+
+        self::assertSame('Tue, 21 Oct 2025 14:15:00 GMT', $edited->getHeaders()->get('Last-Modified')?->getFieldValue());
+        self::assertSame('Thu, 06 Oct 2022 09:30:00 GMT', $neverEdited->getHeaders()->get('Last-Modified')?->getFieldValue(), 'else its creation');
+        self::assertSame(HttpCache::etag($edited->getContent()), $edited->getHeaders()->get('ETag')?->getFieldValue());
+    }
+
+    public function testAPageCitationIsAnswered304WhileItsFileIsCurrent(): void
+    {
+        $etag = (string) $this->download(10, 'ris')->getHeaders()->get('ETag')?->getFieldValue();
+
+        $current = $this->download(10, 'ris', false, ['If-None-Match' => $etag]);
+        $changed = $this->download(10, 'bibtex', false, ['If-None-Match' => $etag]);
+
+        self::assertSame(304, $current->getStatusCode());
+        self::assertSame('', $current->getContent());
+        self::assertSame(200, $changed->getStatusCode(), 'another format is another file');
+    }
+
     public function testAPageWithoutTheBlockIsNotCitable(): void
     {
         self::assertSame(404, $this->download(12, 'csljson', false)->getStatusCode());
@@ -155,7 +178,8 @@ final class PageCitationControllerTest extends TestCase
         self::assertNull($helper($pages[12]), 'a page without the block has no panel');
     }
 
-    private function download(int $pageId, string $format, bool $expectOk = true): Response
+    /** @param array<string,string> $headers request headers */
+    private function download(int $pageId, string $format, bool $expectOk = true, array $headers = []): Response
     {
         $config = require dirname(__DIR__, 2) . '/config/module.config.php';
         $citation = $config['iwac_seo']['citation'];
@@ -191,7 +215,11 @@ final class PageCitationControllerTest extends TestCase
         $event->setRouteMatch(new RouteMatch(['action' => 'page', 'id' => (string) $pageId, 'format' => $format]));
         $controller->setEvent($event);
 
-        $response = $controller->dispatch(new Request(), new Response());
+        $request = new Request();
+        foreach ($headers as $name => $value) {
+            $request->getHeaders()->addHeaderLine($name, $value);
+        }
+        $response = $controller->dispatch($request, new Response());
         self::assertInstanceOf(Response::class, $response);
         if ($expectOk) {
             self::assertSame(200, $response->getStatusCode());
@@ -204,7 +232,7 @@ final class PageCitationControllerTest extends TestCase
     {
         $sites = [1 => $this->site(1, 'afrique_ouest', true), 2 => $this->site(2, 'westafrica', true)];
         return [
-            10 => $this->page(10, 'hajj-bf', 'Hajj in Burkina Faso', $sites[2], true, true),
+            10 => $this->page(10, 'hajj-bf', 'Hajj in Burkina Faso', $sites[2], true, true, new \DateTime('2025-10-21 14:15:00', new \DateTimeZone('UTC'))),
             11 => $this->page(11, 'hadj-bf', 'Hadj au Burkina Faso', $sites[1], true, true),
             12 => $this->page(12, 'about', 'About', $sites[2], true, false),
             13 => $this->page(13, 'draft', 'Draft', $sites[2], false, true),
@@ -231,21 +259,29 @@ final class PageCitationControllerTest extends TestCase
         return $siteSettings;
     }
 
-    private function page(int $id, string $slug, string $title, SiteRepresentation $site, bool $public, bool $withBlock): SitePageRepresentation
-    {
+    private function page(
+        int $id,
+        string $slug,
+        string $title,
+        SiteRepresentation $site,
+        bool $public,
+        bool $withBlock,
+        ?\DateTime $modified = null
+    ): SitePageRepresentation {
         $blocks = [$this->block('html')];
         if ($withBlock) {
             $blocks[] = $this->block(PageCitationData::BLOCK_LAYOUT);
         }
         $page = $this->getMockBuilder(SitePageRepresentation::class)->disableOriginalConstructor()
-            ->onlyMethods(['id', 'slug', 'title', 'site', 'isPublic', 'blocks', 'created', 'siteUrl'])->getMock();
+            ->onlyMethods(['id', 'slug', 'title', 'site', 'isPublic', 'blocks', 'created', 'modified', 'siteUrl'])->getMock();
         $page->method('id')->willReturn($id);
         $page->method('slug')->willReturn($slug);
         $page->method('title')->willReturn($title);
         $page->method('site')->willReturn($site);
         $page->method('isPublic')->willReturn($public);
         $page->method('blocks')->willReturn($blocks);
-        $page->method('created')->willReturn(new \DateTime('2022-10-06 09:30:00'));
+        $page->method('created')->willReturn(new \DateTime('2022-10-06 09:30:00', new \DateTimeZone('UTC')));
+        $page->method('modified')->willReturn($modified);
         $page->method('siteUrl')->willReturnCallback(
             static fn (?string $siteSlug = null, bool $canonical = false): string => 'https://islam.zmo.de/s/' . $siteSlug . '/page/' . $slug
         );

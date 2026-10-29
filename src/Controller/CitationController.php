@@ -40,6 +40,11 @@ use Omeka\Settings\SiteSettings;
  * site, so no ?site= is read: the page's own site fixes its URL and language.
  * Only a public page of a public site that carries the "How to cite this page"
  * block resolves.
+ *
+ * Both are served with an ETag over the file and the record's (or page's)
+ * last change as Last-Modified, and may be cached for five minutes, so a
+ * reference manager re-fetching a citation revalidates cheaply
+ * ({@see \IwacSeo\Service\HttpCache}).
  */
 class CitationController extends AbstractActionController
 {
@@ -90,7 +95,12 @@ class CitationController extends AbstractActionController
         }
 
         [, $contentType] = CitationExport::FORMATS[$format];
-        return $this->fileResponse($body, $contentType, $this->citationExport->filename($record, $format));
+        return $this->fileResponse(
+            $body,
+            $contentType,
+            $this->citationExport->filename($record, $format),
+            self::modified(static fn () => $item->modified() ?? $item->created())
+        );
     }
 
     public function pageAction(): Response
@@ -125,7 +135,13 @@ class CitationController extends AbstractActionController
         }
 
         [, $contentType] = CitationExport::FORMATS[$format];
-        return $this->fileResponse($body, $contentType, $this->citationExport->filename($record, $format));
+        // A page citation dates from the page's own change, not its site's.
+        return $this->fileResponse(
+            $body,
+            $contentType,
+            $this->citationExport->filename($record, $format),
+            self::modified(static fn () => $page->modified() ?? $page->created())
+        );
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
@@ -187,12 +203,28 @@ class CitationController extends AbstractActionController
         return $this->settings->isOn('iwac_seo_citation_meta', true);
     }
 
-    private function fileResponse(string $content, string $contentType, string $filename): Response
+    private function fileResponse(string $content, string $contentType, string $filename, ?\DateTimeInterface $modified): Response
     {
         // filename() is sanitised to [A-Za-z0-9._-], safe inside the header.
-        return $this->respond($content, $contentType, 200, [
+        return $this->respondCacheable($content, $contentType, $modified, 200, [
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
         ]);
+    }
+
+    /**
+     * When the record last changed, else when it was made, for Last-Modified;
+     * null when the representation cannot say.
+     *
+     * @param callable():mixed $read
+     */
+    private static function modified(callable $read): ?\DateTimeInterface
+    {
+        try {
+            $date = $read();
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return $date instanceof \DateTimeInterface ? $date : null;
     }
 
     private function status(int $code): Response
