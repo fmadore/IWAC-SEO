@@ -27,10 +27,11 @@ It is self-contained, with no third-party runtime Composer dependencies or theme
 | **Meta tags** | `<title>`, `<meta name="description">`, canonical link on every public page. |
 | **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. Every indexable page also carries `robots: max-image-preview:large`, so Google may show its image at full width in Search and Discover rather than as a small thumbnail (dropped on `noindex` pages). |
 | **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` on the home page and `BreadcrumbList` on resource pages. |
-| **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
+| **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …), written from the same citation record as the "How to cite" panel. |
+| **FAIR Signposting** | Item, media and item-set pages point machines at what to cite (`cite-as`), the record's citation downloads and Zotero RDF (`describedby`), its schema.org type, authors, licence, files and collections — as `<link>` elements and as an HTTP `Link` header. See [FAIR Signposting](#fair-signposting). |
 | **unAPI (Zotero RDF)** | Primary-source items also advertise a `/unapi` endpoint serving **Zotero RDF**. Zotero prefers unAPI over the meta tags, so it imports a fuller record — the call number (*Cote*) from the `iwac-` identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. |
 | **Page citation tools** | A **"How to cite this page"** page block for static pages (online exhibits): the same panel and downloads (`/cite/page/{id}/{format}`), cited as a web page, with author, title and date set in the static-page table. See [Static-page citations](#static-page-citations--how-to-cite-this-page). |
-| **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
+| **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` (cacheable: ETag, Last-Modified, 304) and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
 | **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. With it, `og:image:alt` / `twitter:image:alt` — the picture's own alt text as Omeka resolves it, else the record's title (the default image is described as itself or as the site, never as the record) — and `og:image:width` / `og:image:height` when the file sits in Omeka's local store, read from its header so a card can be laid out before the image loads. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
 | **robots.txt** | `/robots.txt` disallowing `/admin`, the query variants of the search and browse pages (facets, filters, sorts — clean pagination stays crawlable; `iwac_seo.robots`), and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
@@ -154,15 +155,18 @@ The head signals are written into Omeka's request-global head placeholder helper
 * **Resource pages** (`view.show.after` on the Item/ItemSet/Media controllers): title from
   `displayTitle()`, description from `bibo:shortDescription` (the AI summary on newspaper
   articles) / `dcterms:abstract` / `dcterms:description` (truncated to ~160 chars),
-  canonical from the resource's site URL, `og:image` from the primary media, and JSON-LD
-  from the resource class.
+  canonical from the resource's site URL, `og:image` from the primary media, JSON-LD
+  from the resource class, and the [Signposting](#fair-signposting) links.
 * **Static pages** (`view.show.after` on the Page controller): the editor's per-page
   overrides, else defaults; `WebSite` JSON-LD on the home page.
 * **Browse/search pages** (`view.browse.after`): self-referential canonical and optional
   `noindex` on filtered variants; tracking parameters are removed and pagination remains indexable.
+  An item set's own page (`/item-set/{id}`, which Omeka renders as a browse of its items) is
+  signposted as the set, on its clean URL only.
 * **Every page** (`view.layout`): site-wide constants (`og:site_name`, `og:locale`,
   `twitter:card`, verification tags) and gap-fills for anything not already set. Resource
-  values always win because the resource listeners run before the layout listener.
+  values always win because the resource listeners run before the layout listener. The
+  Signposting `Link` header is added here, once the page has said what it is.
 
 The two canonicals differ deliberately. On the browse routes this module owns, page 2 of a
 listing is a real page in a series, so its canonical is **self-referential** and `noindex`
@@ -311,7 +315,8 @@ So that the **Zotero Connector** and similar tools capture a resource page as a 
 each item page also emits embedded bibliographic `<meta>` tags — the two vocabularies
 Zotero's *Embedded Metadata* translator reads:
 
-* **Highwire Press** (`citation_title`, repeated `citation_author` / `citation_editor`,
+* **Highwire Press** (`citation_title`, repeated `citation_author` / `citation_editor` — see
+  [author names](#author-names-in-the-meta-tags) —
   `citation_publication_date`, `citation_journal_title` / `citation_inbook_title`,
   `citation_volume`, `citation_issue`, `citation_firstpage`/`citation_lastpage`,
   `citation_publisher`, `citation_dissertation_institution`,
@@ -319,9 +324,14 @@ Zotero's *Embedded Metadata* translator reads:
   `citation_keywords`, `citation_abstract`, `citation_pdf_url`, `citation_public_url`).
 * **Dublin Core** (`DC.title`, `DC.creator`, `DC.date`, `DC.publisher`, `DC.type`,
   `DC.language`, `DC.identifier`, `DC.subject`, `DC.description`) — emitted for **every**
-  resource, including authority pages, as a generic fallback.
+  resource, including authority and media pages, as a generic fallback. A media page is not a
+  work and carries no Highwire tags, so Scholar is not handed a file's page as a second copy.
 
-IWAC's field conventions are baked into the per-kind tags (see `src/Service/CitationMeta.php`):
+A work's tags are written from the `CitationRecord` that `CitationData` builds — the record the
+"How to cite" panel formats and the downloads and Zotero RDF serialise — in the page's language
+(the abstract on the English site is the English one), so the two cannot disagree about a field.
+IWAC's field conventions are baked into that record and the per-kind tags (see
+`src/Service/CitationData.php` and `src/Service/CitationMeta.php`):
 
 - the **journal / newspaper / publication title** lives in `dcterms:publisher` (often a
   linked item set), not `dcterms:isPartOf`;
@@ -337,6 +347,25 @@ IWAC's field conventions are baked into the per-kind tags (see `src/Service/Cita
 The citation kind per class lives in `iwac_seo.citation.class_kinds` and is overridable.
 `citation_pdf_url` is emitted only for a **public** PDF media, so restricted bitstreams are
 never exposed. Toggle the whole feature with **Emit citation meta tags** in Configure.
+
+### Author names in the meta tags
+
+Zotero's *Embedded Metadata* translator splits a `citation_author` on its comma when it has
+one, and on its last space when it has not — so *Jean-Pierre Olivier de Sardan*, sent as written,
+is filed under "Sardan". A person whose authority record holds the name in its own fields
+(`foaf:lastName` or `foaf:familyName`, with `foaf:firstName` or `foaf:givenName`) is therefore
+sent **"Family, Given"** — `Olivier de Sardan, Jean-Pierre` — in `citation_author`,
+`citation_editor` and `DC.creator`, a form Google Scholar accepts too.
+
+Every other name goes out **exactly as the archive writes it**: an institution (a creator linked
+to an Organisation record) as its one name, a single word, a label already inverted
+(`Madore, Frédérick`), and a name known only as a label. A label's split is the module's guess,
+and Zotero and Scholar guess on their own rather than take it for fact; linking the name to an
+authority record with its name fields is what fixes it. One exception: Zotero reads a *lone*
+`citation_author` whose two halves both contain a space (`Olivier de Sardan, Jean Pierre`) as a
+comma-separated list of two people, so that one name keeps its label in the Highwire tags.
+`Creator::$structured` records which split came from the record; the formatted citations and
+the exports use the split either way.
 
 ### Newspaper articles & magazine issues — correct Zotero typing
 
@@ -381,6 +410,10 @@ instead of scraping the meta tags — which lets the module set every field exac
 - `prism:publicationName`, `prism:number`/`prism:volume`, `bib:pages`, `dc:date`, `dc:language`,
   `dcterms:abstract`, `dc:rights`, and the public PDF as an `eprints:document_url` attachment.
 
+The RDF and both format lists are served with an ETag (and the RDF with the item's
+Last-Modified) and may be cached for five minutes, answered `304` while a copy is current — the
+Connector asks twice per page saved.
+
 The Highwire / DC `<meta>` tags stay on every page — they still feed Google Scholar and are the
 fallback if unAPI is unreachable, and they remain the sole path for the bibliographic-reference
 kinds (which Highwire already types precisely). `ZoteroRdf` reuses the same
@@ -408,13 +441,19 @@ helper, which returns:
   **CSL-JSON** (`.json`), served by `CitationController` as an `attachment` whose filename is the
   `iwac-` accession id. The panel's links carry `?site={slug}`, so a download from the English
   site links the English page and reads in English (abstract, *Islam West Africa Collection*),
-  one from the French site in French (*Collection Islam Afrique de l'Ouest*); and
+  one from the French site in French (*Collection Islam Afrique de l'Ouest*). Each file carries a
+  strong ETag over its body, the item's last change as `Last-Modified` and
+  `Cache-Control: max-age=300, public`; a conditional GET whose copy is current gets `304`, with
+  `If-None-Match` evaluated alone when present (RFC 9110). The ETag is the validator that counts:
+  an edit to a linked record (an author, the newspaper) changes the file without changing the
+  item's date; and
 - the **Zotero RDF** link (the `/unapi` endpoint above) for the Connector-eligible kinds.
 
 This is the single-item replacement for `Daniel-KM/Omeka-s-module-BulkExport`. All three
-formatters and serialisers read **one** normalized record from `CitationData`, which reuses the
-`CitationMeta` field conventions (container in `dcterms:publisher`, a chapter's book title in
-`dcterms:alternative`, NumericDataTypes dates, person-vs-institution creators). Authority records
+formatters and serialisers, the Zotero RDF and the citation meta tags read **one** normalized
+record from `CitationData`, which holds IWAC's field conventions (container in
+`dcterms:publisher`, a chapter's book title in `dcterms:alternative`, NumericDataTypes dates,
+person-vs-institution creators). Authority records
 (person, place, organisation, event, subject) are **not** citable works — the helper returns
 `null` and the panel is hidden. The panel and downloads share the citation kill-switch with the
 meta tags (the `iwac_seo_citation_meta` setting).
@@ -443,7 +482,35 @@ column) and a default:
 The page's meta description, if set, travels as the exports' abstract. Downloads are served at
 **`/cite/page/{page-id}/{format}`** — no `?site=`, because a page belongs to one site — and only for
 a public page of a public site that carries the block, so the route never cites a page nobody made
-citable. A page has no unAPI identity, so the panel shows no Zotero RDF link.
+citable. They are cached like the item downloads, dated by the page's own last change (an edit to
+the citation fields in the static-page table changes the ETag, not that date). A page has no unAPI
+identity, so the panel shows no Zotero RDF link.
+
+---
+
+## FAIR Signposting
+
+Record pages carry [FAIR Signposting](https://signposting.org/FAIR/) (level 1) links, which FAIR
+assessors such as F-UJI and repository harvesters read; search engines ignore them. The same set
+goes out twice: as `<link>` elements in the head and as an HTTP `Link` header, which is all many
+harvesters read. Items, media pages and item-set pages (on their clean URL) are signposted;
+static pages are not.
+
+| Relation | Target |
+|---|---|
+| `cite-as` | The page's canonical URL on the reader's site — RFC 8574's permalink of the page. IWAC has no persistent-identifier service, and a reference's DOI names the publisher's copy (it travels as `citation_doi`), so it is not used. |
+| `describedby` | For a citable work: `/cite/{id}/{format}?site={slug}` per format the panel offers (`application/x-bibtex`, `application/x-research-info-systems`, `application/vnd.citationstyles.csl+json`), while the citation tags are on; for the unAPI kinds, `/unapi?id={page}&format=rdf_zotero` (`application/rdf+xml`), while unAPI is on. |
+| `type` | The schema.org type the JSON-LD uses (`Collection` for an item set, `MediaObject` for a media page), plus `https://schema.org/AboutPage`. |
+| `author` | Each author linked to an authority record: its ORCID iD, else its first authority URI (Wikidata, VIAF … — the JSON-LD's `sameAs`), else its IWAC page. An author known only by name is not linked. |
+| `license` | The licence or rights statement's URL ([`Licence`](#schemaorg-type-map)), when it resolves to one. |
+| `item` | Each public PDF, image, audio or video file, with its media type (the first ten). |
+| `collection` | From an item, its public item sets' pages; from a media page, its item's page. |
+
+Only public values, records and files are linked, and every page URL is on the reader's site.
+The `Link` header is joined to any `Link` header another module set, never replacing it — Laminas
+replaces a repeated header unless a multi-header class is registered for its name, so the module
+registers one. It is capped at 2 KB: nginx answers `502` when a FastCGI response's headers overflow
+its 4 KB buffer, so links beyond the cap stay in the head only. A failure to add it is logged.
 
 ---
 
@@ -534,7 +601,7 @@ IwacSeo/
 │   │   ├── UnapiController.php       # /unapi -> Zotero RDF
 │   │   ├── CitationController.php    # /cite/{id}/{format}, /cite/page/{id}/{format} -> BibTeX/RIS/CSL-JSON
 │   │   ├── Admin/SeoController.php   # dashboard + static-page table
-│   │   └── Concern/SendsResponses.php  # shared XML/text/file response plumbing
+│   │   └── Concern/SendsResponses.php  # shared XML/text/file response plumbing, cache validators
 │   ├── Form/{ConfigForm,PageSeoForm}.php
 │   ├── Job/PingSearchEngines.php
 │   ├── View/Helper/Citation.php      # iwacCitation() -> "How to cite" view-model
@@ -549,7 +616,9 @@ IwacSeo/
 │       ├── LanguageCode.php          # BCP 47 tags from the language records
 │       ├── CitationKind.php          # the kind vocabulary + export type tables
 │       ├── CitationKindMap.php       # resource class id -> kind (one shared map)
-│       ├── CitationMeta.php          # Highwire + Dublin Core citation tags
+│       ├── CitationMeta.php          # Highwire + Dublin Core citation tags, from the record
+│       ├── Signposting.php           # FAIR Signposting links + the Link header value
+│       ├── HttpCache.php             # ETag / Last-Modified / 304 for the citation documents
 │       ├── ZoteroRdf.php             # Zotero RDF (served via unAPI)
 │       ├── CitationData.php          # builds a CitationRecord from an item
 │       ├── PageCitationData.php      # builds one from a static site page
@@ -587,11 +656,16 @@ IwacSeo/
 3. View-source an item page (`/s/afrique_ouest/item/2231`): confirm `<title>`, `description`,
    `og:*`, `twitter:*`, `<link rel="canonical">` and an `application/ld+json` block. Validate
    the JSON-LD with the [Rich Results Test](https://search.google.com/test/rich-results).
-4. Open a reference page (e.g. a journal article) with the **Zotero Connector** and confirm it
-   saves as the right item type with authors, date, container and DOI; open a newspaper article
+   `curl -sI https://islam.zmo.de/s/afrique_ouest/item/2231 | grep -i '^link'` shows the
+   Signposting header, beginning `rel="cite-as"`.
+4. `curl -sI https://islam.zmo.de/cite/2231/ris` shows an `ETag`; repeating it with
+   `-H 'If-None-Match: "…"'` answers `304`.
+5. Open a reference page (e.g. a journal article) with the **Zotero Connector** and confirm it
+   saves as the right item type with authors, date, container and DOI — an author linked to an
+   authority record with a multi-word family name keeps it whole; open a newspaper article
    and confirm it saves as a *newspaper article* with the newspaper as the publication.
-5. Home page: `og:site_name` and a `WebSite` JSON-LD block; the GSC tag once a token is set.
-6. In Search Console: add the property, verify via the meta tag, submit `/sitemap.xml`.
+6. Home page: `og:site_name` and a `WebSite` JSON-LD block; the GSC tag once a token is set.
+7. In Search Console: add the property, verify via the meta tag, submit `/sitemap.xml`.
 
 ---
 
