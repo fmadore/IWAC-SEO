@@ -3,6 +3,10 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.4.1 — 2026-10-29
+
+- Fix a PHP 8.5 deprecation on every record page whose author, publisher or other linked record has no resource class: the JSON-LD looked that record's type up under a null array key. The output is unchanged.
+
 ## 1.4.0 — 2026-10-29
 
 - Fix IndexNow never queueing a URL. The `api.*.post` events carry the Doctrine entity, which has no `siteUrl()` (Omeka turns the response into a representation only after they run), so every save was skipped. The URL is now built from the adapter's representation.
