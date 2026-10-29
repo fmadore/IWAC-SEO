@@ -610,7 +610,10 @@ class StructuredData
                 }
                 $linked = $value->valueResource();
                 if ($linked) {
-                    $linkedType = $this->classTypes[ResourceUrl::classId($linked)] ?? $type;
+                    // An unclassed record never looks the map up: PHP 8.5
+                    // deprecates null as an array key, even behind ??.
+                    $linkedClass = ResourceUrl::classId($linked);
+                    $linkedType = ($linkedClass !== null ? $this->classTypes[$linkedClass] ?? null : null) ?? $type;
                     $node = ['@type' => $linkedType === 'Organization' ? 'Organization' : $type, 'name' => $label];
                     $url = ResourceUrl::forSite($linked, $site->slug());
                     if ($url !== null) {

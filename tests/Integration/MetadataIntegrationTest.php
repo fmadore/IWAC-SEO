@@ -237,6 +237,34 @@ final class MetadataIntegrationTest extends TestCase
         self::assertSame([['@type' => 'Place', 'name' => 'Burkina Faso']], $data['location']);
     }
 
+    /**
+     * A linked record without a resource class (an unclassed author record)
+     * takes the role's type without looking the class map up under a null
+     * key, which PHP 8.5 deprecates even behind `??`.
+     */
+    public function testALinkedRecordWithoutAClassIsTypedQuietly(): void
+    {
+        $deprecations = [];
+        set_error_handler(static function (int $level, string $message) use (&$deprecations): bool {
+            $deprecations[] = $message;
+            return true;
+        }, E_DEPRECATED);
+        try {
+            $data = $this->structuredData()->forResource(
+                $this->resource(36, ['dcterms:title' => 'Un article'], ['dcterms:creator' => ['Jane Doe', 7]]),
+                $this->site(),
+                self::CANONICAL,
+                null
+            );
+        } finally {
+            restore_error_handler();
+        }
+
+        self::assertSame([], $deprecations);
+        self::assertSame('Person', $data['author'][0]['@type']);
+        self::assertSame('Jane Doe', $data['author'][0]['name']);
+    }
+
     public function testEventWithASingleDateGetsNoEndDate(): void
     {
         $data = $this->structuredData()->forResource(
