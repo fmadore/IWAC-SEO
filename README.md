@@ -278,6 +278,22 @@ Creative works also carry `author`/`editor`/`contributor` (from `bibo:authorList
 when present. Every record carries `sameAs` from its `dcterms:identifier` **URI** values
 (Wikidata, GeoNames, VIAF …) — opaque internal ids like `iwac-article-0000001` are skipped.
 
+`license` is the record's rights statement. IWAC states rights in `dcterms:rights` with the
+RightsStatements module's data type, whose URI is the statement itself
+(`http://rightsstatements.org/vocab/InC-EDU/1.0/`), and that URI is emitted as it is stored —
+on articles, issues, audiovisual records, documents and photographs; references carry none.
+`dcterms:license` would outrank it, a well-known Creative Commons label (`CC BY-NC-SA 4.0`)
+becomes its canonical URL, and other text is emitted as text. A record that states no rights
+is given none. `Licence` resolves it once, so a Signposting `license` link can reuse it.
+
+`isAccessibleForFree: true` is claimed only for a work IWAC actually serves: one whose full
+text (`bibo:content`) is public, one with a public file in its own form — a PDF, an audio or
+video file, or, for a photograph, the image (a book's public JPEG is its cover, the text
+behind it private) — or a video with a player (`embedUrl`). Anything else says nothing, and
+never `false`: Google reads `false` as paywall markup and asks for the paywalled part to be
+marked, whereas IWAC withholds an in-copyright text without selling it and its record stays
+free to read.
+
 ---
 
 ## Citation metadata (Zotero, Google Scholar, …)
@@ -520,6 +536,7 @@ IwacSeo/
 │       ├── HeadWriter.php            # writes them; tracks what the request has set
 │       ├── ImageDimensions.php       # share-image pixel size from the local file store
 │       ├── StructuredData.php        # schema.org JSON-LD (by resource class)
+│       ├── Licence.php               # a record's licence / rights statement, resolved once
 │       ├── CitationKind.php          # the kind vocabulary + export type tables
 │       ├── CitationKindMap.php       # resource class id -> kind (one shared map)
 │       ├── CitationMeta.php          # Highwire + Dublin Core citation tags

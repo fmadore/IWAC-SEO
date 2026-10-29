@@ -333,6 +333,17 @@ class StructuredData
             $data['publisher'] = ['@type' => 'Organization', 'name' => $publisher];
         }
 
+        // license is valid on any creative work; emit it whenever the record
+        // states one — on IWAC, its RightsStatements.org statement. No default
+        // is asserted for a record that states none.
+        $license = $this->licenseValue($resource, $site);
+        if ($license !== null) {
+            $data['license'] = $license;
+        }
+        if ($this->servesTheWork($type, $resource, $data)) {
+            $data['isAccessibleForFree'] = true;
+        }
+
         // description is required of a VideoObject, and 310 of IWAC's videos
         // hold no descriptive text at all. Rather than leave the node invalid
         // or invent prose, read the record's own facts out as a sentence in
@@ -424,6 +435,87 @@ class StructuredData
             return null;
         }
         return $this->firstLabel($resource, 'dcterms:publisher');
+    }
+
+    /**
+     * The record's licence ({@see Licence}): its URL when it resolves to one —
+     * the rights statement's own URI, a licence registry URL on a linked
+     * licence item, or the canonical URL of a well-known Creative Commons
+     * label — else, for a linked licence item, a CreativeWork named by its
+     * label at its page, else the literal text.
+     *
+     * @return string|array<string,string>|null
+     */
+    private function licenseValue(AbstractResourceEntityRepresentation $resource, SiteRepresentation $site): string|array|null
+    {
+        $licence = Licence::of($resource);
+        if ($licence === null) {
+            return null;
+        }
+        if ($licence->url !== null) {
+            return $licence->url;
+        }
+        if ($licence->item !== null) {
+            return array_filter([
+                '@type' => 'CreativeWork',
+                'name'  => $licence->name,
+                'url'   => ResourceUrl::forSite($licence->item, $site->slug()),
+            ], static fn (?string $value): bool => $value !== null);
+        }
+        return $licence->name;
+    }
+
+    /**
+     * Whether the work itself — not only its description — can be read,
+     * viewed or heard here without charge, which is what isAccessibleForFree
+     * claims. It does when:
+     *
+     *   - its full text is public: bibo:content, the OCR or the transcription
+     *     (every newspaper article and issue sampled on 2026-10-29);
+     *   - it has a public file in its own form: a PDF, an audio or video file,
+     *     or — for a photograph only — the image. A book's or a report's
+     *     public JPEG is its cover, and the text behind it is private;
+     *   - or the record names a player for it (a video's embedUrl).
+     *
+     * Otherwise nothing is said, never false: Google reads
+     * isAccessibleForFree=false as paywall markup, which wants the paywalled
+     * part marked with hasPart and cssSelector. IWAC withholds the text of an
+     * in-copyright reference rather than selling it, and its record — the
+     * description, the summary, the citation — stays free, so false would
+     * describe it wrongly and draw a structured-data error besides.
+     *
+     * @param array<mixed> $data the node so far, for the playback URLs
+     */
+    private function servesTheWork(string $type, AbstractResourceEntityRepresentation $resource, array $data): bool
+    {
+        if (isset($data['embedUrl']) || isset($data['contentUrl'])) {
+            return true;
+        }
+        foreach ($resource->value('bibo:content', ['all' => true]) as $value) {
+            // Not MetadataValue::text(): an OCR text runs to hundreds of
+            // kilobytes, and only its being public and non-empty matters.
+            if ($value instanceof ValueRepresentation && $value->isPublic() && trim((string) $value->value()) !== '') {
+                return true;
+            }
+        }
+        if (!$resource instanceof ItemRepresentation) {
+            return false;
+        }
+        foreach ($resource->media() as $media) {
+            if (!$media->isPublic() || MetadataValue::url($media->originalUrl()) === null) {
+                continue;
+            }
+            $mediaType = (string) $media->mediaType();
+            if (
+                $mediaType === 'application/pdf'
+                || str_starts_with($mediaType, 'audio/')
+                || str_starts_with($mediaType, 'video/')
+                || ($type === 'ImageObject' && str_starts_with($mediaType, 'image/'))
+            ) {
+                return true;
+            }
+        }
+        return false;
     }
 
     // ─── Value readers ──────────────────────────────────────────────────────

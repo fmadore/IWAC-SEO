@@ -646,6 +646,159 @@ final class MetadataIntegrationTest extends TestCase
         self::assertArrayNotHasKey('location', $data);
     }
 
+    public function testARightsStatementIsTheLicence(): void
+    {
+        // IWAC's dcterms:rights values are RightsStatements.org statements:
+        // the URI is the statement, the label only its name.
+        $data = $this->structuredData()->forResource(
+            $this->resource(36, ['dcterms:title' => 'Un article'], uris: [
+                'dcterms:rights' => 'http://rightsstatements.org/vocab/InC-EDU/1.0/',
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('http://rightsstatements.org/vocab/InC-EDU/1.0/', $data['license']);
+    }
+
+    public function testALicenceIsNamedOnlyWhenItCannotBeLinked(): void
+    {
+        $byLabel = $this->structuredData()->forResource(
+            $this->resource(35, ['dcterms:license' => 'CC BY-NC-SA 4.0', 'dcterms:rights' => 'Tous droits réservés']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+        $freeText = $this->structuredData()->forResource(
+            $this->resource(35, ['dcterms:rights' => 'Tous droits réservés']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        // dcterms:license outranks dcterms:rights, and a well-known label links.
+        self::assertSame('https://creativecommons.org/licenses/by-nc-sa/4.0/', $byLabel['license']);
+        self::assertSame('Tous droits réservés', $freeText['license']);
+    }
+
+    public function testAPrivateRightsValueIsNotPublished(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(36, ['dcterms:rights' => [
+                $this->value('In Copyright', 'http://rightsstatements.org/vocab/InC/1.0/', public: false),
+            ]]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('license', $data);
+    }
+
+    /** No record is given a licence it does not state. */
+    public function testARecordWithNoRightsClaimsNoLicence(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(35, ['dcterms:title' => 'An article']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('license', $data);
+    }
+
+    /** @return array<string,array{0:int,1:array<string,mixed>,2:list<array{0:string,1:?string,2:bool}>,3:array<string,string>}> */
+    public static function freelyServedWorks(): array
+    {
+        return [
+            'public full text' => [36, ['bibo:content' => 'Le texte intégral.'], [], []],
+            'public PDF' => [40, [], [['application/pdf', 'https://example.test/files/original/book.pdf', true]], []],
+            'digitised recording' => [38, [], [['video/mp4', 'https://example.test/files/original/tape.mp4', true]], []],
+            'hosted video' => [38, [], [], ['fabio:hasURL' => 'https://www.youtube.com/watch?v=UENBMWutb-w']],
+            'photograph' => [58, [], [['image/jpeg', 'https://example.test/files/original/photo.jpg', true]], []],
+        ];
+    }
+
+    /**
+     * @param array<string,mixed> $values
+     * @param list<array{0:string,1:?string,2:bool}> $media
+     * @param array<string,string> $uris
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('freelyServedWorks')]
+    public function testAWorkServedHereIsAccessibleForFree(int $classId, array $values, array $media, array $uris): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(
+                $classId,
+                $values + ['dcterms:title' => 'A work'],
+                [],
+                array_map(fn (array $m): MediaRepresentation => $this->media(...$m), $media),
+                $uris
+            ),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertTrue($data['isAccessibleForFree']);
+    }
+
+    /** @return array<string,array{0:int,1:array<string,mixed>,2:list<array{0:string,1:?string,2:bool}>}> */
+    public static function worksNotServedHere(): array
+    {
+        return [
+            // Classes 40, 52, 82 and 305 keep a public cover beside private text.
+            'a book with only its cover' => [40, ['bibo:content' => 'private'], [['image/jpeg', 'https://example.test/files/original/cover.jpg', true]]],
+            'private full text' => [36, ['bibo:content' => 'private'], []],
+            'private PDF' => [35, [], [['application/pdf', 'https://example.test/files/original/article.pdf', false]]],
+            'a description and nothing more' => [35, [], []],
+        ];
+    }
+
+    /**
+     * Nothing is said rather than false: false is Google's paywall markup,
+     * and IWAC withholds an in-copyright text without selling it.
+     *
+     * @param array<string,mixed> $values
+     * @param list<array{0:string,1:?string,2:bool}> $media
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('worksNotServedHere')]
+    public function testAWorkNotServedHereSaysNothingAboutAccess(int $classId, array $values, array $media): void
+    {
+        if (isset($values['bibo:content'])) {
+            $values['bibo:content'] = [$this->value('Le texte intégral.', public: false)];
+        }
+        $data = $this->structuredData()->forResource(
+            $this->resource(
+                $classId,
+                $values + ['dcterms:title' => 'A work'],
+                [],
+                array_map(fn (array $m): MediaRepresentation => $this->media(...$m), $media)
+            ),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('isAccessibleForFree', $data);
+    }
+
+    /** Authority records describe a person or a place, not a work anyone reads. */
+    public function testAnAuthorityRecordMakesNoAccessClaim(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(54, ['dcterms:title' => 'Congrès OJEMAO (1997)', 'bibo:content' => 'Notes.']),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertArrayNotHasKey('isAccessibleForFree', $data);
+        self::assertArrayNotHasKey('license', $data);
+    }
+
     public function testTheShareImageCarriesItsAltTextAndItsSize(): void
     {
         $files = $this->fileStore(['large/scan.jpg' => [1200, 800]]);
@@ -902,7 +1055,8 @@ final class MetadataIntegrationTest extends TestCase
     {
         return new StructuredData(
             [54 => 'DefinedTerm', 77 => 'CreativeWork', 38 => 'VideoObject',
-                178 => 'ScholarlyArticle', 35 => 'ScholarlyArticle', 99 => 'Event'],
+                178 => 'ScholarlyArticle', 35 => 'ScholarlyArticle', 99 => 'Event',
+                36 => 'NewsArticle', 40 => 'Book', 58 => 'ImageObject'],
             'CreativeWork'
         );
     }
