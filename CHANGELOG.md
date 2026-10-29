@@ -3,7 +3,7 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
-## Unreleased
+## 1.4.0 — 2026-10-29
 
 - Fix IndexNow never queueing a URL. The `api.*.post` events carry the Doctrine entity, which has no `siteUrl()` (Omeka turns the response into a representation only after they run), so every save was skipped. The URL is now built from the adapter's representation.
 - A deleted record is pinged at the URL it had before the deletion: by `api.delete.post` Doctrine has cleared its id, so it is read at `api.delete.pre` and queued once the delete succeeds.
