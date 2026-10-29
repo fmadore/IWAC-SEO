@@ -72,11 +72,28 @@ final class CreatorTest extends TestCase
     {
         $creators = [
             Creator::person('Madore', 'Frédérick', 'Frédérick Madore'),
+            Creator::person('Olivier de Sardan', 'Jean-Pierre', 'Jean-Pierre Olivier de Sardan', true),
             Creator::person('Sanogo', null, 'Sanogo'),
             Creator::institution('AEEMB'),
         ];
         foreach ($creators as $creator) {
             $this->assertEquals($creator, Creator::fromArray($creator->toArray()));
         }
+    }
+
+    public function testAParsedLabelIsNeverStructured(): void
+    {
+        $this->assertFalse(Creator::parse('Jean-Pierre Olivier de Sardan', false)->structured);
+        $this->assertFalse(Creator::parse('Madore, Frédérick', false)->structured);
+        $this->assertFalse(Creator::institution('AEEMB')->structured);
+        $this->assertTrue(Creator::person('Olivier de Sardan', 'Jean-Pierre', 'Jean-Pierre Olivier de Sardan', true)->structured);
+    }
+
+    public function testAnArrayFromBeforeTheMarkerReadsAsAParsedLabel(): void
+    {
+        $creator = Creator::fromArray(['family' => 'Madore', 'given' => 'Frédérick', 'literal' => 'Frédérick Madore', 'isInstitution' => false]);
+
+        $this->assertFalse($creator->structured);
+        $this->assertSame('Madore', $creator->family);
     }
 }

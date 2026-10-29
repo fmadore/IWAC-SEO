@@ -15,6 +15,13 @@ namespace IwacSeo\Service\Citation;
  *
  * The literal is always kept, so every consumer can fall back to the name
  * exactly as the archive records it.
+ *
+ * $structured says where the split came from: true when the family and given
+ * names are the authority record's own fields (foaf:lastName, foaf:firstName),
+ * false when they are this class's reading of a label. The split is the same
+ * either way for the formatted citations and the exports, but a signal that
+ * hands the split to another program as fact — the citation meta tags'
+ * "Family, Given" — sends it only when the record made it.
  */
 final class Creator
 {
@@ -23,6 +30,7 @@ final class Creator
         public readonly ?string $given,
         public readonly string $literal,
         public readonly bool $isInstitution,
+        public readonly bool $structured = false,
     ) {
     }
 
@@ -32,9 +40,13 @@ final class Creator
         return new self(null, null, $literal, true);
     }
 
-    public static function person(?string $family, ?string $given, string $literal): self
+    /**
+     * @param bool $structured whether $family and $given are the authority
+     *   record's own name fields, rather than read off the label
+     */
+    public static function person(?string $family, ?string $given, string $literal, bool $structured = false): self
     {
-        return new self($family, ($given ?? '') !== '' ? $given : null, $literal, false);
+        return new self($family, ($given ?? '') !== '' ? $given : null, $literal, false, $structured);
     }
 
     /**
@@ -68,7 +80,7 @@ final class Creator
         return $this->isInstitution || $this->family === null;
     }
 
-    /** @return array{family:?string,given:?string,literal:string,isInstitution:bool} */
+    /** @return array{family:?string,given:?string,literal:string,isInstitution:bool,structured:bool} */
     public function toArray(): array
     {
         return [
@@ -76,10 +88,16 @@ final class Creator
             'given'         => $this->given,
             'literal'       => $this->literal,
             'isInstitution' => $this->isInstitution,
+            'structured'    => $this->structured,
         ];
     }
 
-    /** @param array<string,mixed> $data the inverse of {@see toArray()} */
+    /**
+     * The inverse of {@see toArray()}. An array written before `structured`
+     * existed reads as a split of the label, which is the safe assumption.
+     *
+     * @param array<string,mixed> $data
+     */
     public static function fromArray(array $data): self
     {
         $literal = (string) ($data['literal'] ?? '');
@@ -90,7 +108,8 @@ final class Creator
         return self::person(
             $family !== null ? (string) $family : null,
             isset($data['given']) ? (string) $data['given'] : null,
-            $literal
+            $literal,
+            !empty($data['structured'])
         );
     }
 }

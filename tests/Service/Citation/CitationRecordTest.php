@@ -67,8 +67,10 @@ final class CitationRecordTest extends TestCase
         // The kind is a plain string and the type is resolved, as before.
         $this->assertSame('newspaper', $array['kind']);
         $this->assertSame('article-newspaper', $array['cslType']);
+        // `structured` (whether the split is the authority record's own) was
+        // added after 1.3.0; an added key leaves the theme's reads unchanged.
         $this->assertSame(
-            ['family' => 'Madore', 'given' => 'Frédérick', 'literal' => 'Frédérick Madore', 'isInstitution' => false],
+            ['family' => 'Madore', 'given' => 'Frédérick', 'literal' => 'Frédérick Madore', 'isInstitution' => false, 'structured' => false],
             $array['authors'][0]
         );
         $this->assertSame(['year' => 2018, 'month' => 12, 'day' => 7, 'literal' => '2018-12-07'], $array['issued']);

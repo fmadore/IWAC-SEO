@@ -725,6 +725,115 @@ final class MetadataIntegrationTest extends TestCase
         self::assertStringContainsString('<dc:language>kbp</dc:language>', (string) $rdf);
     }
 
+    /**
+     * Zotero's Embedded Metadata translator splits a citation_author on its
+     * comma, and on its last space when there is none: a name the authority
+     * record holds in its own fields is sent "Family, Given", so a multi-word
+     * family name survives. Everything else goes out as the archive writes it.
+     */
+    public function testAuthorsWhoseRecordsHoldTheirNamesAreSentFamilyFirst(): void
+    {
+        $item = $this->resource(35, ['dcterms:title' => 'Anthropologie et développement'] + [
+            'bibo:authorList' => [
+                $this->authorityValue('Jean-Pierre Olivier de Sardan', 94, ['foaf:lastName' => 'Olivier de Sardan', 'foaf:firstName' => 'Jean-Pierre']),
+                $this->value('Aminata Diallo Sow'),
+                $this->value('Madore, Frédérick'),
+                $this->value('Sanogo'),
+                $this->authorityValue('Sanogo', 94, ['foaf:lastName' => 'Sanogo']),
+            ],
+            'bibo:editorList' => [
+                $this->authorityValue('Mirjam de Bruijn', 94, ['foaf:familyName' => 'de Bruijn', 'foaf:givenName' => 'Mirjam']),
+                $this->value('Muriel Gomez-Perez'),
+            ],
+        ]);
+        $view = $this->renderer();
+
+        (new CitationMeta($this->kinds))->apply($view, $item, 35, self::CANONICAL);
+
+        $headMeta = $view->headMeta()->toString();
+        $expected = ['Olivier de Sardan, Jean-Pierre', 'Aminata Diallo Sow', 'Madore, Frédérick', 'Sanogo', 'Sanogo'];
+        self::assertSame($expected, $this->metaContents($headMeta, 'citation_author'), 'a label alone is never inverted');
+        self::assertSame($expected, $this->metaContents($headMeta, 'DC.creator'));
+        self::assertSame(['de Bruijn, Mirjam', 'Muriel Gomez-Perez'], $this->metaContents($headMeta, 'citation_editor'));
+    }
+
+    public function testAnInstitutionalAuthorIsSentAsOneName(): void
+    {
+        $item = $this->resource(82, [
+            'dcterms:title' => 'Rapport annuel',
+            'dcterms:creator' => [$this->authorityValue("Association Islamique d'Al Mawadda Burkina Faso", 96, [])],
+        ]);
+        $view = $this->renderer();
+
+        (new CitationMeta($this->kinds))->apply($view, $item, 82, self::CANONICAL);
+
+        $headMeta = $view->headMeta()->toString();
+        self::assertSame(["Association Islamique d'Al Mawadda Burkina Faso"], $this->metaContents($headMeta, 'citation_author'));
+        self::assertSame(["Association Islamique d'Al Mawadda Burkina Faso"], $this->metaContents($headMeta, 'DC.creator'));
+    }
+
+    /**
+     * A lone citation_author whose two halves both hold a space is read by
+     * Zotero as a comma-separated list of two people, so that one name is
+     * sent as written. Dublin Core has no such reading.
+     */
+    public function testALoneAuthorThatZoteroWouldSplitInTwoIsSentAsWritten(): void
+    {
+        $item = $this->resource(35, ['dcterms:title' => 'Un article'] + [
+            'bibo:authorList' => [
+                $this->authorityValue('Jean Pierre Olivier de Sardan', 94, ['foaf:lastName' => 'Olivier de Sardan', 'foaf:firstName' => 'Jean Pierre']),
+            ],
+        ]);
+        $view = $this->renderer();
+
+        (new CitationMeta($this->kinds))->apply($view, $item, 35, self::CANONICAL);
+
+        $headMeta = $view->headMeta()->toString();
+        self::assertSame(['Jean Pierre Olivier de Sardan'], $this->metaContents($headMeta, 'citation_author'));
+        self::assertSame(['Olivier de Sardan, Jean Pierre'], $this->metaContents($headMeta, 'DC.creator'));
+    }
+
+    /** The tags read the record the "How to cite" panel shows: in the page's language. */
+    public function testTheCitationTagsReadTheRecordInThePagesLanguage(): void
+    {
+        $item = $this->resource(35, [
+            'dcterms:title' => 'Un article',
+            'dcterms:abstract' => [$this->value('Un résumé.', lang: 'fr'), $this->value('An abstract.', lang: 'en')],
+        ]);
+        $english = $this->renderer();
+        $french = $this->renderer();
+        $french->getHelperPluginManager()->setService('lang', static fn (): string => 'fr');
+
+        (new CitationMeta($this->kinds))->apply($english, $item, 35, self::CANONICAL);
+        (new CitationMeta($this->kinds))->apply($french, $item, 35, self::CANONICAL);
+
+        self::assertSame(['An abstract.'], $this->metaContents($english->headMeta()->toString(), 'citation_abstract'));
+        self::assertSame(['An abstract.'], $this->metaContents($english->headMeta()->toString(), 'DC.description'));
+        self::assertSame(['Un résumé.'], $this->metaContents($french->headMeta()->toString(), 'citation_abstract'));
+        self::assertSame(
+            (new CitationData($this->kinds))->build($item, self::CANONICAL, 'fr')?->abstract,
+            $this->metaContents($french->headMeta()->toString(), 'citation_abstract')[0]
+        );
+    }
+
+    /** A file's page is not a work: Scholar would index it as a second copy of the paper. */
+    public function testAMediaPageCarriesDublinCoreOnly(): void
+    {
+        $media = $this->createStub(MediaRepresentation::class);
+        $media->method('value')->willReturnCallback(
+            fn (string $term, array $options = []) => $term === 'dcterms:title'
+                ? (!empty($options['all']) ? [$this->value('Page 1')] : $this->value('Page 1'))
+                : (!empty($options['all']) ? [] : null)
+        );
+        $view = $this->renderer();
+
+        (new CitationMeta($this->kinds))->apply($view, $media, null, self::CANONICAL);
+
+        $headMeta = $view->headMeta()->toString();
+        self::assertSame(['Page 1'], $this->metaContents($headMeta, 'DC.title'));
+        self::assertStringNotContainsString('citation_', $headMeta);
+    }
+
     public function testARightsStatementIsTheLicence(): void
     {
         // IWAC's dcterms:rights values are RightsStatements.org statements:
@@ -1383,6 +1492,43 @@ final class MetadataIntegrationTest extends TestCase
                 }
             }
         }
+    }
+
+    /**
+     * The contents of every <meta name="$name">, in document order.
+     *
+     * @return string[]
+     */
+    private function metaContents(string $html, string $name): array
+    {
+        preg_match_all('#<meta name="' . preg_quote($name, '#') . '" content="([^"]*)"#', $this->decoded($html), $matches);
+        return $matches[1];
+    }
+
+    /**
+     * A value linking an authority record of class $classId that holds
+     * $fields (foaf:lastName, foaf:firstName …) as its own values.
+     *
+     * @param array<string,string> $fields
+     */
+    private function authorityValue(string $title, int $classId, array $fields): ValueRepresentation
+    {
+        $class = $this->createStub(ResourceClassRepresentation::class);
+        $class->method('id')->willReturn($classId);
+        $wrapped = array_map(fn (string $text): array => [$this->value($text)], $fields);
+        $record = $this->createStub(ItemRepresentation::class);
+        $record->method('isPublic')->willReturn(true);
+        $record->method('displayTitle')->willReturn($title);
+        $record->method('resourceClass')->willReturn($class);
+        $record->method('value')->willReturnCallback(
+            static fn (string $term, array $options = []) => !empty($options['all']) ? ($wrapped[$term] ?? []) : ($wrapped[$term][0] ?? null)
+        );
+
+        $value = $this->createStub(ValueRepresentation::class);
+        $value->method('isPublic')->willReturn(true);
+        $value->method('__toString')->willReturn($title);
+        $value->method('valueResource')->willReturn($record);
+        return $value;
     }
 
     private function decoded(string $html): string

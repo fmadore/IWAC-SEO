@@ -70,7 +70,7 @@ final class MetadataValue
             $family = self::select($linked, ['foaf:lastName', 'foaf:familyName']);
             $given = self::select($linked, ['foaf:firstName', 'foaf:givenName']);
             if ($family !== null) {
-                return Creator::person($family, $given, $label);
+                return Creator::person($family, $given, $label, true);
             }
         }
         return Creator::parse($label, false);
