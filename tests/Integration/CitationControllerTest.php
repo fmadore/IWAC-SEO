@@ -69,6 +69,13 @@ final class CitationControllerTest extends TestCase
         self::assertSame('noindex', $this->header($response, 'X-Robots-Tag'));
     }
 
+    public function testADownloadCanBeReadByAScriptOnAnotherSite(): void
+    {
+        $response = $this->dispatch(['site' => 'westafrica']);
+
+        self::assertSame('*', $this->header($response, 'Access-Control-Allow-Origin'));
+    }
+
     public function testACurrentCopyIsAnswered304WithoutTheFile(): void
     {
         $etag = $this->header($this->dispatch(['site' => 'westafrica']), 'ETag');

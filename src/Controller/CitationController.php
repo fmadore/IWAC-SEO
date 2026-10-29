@@ -206,8 +206,12 @@ class CitationController extends AbstractActionController
     private function fileResponse(string $content, string $contentType, string $filename, ?\DateTimeInterface $modified): Response
     {
         // filename() is sanitised to [A-Za-z0-9._-], safe inside the header.
+        // The files are public citations of public records, so any site's
+        // scripts may read them — a reference tool, a reading list — as
+        // DRE-SEO's downloads allow.
         return $this->respondCacheable($content, $contentType, $modified, 200, [
             'Content-Disposition' => 'attachment; filename="' . $filename . '"',
+            'Access-Control-Allow-Origin' => '*',
         ]);
     }
 
