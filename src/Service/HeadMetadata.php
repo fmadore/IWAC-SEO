@@ -33,9 +33,17 @@ class HeadMetadata
 {
     private const DESCRIPTION_MAX = 160;
 
-    private ?string $defaultImageUrl = null;
+    /** X's limit on image alt text; Open Graph sets none. */
+    private const IMAGE_ALT_MAX = 420;
+
+    /** @var array{url:string,alt:?string}|null */
+    private ?array $defaultImage = null;
     private bool $defaultImageResolved = false;
 
+    /**
+     * @param ImageDimensions|null $imageDimensions null leaves og:image:width
+     *   and og:image:height out, as for any image whose size is unknown
+     */
     public function __construct(
         private readonly SettingsGate $settings,
         private readonly HeadWriter $head,
@@ -43,6 +51,7 @@ class HeadMetadata
         private readonly CitationMeta $citationMeta,
         private readonly Hreflang $hreflang,
         private readonly ZoteroRdf $zoteroRdf,
+        private readonly ?ImageDimensions $imageDimensions = null,
     ) {
     }
 
@@ -62,7 +71,6 @@ class HeadMetadata
         $description = $this->resourceDescription($resource, $site, ViewLocale::forCitation($view));
         $canonical = ResourceUrl::forSite($resource, $site->slug());
         $thumbnail = $this->resourceThumbnail($view, $resource);
-        $image = $thumbnail ?? $this->resolveDefaultImage($view);
 
         $this->head->openGraph($view, [
             'og:type'  => 'article',
@@ -76,8 +84,13 @@ class HeadMetadata
         if ($canonical !== null) {
             $this->head->canonical($view, $canonical);
         }
-        if ($image !== null) {
-            $this->head->image($view, $image);
+        // A picture of the record is described by its own alt text, else by
+        // the record's title. The site's share graphic stands in when it has
+        // none, and is described as itself, never as the record.
+        if ($thumbnail !== null) {
+            $this->shareImage($view, $thumbnail['url'], $thumbnail['alt'] ?? $title);
+        } else {
+            $this->defaultShareImage($view, $site);
         }
         $this->head->mark('og:title');
 
@@ -86,8 +99,8 @@ class HeadMetadata
                 $resource,
                 $site,
                 $canonical,
-                $thumbnail,
-                $thumbnail,
+                $thumbnail['url'] ?? null,
+                $thumbnail['url'] ?? null,
                 ViewLocale::forCitation($view)
             );
             if ($data !== null) {
@@ -168,10 +181,10 @@ class HeadMetadata
 
         $image = null;
         if (!empty($overrides['image'])) {
-            $image = $this->assetUrl($view, (int) $overrides['image']);
+            $image = $this->asset($view, (int) $overrides['image']);
         }
         if ($image !== null) {
-            $this->head->image($view, $image);
+            $this->shareImage($view, $image['url'], $image['alt'] ?? $title);
         }
 
         $this->head->openGraph($view, array_filter([
@@ -268,10 +281,7 @@ class HeadMetadata
             }
         }
         if (!$this->head->has('image')) {
-            $img = $this->resolveDefaultImage($view);
-            if ($img !== null) {
-                $this->head->image($view, $img);
-            }
+            $this->defaultShareImage($view, $site);
         }
         // Apply the shared URL policy to routes without resource/page metadata.
         // Filter variants receive noindex; tracking and pagination use the same
@@ -302,6 +312,10 @@ class HeadMetadata
             $url = $this->head->writtenCanonical() ?? UrlPolicy::publicUrl($view->serverUrl(true));
             $this->head->openGraph($view, ['og:url' => $url]);
         }
+        // Last, once every indexing directive above (page override, browse
+        // rule, staging switch) has had its say; the writer drops the hint on
+        // a noindex page whichever order they come in.
+        $this->head->largeImagePreview($view);
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
@@ -343,11 +357,19 @@ class HeadMetadata
      * a share card needs some picture. schema.org's thumbnailUrl claims to
      * depict the resource, so falling back there would tell Google the site
      * logo is a still from the video.
+     *
+     * Its alt text comes from wherever the picture does — the asset's, or the
+     * media's as Omeka resolves it for its own thumbnails (the media's alt
+     * text, else the property the installation names in
+     * `media_alt_text_property`) — so the share card describes the same
+     * picture the page shows.
+     *
+     * @return array{url:string,alt:?string}|null
      */
     private function resourceThumbnail(
         PhpRenderer $view,
         AbstractResourceEntityRepresentation $resource
-    ): ?string {
+    ): ?array {
         // An asset assigned to the resource itself comes first: it is the
         // editor's explicit choice of picture, and the one way to give a video
         // whose file yielded no still a thumbnail that is actually of it.
@@ -355,7 +377,7 @@ class HeadMetadata
         if ($asset !== null) {
             $url = (string) $asset->assetUrl();
             if ($url !== '') {
-                return $this->absolutize($view, $url);
+                return ['url' => $this->absolutize($view, $url), 'alt' => self::altText(static fn () => $asset->altText())];
             }
         }
 
@@ -373,11 +395,54 @@ class HeadMetadata
         if ($media instanceof MediaRepresentation && $media->isPublic() && $media->hasThumbnails()) {
             $thumb = $media->thumbnailUrl('large');
             if ($thumb) {
-                return $this->absolutize($view, $thumb);
+                return [
+                    'url' => $this->absolutize($view, $thumb),
+                    'alt' => self::altText(static fn () => $media->altTextResolved()),
+                ];
             }
         }
         // Item sets, and media without a thumbnail, simply have none.
         return null;
+    }
+
+    /**
+     * Alt text as Omeka holds it, or null when there is none. The fallback
+     * property can hand back a value representation rather than a string, and
+     * a lookup that fails costs the card its alt text, never the page.
+     *
+     * @param callable():mixed $read
+     */
+    private static function altText(callable $read): ?string
+    {
+        try {
+            $text = trim((string) $read());
+        } catch (\Throwable $e) {
+            return null;
+        }
+        return $text !== '' ? $text : null;
+    }
+
+    /** Write the share image, with its size when the file store knows it. */
+    private function shareImage(PhpRenderer $view, string $url, string $alt): void
+    {
+        $this->head->image(
+            $view,
+            $url,
+            Text::truncate($alt, self::IMAGE_ALT_MAX),
+            $this->imageDimensions?->of($url)
+        );
+    }
+
+    /**
+     * The site's default share graphic, if one is configured — described by
+     * its own alt text, else as the site it stands for.
+     */
+    private function defaultShareImage(PhpRenderer $view, SiteRepresentation $site): void
+    {
+        $image = $this->resolveDefaultImage($view);
+        if ($image !== null) {
+            $this->shareImage($view, $image['url'], $image['alt'] ?? (string) $site->title());
+        }
     }
 
     /**
@@ -392,30 +457,33 @@ class HeadMetadata
         return $view->serverUrl($url);
     }
 
-    private function resolveDefaultImage(PhpRenderer $view): ?string
+    /** @return array{url:string,alt:?string}|null */
+    private function resolveDefaultImage(PhpRenderer $view): ?array
     {
         if ($this->defaultImageResolved) {
-            return $this->defaultImageUrl;
+            return $this->defaultImage;
         }
         $this->defaultImageResolved = true;
         $assetId = $this->settings->int('iwac_seo_default_share_image');
         if ($assetId > 0) {
-            $this->defaultImageUrl = $this->assetUrl($view, $assetId);
+            $this->defaultImage = $this->asset($view, $assetId);
         }
-        return $this->defaultImageUrl;
+        return $this->defaultImage;
     }
 
-    private function assetUrl(PhpRenderer $view, int $assetId): ?string
+    /** @return array{url:string,alt:?string}|null */
+    private function asset(PhpRenderer $view, int $assetId): ?array
     {
         if ($assetId <= 0) {
             return null;
         }
         try {
             $asset = $view->api()->read('assets', $assetId)->getContent();
-            return $this->absolutize($view, $asset->assetUrl());
+            $url = $this->absolutize($view, (string) $asset->assetUrl());
         } catch (\Throwable $e) {
             return null;
         }
+        return $url !== '' ? ['url' => $url, 'alt' => self::altText(static fn () => $asset->altText())] : null;
     }
 
     private function truncate(string $text): string

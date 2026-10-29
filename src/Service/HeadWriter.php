@@ -32,6 +32,11 @@ final class HeadWriter
     /** The canonical as written, so the layout pass can mirror it to og:url. */
     private ?string $canonical = null;
 
+    /** The indexing directive as written, kept apart from the preview hint merged into it. */
+    private ?string $robots = null;
+
+    private bool $largeImagePreview = false;
+
     public function description(PhpRenderer $view, string $description): void
     {
         $view->headMeta()->setName('description', $description);
@@ -63,15 +68,34 @@ final class HeadWriter
         return $this->canonical;
     }
 
-    public function image(PhpRenderer $view, string $url): void
+    /**
+     * The share-card image, with what a card needs beside the URL: alt text
+     * for screen readers (Open Graph and X both carry one), and the pixel size
+     * when it is known, so a card can be laid out before the image arrives.
+     *
+     * @param array{0:int,1:int}|null $size width and height; omitted when unknown
+     */
+    public function image(PhpRenderer $view, string $url, ?string $alt = null, ?array $size = null): void
     {
-        $this->openGraph($view, ['og:image' => $url]);
+        $alt = $alt !== null && trim($alt) !== '' ? $alt : null;
+        // og:image's structured properties follow it, in one write.
+        $this->openGraph($view, [
+            'og:image'        => $url,
+            'og:image:width'  => $size !== null ? (string) $size[0] : null,
+            'og:image:height' => $size !== null ? (string) $size[1] : null,
+            'og:image:alt'    => $alt,
+        ]);
         $view->headMeta()->appendName('twitter:image', $url);
+        if ($alt !== null) {
+            $view->headMeta()->appendName('twitter:image:alt', $alt);
+        }
         $this->mark('image');
     }
 
     /**
-     * @param bool $force overwrite a robots value already set this request —
+     * The page's indexing directive ("noindex, follow", "index, follow" …).
+     *
+     * @param bool $force overwrite a directive already set this request —
      *   the site-wide staging noindex outranks any per-page directive.
      */
     public function robots(PhpRenderer $view, string $value, bool $force = false): void
@@ -79,8 +103,39 @@ final class HeadWriter
         if (!$force && $this->has('robots')) {
             return;
         }
-        $view->headMeta()->setName('robots', $value);
+        $this->robots = $value;
         $this->mark('robots');
+        $this->writeRobots($view);
+    }
+
+    /**
+     * Let search engines show the page's images at full width (Google's
+     * default in Search and Discover is a small thumbnail) — for a scan-heavy
+     * archive, the picture is the result.
+     *
+     * A hint, not a directive, so it merges with the page's indexing directive
+     * instead of competing with it: it is written into the same robots meta
+     * beside whatever robots() set, before or after this call, and dropped
+     * while that directive is noindex — a page kept out of the index has no
+     * preview to size. It does not count as a robots value having been set,
+     * so a later noindex still applies.
+     */
+    public function largeImagePreview(PhpRenderer $view): void
+    {
+        $this->largeImagePreview = true;
+        $this->writeRobots($view);
+    }
+
+    /** The robots meta for the directive and hint recorded so far; replaces any earlier one. */
+    private function writeRobots(PhpRenderer $view): void
+    {
+        $content = array_filter([
+            $this->robots,
+            $this->largeImagePreview && PageIndexability::allows($this->robots) ? 'max-image-preview:large' : null,
+        ], static fn (?string $part): bool => $part !== null && $part !== '');
+        if ($content !== []) {
+            $view->headMeta()->setName('robots', implode(', ', $content));
+        }
     }
 
     /** @param array<string,string|null> $tags og property => content */

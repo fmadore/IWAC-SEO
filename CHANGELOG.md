@@ -16,6 +16,8 @@ All notable changes to the IWAC SEO module. Versions follow
 - The release workflow tests the tag before building it: strict Composer validation, the translation-template check, PSR-12, PHPStan and PHPUnit on PHP 8.4, as CI does. It no longer builds a zip from a commit whose checks fail, which is how 1.0.3 shipped before CI went red.
 - Releases carry a SHA-256 checksum, `IwacSeo-<version>.zip.sha256`, beside the zip; the release notes say how to check it.
 - The configuration form warns when this module's JSON-LD is on and a public site still carries Omeka's own JSON-LD embed — the 2–4 MB block on authority records whose truncation Search Console reported in 1.0.1 — and names each such site, so a new site or a reset setting no longer reintroduces it unnoticed. The fix is still Omeka's per-site **Disable JSON-LD embed** box.
+- Share cards describe their picture: `og:image:alt` and `twitter:image:alt` carry the image's own alt text (the asset's, or the media's as Omeka resolves it, `media_alt_text_property` included), else the record's title; the site's default share graphic is described by its alt text or as the site, never as the record. `og:image:width` and `og:image:height` follow when the image is a file in Omeka's local store (read from its header, never fetched), so a preview can be laid out before the image loads.
+- Every indexable public page asks for `max-image-preview:large`, so Google may show its scan or cover at full width in Search and Discover rather than as a thumbnail. The hint shares the robots meta with the page's directive (`index, follow, max-image-preview:large`) and is dropped wherever the page is `noindex` — a static-page override, a filtered listing, or the staging switch.
 
 ## 1.3.0 — 2026-10-26
 

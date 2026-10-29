@@ -25,13 +25,13 @@ It is self-contained, with no third-party runtime Composer dependencies or theme
 | Area | Detail |
 |---|---|
 | **Meta tags** | `<title>`, `<meta name="description">`, canonical link on every public page. |
-| **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. |
+| **Open Graph / Twitter** | `og:title/description/image/type/url/site_name/locale` + `twitter:card/title/description/image/site` so shared links render a rich preview. Every indexable page also carries `robots: max-image-preview:large`, so Google may show its image at full width in Search and Discover rather than as a small thumbnail (dropped on `noindex` pages). |
 | **schema.org JSON-LD** | Per-resource structured data typed from the resource **class** (Person, Place, Organization, Event, NewsArticle, PublicationIssue, the scholarly reference types, VideoObject …), plus `WebSite` on the home page and `BreadcrumbList` on resource pages. |
 | **Citation metadata (Zotero)** | Highwire Press `citation_*` + Dublin Core `DC.*` `<meta>` tags so the **Zotero Connector**, Google Scholar, Mendeley and other reference managers capture each item as a properly-typed reference (newspaper article, magazine issue, journal article, book, chapter, thesis, report, blog post …). |
 | **unAPI (Zotero RDF)** | Primary-source items also advertise a `/unapi` endpoint serving **Zotero RDF**. Zotero prefers unAPI over the meta tags, so it imports a fuller record — the call number (*Cote*) from the `iwac-` identifier, single-field institutional creators, and Sujet + Couverture spatiale as tags. |
 | **Page citation tools** | A **"How to cite this page"** page block for static pages (online exhibits): the same panel and downloads (`/cite/page/{id}/{format}`), cited as a web page, with author, title and date set in the static-page table. See [Static-page citations](#static-page-citations--how-to-cite-this-page). |
 | **Item-page citation tools** | A **"How to cite"** resource page block — a formatted **Chicago / APA / MLA** reference (switchable, copy-to-clipboard) plus **BibTeX / RIS / CSL-JSON** downloads at `/cite/{id}/{format}` and the Zotero-RDF link for eligible kinds. Placed via the theme's *Configure resource pages* screen; the theme renders the UI (its `common/citation` partial) via the `iwacCitation` view helper, and this module owns the data. Replaces the BulkExport block for single-item exports. |
-| **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. |
+| **og:image** | The large thumbnail of the item's primary media (the page scan / cover); falls back to a site-wide default share image. With it, `og:image:alt` / `twitter:image:alt` — the picture's own alt text as Omeka resolves it, else the record's title (the default image is described as itself or as the site, never as the record) — and `og:image:width` / `og:image:height` when the file sits in Omeka's local store, read from its header so a card can be laid out before the image loads. |
 | **XML sitemap** | `/sitemap.xml` index → `/sitemap-pages.xml`, `/sitemap-item-sets.xml`, `/sitemap-items-{n}.xml` (5,000 items per file by default). Public resources only, with `<lastmod>`, `<changefreq>`, `<priority>`. Cached. |
 | **robots.txt** | `/robots.txt` disallowing `/admin`, the query variants of the search and browse pages (facets, filters, sorts — clean pagination stays crawlable; `iwac_seo.robots`), and pointing crawlers at the sitemap. The staging switch uses page-level `noindex`, which crawlers can fetch. |
 | **Google Search Console** | Paste the verification snippet in the module config; the `<meta name="google-site-verification">` tag is injected site-wide. |
@@ -518,6 +518,7 @@ IwacSeo/
 │   └── Service/
 │       ├── HeadMetadata.php          # decides every <head> SEO signal
 │       ├── HeadWriter.php            # writes them; tracks what the request has set
+│       ├── ImageDimensions.php       # share-image pixel size from the local file store
 │       ├── StructuredData.php        # schema.org JSON-LD (by resource class)
 │       ├── CitationKind.php          # the kind vocabulary + export type tables
 │       ├── CitationKindMap.php       # resource class id -> kind (one shared map)

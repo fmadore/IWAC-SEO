@@ -24,6 +24,7 @@ use Omeka\Api\Representation\AssetRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
 use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\ResourceClassRepresentation;
+use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
 use Omeka\Settings\Settings;
@@ -168,7 +169,11 @@ final class MetadataIntegrationTest extends TestCase
             'href="' . $search . '"',
             $this->decoded($view->headLink()->toString())
         );
-        self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
+        // No indexing directive; only the large-preview hint every indexable page carries.
+        self::assertStringContainsString(
+            'name="robots" content="max-image-preview:large"',
+            $this->decoded($view->headMeta()->toString())
+        );
     }
 
     public function testBrowseKeepsPaginationIndexableAndSelfCanonical(): void
@@ -206,7 +211,10 @@ final class MetadataIntegrationTest extends TestCase
         $headLink = $this->decoded($view->headLink()->toString());
         self::assertStringContainsString('href="' . self::CANONICAL . '"', $headLink);
         self::assertStringNotContainsString('page=380', $headLink);
-        self::assertStringNotContainsString('name="robots"', $this->decoded($view->headMeta()->toString()));
+        self::assertStringContainsString(
+            'name="robots" content="max-image-preview:large"',
+            $this->decoded($view->headMeta()->toString())
+        );
     }
 
     public function testEventIntervalBecomesStartDateAndEndDate(): void
@@ -636,6 +644,258 @@ final class MetadataIntegrationTest extends TestCase
         self::assertSame('DefinedTerm', $data['@type']);
         self::assertArrayNotHasKey('startDate', $data);
         self::assertArrayNotHasKey('location', $data);
+    }
+
+    public function testTheShareImageCarriesItsAltTextAndItsSize(): void
+    {
+        $files = $this->fileStore(['large/scan.jpg' => [1200, 800]]);
+        $media = $this->thumbnailMedia('https://example.test/files/large/scan.jpg', 'Front page of Fraternité Matin, 13 May 2025');
+        $view = $this->renderer();
+
+        $this->shareMetadata(new \IwacSeo\Service\ImageDimensions($files))
+            ->applyResource($view, $this->videoItem($media, null), $this->site());
+
+        $headMeta = $this->decoded($view->headMeta()->toString());
+        self::assertStringContainsString('property="og:image" content="https://example.test/files/large/scan.jpg"', $headMeta);
+        self::assertStringContainsString('property="og:image:width" content="1200"', $headMeta);
+        self::assertStringContainsString('property="og:image:height" content="800"', $headMeta);
+        self::assertStringContainsString('property="og:image:alt" content="Front page of Fraternité Matin, 13 May 2025"', $headMeta);
+        self::assertStringContainsString('name="twitter:image:alt" content="Front page of Fraternité Matin, 13 May 2025"', $headMeta);
+        // The structured properties follow og:image, as Open Graph orders them.
+        self::assertLessThan(strpos($headMeta, 'og:image:width'), strpos($headMeta, 'property="og:image"'));
+    }
+
+    public function testAPictureWithNoAltTextIsDescribedByTheRecordTitle(): void
+    {
+        $media = $this->thumbnailMedia('https://example.test/files/large/scan.jpg', null);
+        $view = $this->renderer();
+
+        // No file store: the size is unknown, and so left out, not guessed.
+        $this->shareMetadata()->applyResource($view, $this->videoItem($media, null), $this->site());
+
+        $headMeta = $this->decoded($view->headMeta()->toString());
+        self::assertStringContainsString('property="og:image:alt" content="A tape"', $headMeta);
+        self::assertStringContainsString('name="twitter:image:alt" content="A tape"', $headMeta);
+        self::assertStringNotContainsString('og:image:width', $headMeta);
+        self::assertStringNotContainsString('og:image:height', $headMeta);
+    }
+
+    /** The site's share graphic stands in for a record with no picture; it is not a picture of the record. */
+    public function testTheSiteShareGraphicIsDescribedAsItselfNotAsTheRecord(): void
+    {
+        $files = $this->fileStore(['asset/logo.png' => [1200, 630]]);
+        $view = $this->renderer();
+        $this->withAssets($view, [7 => ['https://example.test/files/asset/logo.png', null]]);
+        $metadata = $this->shareMetadata(new \IwacSeo\Service\ImageDimensions($files), ['iwac_seo_default_share_image' => '7']);
+
+        $metadata->applyResource($view, $this->videoItem(null, null), $this->site());
+
+        $headMeta = $this->decoded($view->headMeta()->toString());
+        self::assertStringContainsString('property="og:image" content="https://example.test/files/asset/logo.png"', $headMeta);
+        self::assertStringContainsString('property="og:image:width" content="1200"', $headMeta);
+        self::assertStringContainsString('property="og:image:alt" content="Collection Islam Afrique de l\'Ouest"', $headMeta);
+        self::assertStringNotContainsString('A tape', $this->imageTags($headMeta));
+    }
+
+    public function testAnAssetsOwnAltTextDescribesIt(): void
+    {
+        $view = $this->renderer();
+        $this->withAssets($view, [7 => ['https://example.test/files/asset/logo.png', 'The IWAC logo: a lamp over a map of West Africa']]);
+
+        $this->shareMetadata(null, ['iwac_seo_default_share_image' => '7'])->applyGlobals($view, $this->site());
+
+        self::assertStringContainsString(
+            'property="og:image:alt" content="The IWAC logo: a lamp over a map of West Africa"',
+            $this->decoded($view->headMeta()->toString())
+        );
+    }
+
+    public function testLargeImagePreviewJoinsAnIndexDirective(): void
+    {
+        $view = $this->renderer();
+        $metadata = $this->shareMetadata();
+
+        $metadata->applyPage($view, $this->page(), $this->site(), ['robots' => 'index, follow'], false);
+        $metadata->applyGlobals($view, $this->site());
+
+        self::assertSame(['index, follow, max-image-preview:large'], $this->robots($view));
+    }
+
+    /** @return array<string,array{0:array<string,string>,1:array<string,mixed>,2:string}> */
+    public static function noindexSources(): array
+    {
+        return [
+            'page override' => [['robots' => 'noindex, follow'], [], 'https://example.test/s/afrique_ouest/page/about'],
+            'staging switch' => [[], ['iwac_seo_noindex_site' => '1'], 'https://example.test/s/afrique_ouest/page/about'],
+            'filtered variant' => [[], ['iwac_seo_noindex_browse' => '1'], 'https://example.test/s/afrique_ouest/search?q=tabaski'],
+        ];
+    }
+
+    /**
+     * @param array<string,string> $overrides
+     * @param array<string,mixed> $settings
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('noindexSources')]
+    public function testANoindexPageCarriesNoPreviewHint(array $overrides, array $settings, string $url): void
+    {
+        $view = $this->renderer($url);
+        $metadata = $this->shareMetadata(null, $settings);
+
+        if ($overrides !== []) {
+            $metadata->applyPage($view, $this->page(), $this->site(), $overrides, false);
+        }
+        $metadata->applyGlobals($view, $this->site());
+
+        $robots = $this->robots($view);
+        self::assertCount(1, $robots);
+        self::assertStringStartsWith('noindex', $robots[0]);
+        self::assertStringNotContainsString('max-image-preview', $robots[0]);
+    }
+
+    /** Merged, not competing: a noindex written after the hint still wins, and replaces the tag. */
+    public function testTheHintNeverBlocksALaterNoindex(): void
+    {
+        $view = $this->renderer();
+        $writer = new HeadWriter();
+
+        $writer->largeImagePreview($view);
+        self::assertSame(['max-image-preview:large'], $this->robots($view));
+
+        $writer->robots($view, 'noindex, follow');
+        self::assertSame(['noindex, follow'], $this->robots($view));
+
+        $writer->robots($view, 'noindex, nofollow', true);
+        self::assertSame(['noindex, nofollow'], $this->robots($view));
+    }
+
+    /** @return string[] the content of every robots meta tag */
+    private function robots(PhpRenderer $view): array
+    {
+        preg_match_all('/<meta name="robots" content="([^"]*)"/', $this->decoded($view->headMeta()->toString()), $m);
+        return $m[1];
+    }
+
+    /** Only the image-related tags, so a test can ask what they say without the title tags in the way. */
+    private function imageTags(string $headMeta): string
+    {
+        return implode("\n", preg_grep('/image/', explode("\n", $headMeta)) ?: []);
+    }
+
+    /**
+     * A throwaway local file store holding image headers of the given sizes —
+     * enough for getimagesize(), which reads no further.
+     *
+     * @param array<string,array{0:int,1:int}> $files path under files/ => [width, height]
+     */
+    private function fileStore(array $files): string
+    {
+        $root = sys_get_temp_dir() . '/iwac-seo-files-' . bin2hex(random_bytes(4));
+        foreach ($files as $path => [$width, $height]) {
+            $file = $root . '/' . $path;
+            @mkdir(dirname($file), 0777, true);
+            file_put_contents($file, "\x89PNG\r\n\x1a\n" . pack('N', 13) . 'IHDR' . pack('NN', $width, $height) . "\x08\x02\x00\x00\x00" . pack('N', 0));
+        }
+        $this->tempFiles[] = $root;
+        return $root;
+    }
+
+    /** @var string[] */
+    private array $tempFiles = [];
+
+    protected function tearDown(): void
+    {
+        foreach ($this->tempFiles as $root) {
+            $files = new \RecursiveIteratorIterator(
+                new \RecursiveDirectoryIterator($root, \FilesystemIterator::SKIP_DOTS),
+                \RecursiveIteratorIterator::CHILD_FIRST
+            );
+            foreach ($files as $file) {
+                $file->isDir() ? rmdir($file->getPathname()) : unlink($file->getPathname());
+            }
+            rmdir($root);
+        }
+    }
+
+    /** @return MediaRepresentation&\PHPUnit\Framework\MockObject\Stub a public media with a large derivative */
+    private function thumbnailMedia(string $large, ?string $alt): MediaRepresentation
+    {
+        $media = $this->createStub(MediaRepresentation::class);
+        $media->method('hasThumbnails')->willReturn(true);
+        $media->method('thumbnailUrl')->willReturn($large);
+        $media->method('isPublic')->willReturn(true);
+        $media->method('mediaType')->willReturn('image/jpeg');
+        $media->method('originalUrl')->willReturn(str_replace('/large/', '/original/', $large));
+        $media->method('altTextResolved')->willReturn($alt);
+        return $media;
+    }
+
+    /**
+     * Answer `$view->api()->read('assets', $id)` from a fixed table.
+     *
+     * @param array<int,array{0:string,1:?string}> $assets id => [url, alt text]
+     */
+    private function withAssets(PhpRenderer $view, array $assets): void
+    {
+        $mocks = [];
+        foreach ($assets as $id => [$url, $alt]) {
+            $asset = $this->createStub(AssetRepresentation::class);
+            $asset->method('assetUrl')->willReturn($url);
+            $asset->method('altText')->willReturn($alt);
+            $mocks[$id] = $asset;
+        }
+        $view->getHelperPluginManager()->setService('api', static fn () => new class ($mocks) {
+            /** @param array<int,AssetRepresentation> $assets */
+            public function __construct(private array $assets)
+            {
+            }
+
+            public function read(string $resource, int $id): object
+            {
+                return new class ($this->assets[$id]) {
+                    public function __construct(private object $content)
+                    {
+                    }
+
+                    public function getContent(): object
+                    {
+                        return $this->content;
+                    }
+                };
+            }
+        });
+    }
+
+    /** @return SitePageRepresentation&\PHPUnit\Framework\MockObject\Stub */
+    private function page(): SitePageRepresentation
+    {
+        $page = $this->createStub(SitePageRepresentation::class);
+        $page->method('id')->willReturn(12);
+        $page->method('title')->willReturn('About the collection');
+        $page->method('siteUrl')->willReturn('https://example.test/s/afrique_ouest/page/about');
+        return $page;
+    }
+
+    /**
+     * The head pipeline with JSON-LD and citations off, for the share-card
+     * and robots tests.
+     *
+     * @param array<string,mixed> $settings
+     */
+    private function shareMetadata(?\IwacSeo\Service\ImageDimensions $dimensions = null, array $settings = []): HeadMetadata
+    {
+        return new HeadMetadata(
+            new SettingsGate($this->settings($settings + [
+                'iwac_seo_jsonld_enabled' => '0',
+                'iwac_seo_citation_meta' => '0',
+                'iwac_seo_unapi' => '0',
+            ])),
+            new HeadWriter(),
+            $this->structuredData(),
+            new CitationMeta($this->kinds),
+            new Hreflang(['enabled' => false]),
+            new ZoteroRdf($this->kinds, new CitationData($this->kinds)),
+            $dimensions,
+        );
     }
 
     private function structuredData(): StructuredData
