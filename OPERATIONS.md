@@ -33,6 +33,16 @@ it. A URL Google indexed before the rule appeared keeps its entry until it drops
 Search Console lists such URLs as "Indexed, though blocked by robots.txt", remove the rule
 for that pattern until their `noindex` has been seen, then restore it.
 
+## Omeka's own JSON-LD embed
+
+Omeka S core writes each resource's whole API representation into every public show
+and browse page — 2–4 MB on an authority record, which Search Console truncates and
+reports as unparsable structured data — unless the site's **Settings → General →
+Disable JSON-LD embed** box is ticked. Both IWAC sites have it ticked since 2026-08-31,
+but a new site starts without it, so the module's configuration form opens with a
+warning naming every public site that still embeds while the module's own JSON-LD is
+on. Tick the box on each site it names; the data stays at `/api/items/{id}`.
+
 ## Sitemap and queue
 
 The index includes the other configured public language site's page sitemap, including
