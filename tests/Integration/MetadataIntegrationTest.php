@@ -646,6 +646,85 @@ final class MetadataIntegrationTest extends TestCase
         self::assertArrayNotHasKey('location', $data);
     }
 
+    public function testALanguageRecordGivesItsCode(): void
+    {
+        $tags = \IwacSeo\Service\LanguageCode::of($this->resource(36, ['dcterms:language' => [
+            $this->languageValue('Français', 'fr'),
+            $this->languageValue('Dendi', 'ddn'),
+            // Mooré's record holds an unaccented name where the code belongs,
+            // and Spanish's holds nothing: both are known by name.
+            $this->languageValue('Mooré', 'Moore'),
+            $this->languageValue('Espagnol', null),
+            $this->languageValue('Français', 'fr'),
+        ]]));
+
+        self::assertSame(['fr', 'ddn', 'mos', 'es'], $tags);
+    }
+
+    public function testALanguageWithNoCodeOrKnownNameYieldsNoTag(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(36, ['dcterms:language' => [$this->languageValue('Fulfulde', null)]]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        // Before, the name itself went into inLanguage, which wants a BCP 47 tag.
+        self::assertArrayNotHasKey('inLanguage', $data);
+    }
+
+    public function testAPrivateLanguageIsNotPublished(): void
+    {
+        self::assertSame([], \IwacSeo\Service\LanguageCode::of($this->resource(36, ['dcterms:language' => [
+            $this->languageValue('Haoussa', 'ha', false),
+        ]])));
+    }
+
+    public function testInLanguageNamesEveryLanguageTheRecordIsIn(): void
+    {
+        $single = $this->structuredData()->forResource(
+            $this->resource(36, ['dcterms:language' => [$this->languageValue('Mooré', 'Moore')]]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+        $bilingual = $this->structuredData()->forResource(
+            $this->resource(36, ['dcterms:language' => [
+                $this->languageValue('Français', 'fr'),
+                $this->languageValue('Arabe', 'ar'),
+            ]]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('mos', $single['inLanguage']);
+        self::assertSame(['fr', 'ar'], $bilingual['inLanguage']);
+    }
+
+    /** Zotero files its Language field, and CSL reads its language, as a tag. */
+    public function testCitationsCarryTheLanguageTag(): void
+    {
+        $item = $this->resource(36, [
+            'dcterms:title' => 'Un article',
+            'dcterms:date' => '2001-02-03',
+            'dcterms:language' => [$this->languageValue('Kabyè', 'Kabiye')],
+        ]);
+        $view = $this->renderer();
+
+        (new CitationMeta($this->kinds))->apply($view, $item, 36, self::CANONICAL);
+        $record = (new CitationData($this->kinds))->build($item, self::CANONICAL);
+        $rdf = (new ZoteroRdf($this->kinds, new CitationData($this->kinds)))->render($item, self::CANONICAL);
+
+        $headMeta = $this->decoded($view->headMeta()->toString());
+        self::assertStringContainsString('name="citation_language" content="kbp"', $headMeta);
+        self::assertStringContainsString('name="DC.language" content="kbp"', $headMeta);
+        self::assertNotNull($record);
+        self::assertSame('kbp', $record->language);
+        self::assertStringContainsString('<dc:language>kbp</dc:language>', (string) $rdf);
+    }
+
     public function testARightsStatementIsTheLicence(): void
     {
         // IWAC's dcterms:rights values are RightsStatements.org statements:
@@ -1388,6 +1467,32 @@ final class MetadataIntegrationTest extends TestCase
         $value->method('__toString')->willReturn($title);
         $value->method('valueResource')->willReturn($linked);
         $value->method('uri')->willReturn(null);
+        return $value;
+    }
+
+    /**
+     * A dcterms:language value linking a language record shaped like IWAC's:
+     * titled in French, with what passes for its code in dcterms:alternative.
+     *
+     * @return ValueRepresentation&\PHPUnit\Framework\MockObject\Stub
+     */
+    private function languageValue(string $title, ?string $alternative, bool $public = true): ValueRepresentation
+    {
+        $alternatives = $alternative !== null ? [$this->value($alternative)] : [];
+        $record = $this->createStub(ItemRepresentation::class);
+        $record->method('isPublic')->willReturn(true);
+        $record->method('displayTitle')->willReturn($title);
+        $record->method('value')->willReturnCallback(
+            static function (string $term, array $options = []) use ($alternatives) {
+                $matches = $term === 'dcterms:alternative' ? $alternatives : [];
+                return !empty($options['all']) ? $matches : ($matches[0] ?? null);
+            }
+        );
+
+        $value = $this->createStub(ValueRepresentation::class);
+        $value->method('isPublic')->willReturn($public);
+        $value->method('__toString')->willReturn($title);
+        $value->method('valueResource')->willReturn($record);
         return $value;
     }
 

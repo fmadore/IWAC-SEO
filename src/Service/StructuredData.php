@@ -241,9 +241,12 @@ class StructuredData
             $data['datePublished'] = $issued->iso();
         }
 
+        // inLanguage takes BCP 47 tags, one per language the record is in; the
+        // name stays for the composed video description below.
         $language = $this->firstLabel($resource, 'dcterms:language');
-        if ($language !== null) {
-            $data['inLanguage'] = MetadataValue::language($language);
+        $languages = LanguageCode::of($resource);
+        if ($languages) {
+            $data['inLanguage'] = count($languages) === 1 ? $languages[0] : $languages;
         }
         if (in_array($type, ['NewsArticle', 'ScholarlyArticle', 'BlogPosting'], true)) {
             $data['headline'] = (string) $resource->displayTitle();

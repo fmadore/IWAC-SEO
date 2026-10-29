@@ -96,7 +96,7 @@ final class CitationData
             pageLast: $this->firstString($item, ['bibo:pageEnd']),
             doi: $this->doi($item),
             url: ($url !== null && $url !== '') ? $url : null,
-            language: MetadataValue::language($this->firstLabel($item, 'dcterms:language')),
+            language: LanguageCode::of($item)[0] ?? $this->firstLabel($item, 'dcterms:language'),
             abstract: $abstract !== null ? $this->clip($abstract) : null,
             keywords: $this->keywords($item),
             accession: $accession,

@@ -99,16 +99,6 @@ final class MetadataValue
             ? $url : null;
     }
 
-    public static function language(?string $label): ?string
-    {
-        return match (mb_strtolower($label ?? '')) {
-            'français', 'french' => 'fr', 'anglais', 'english' => 'en',
-            'arabe', 'arabic' => 'ar', 'haoussa', 'hausa' => 'ha',
-            'allemand', 'german' => 'de', 'portugais', 'portuguese' => 'pt',
-            default => $label,
-        };
-    }
-
     public static function isAudio(AbstractResourceEntityRepresentation $resource): bool
     {
         $type = self::select($resource, ['dcterms:type', 'dcterms:format']) ?? '';

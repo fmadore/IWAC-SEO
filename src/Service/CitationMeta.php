@@ -119,7 +119,7 @@ class CitationMeta
         }
 
         $this->single($headMeta, 'citation_publication_date', $this->scholarDate($shared['date']));
-        $this->single($headMeta, 'citation_language', $this->firstLabel($resource, 'dcterms:language'));
+        $this->single($headMeta, 'citation_language', $this->language($resource));
         $this->single($headMeta, 'citation_doi', $this->doi($resource));
 
         if ($shared['keywords']) {
@@ -209,7 +209,7 @@ class CitationMeta
         $this->single($headMeta, 'DC.date', $shared['date']);
         $this->single($headMeta, 'DC.publisher', $this->firstLabel($resource, 'dcterms:publisher'));
         $this->single($headMeta, 'DC.type', ResourceUrl::classLabel($resource));
-        $this->single($headMeta, 'DC.language', $this->firstLabel($resource, 'dcterms:language'));
+        $this->single($headMeta, 'DC.language', $this->language($resource));
 
         // DC.identifier is the resource's own (canonical) URL. The DOI is
         // conveyed solely through citation_doi → Zotero's DOI field; emitting it
@@ -269,6 +269,16 @@ class CitationMeta
             return $raw;
         }
         return implode('/', array_filter([$date->year, $date->month, $date->day], static fn ($part) => $part !== null));
+    }
+
+    /**
+     * The record's first language as a BCP 47 tag — the form Zotero files in
+     * its Language field and citation styles read — else its name, which is
+     * what both tags carried before ({@see LanguageCode}).
+     */
+    private function language(AbstractResourceEntityRepresentation $resource): ?string
+    {
+        return LanguageCode::of($resource)[0] ?? $this->firstLabel($resource, 'dcterms:language');
     }
 
     private function single(\Laminas\View\Helper\HeadMeta $headMeta, string $name, ?string $content): void

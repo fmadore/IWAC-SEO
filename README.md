@@ -278,6 +278,15 @@ Creative works also carry `author`/`editor`/`contributor` (from `bibo:authorList
 when present. Every record carries `sameAs` from its `dcterms:identifier` **URI** values
 (Wikidata, GeoNames, VIAF …) — opaque internal ids like `iwac-article-0000001` are skipped.
 
+`inLanguage` lists every language the record is in, as BCP 47 tags. `dcterms:language` links
+one of the archive's twelve language records, which keep the ISO 639-1 code in
+`dcterms:alternative` (`fr`, `ha`; Dendi its ISO 639-3 `ddn`); Mooré, Kabyè and Spanish hold no
+usable code there and are known by name (`mos`, `kbp`, `es`). A language that resolves to no tag
+is left out rather than emitted as its name. The same tag (`LanguageCode`) fills
+`citation_language`, `DC.language`, Zotero RDF's `dc:language` and the exports' language — the
+form Zotero files in its Language field and citation styles read — with the name as the
+fallback there.
+
 `license` is the record's rights statement. IWAC states rights in `dcterms:rights` with the
 RightsStatements module's data type, whose URI is the statement itself
 (`http://rightsstatements.org/vocab/InC-EDU/1.0/`), and that URI is emitted as it is stored —
@@ -537,6 +546,7 @@ IwacSeo/
 │       ├── ImageDimensions.php       # share-image pixel size from the local file store
 │       ├── StructuredData.php        # schema.org JSON-LD (by resource class)
 │       ├── Licence.php               # a record's licence / rights statement, resolved once
+│       ├── LanguageCode.php          # BCP 47 tags from the language records
 │       ├── CitationKind.php          # the kind vocabulary + export type tables
 │       ├── CitationKindMap.php       # resource class id -> kind (one shared map)
 │       ├── CitationMeta.php          # Highwire + Dublin Core citation tags

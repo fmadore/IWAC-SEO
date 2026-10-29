@@ -119,7 +119,7 @@ class ZoteroRdf
         }
 
         $props[] = $this->el('dc:date', $record->issued->iso() ?? $record->issued->literal);
-        $props[] = $this->el('dc:language', MetadataValue::select($item, ['dcterms:language']));
+        $props[] = $this->el('dc:language', $record->language);
 
         // Only the periodical kinds carry a container (publication) + issue/pages.
         if (in_array($kind, [CitationKind::Newspaper, CitationKind::Magazine, CitationKind::PeriodicalIssue], true)) {

@@ -26,6 +26,7 @@ final class CitationExport
      */
     private const BIBLATEX_LANGUAGES = [
         'fr' => 'french', 'en' => 'english', 'de' => 'ngerman', 'ar' => 'arabic', 'pt' => 'portuguese',
+        'it' => 'italian', 'es' => 'spanish', 'sl' => 'slovene',
     ];
 
     /** Format id => [extension, MIME type]. */
