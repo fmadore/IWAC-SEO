@@ -7,38 +7,44 @@ section before changing behaviour. This file is only the things that bite.
 
 ## The whole suite runs locally
 
-`php` and `composer` are both available, `vendor/` is installed, and **every
-check CI runs can be run here** — including PSR-12 and the real-Omeka
-integration suite, which earlier revisions of this file said could not be.
+`vendor/` is installed and **every check CI runs can be run here** — including
+PSR-12 and the real-Omeka integration suite. Three things on this machine make
+the obvious commands fail:
+
+- `php` on PATH is **PHP 8.5** (winget `PHP.PHP.8.5_…`), but `composer` /
+  `composer.bat` still forwards to the old PHP 8.2 install, and its `@php`
+  scripts then fail the 8.4 platform check. Run the phar with the PHP on PATH;
+  the phar itself does not care which.
+- `composer test` (and so `composer check`) calls `phpunit`, which has no
+  `.bat` shim in `vendor/bin` — Composer writes those only for the packages it
+  installed on Windows (here phpcs and phpcbf). Run `php vendor/bin/phpunit`.
+- The integration suite needs `OMEKA_PATH` (below).
 
 ```bash
-composer check            # i18n:check + lint + analyse + test, what CI's two jobs cover
-composer test:integration # needs OMEKA_PATH; see below
+C=C:/Users/frede/AppData/Local/Microsoft/WinGet/Packages/PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe/composer.phar
+php $C i18n:check && php $C lint && php $C analyse   # composer check, bar the tests
+php vendor/bin/phpunit
+OMEKA_PATH=C:/Users/frede/GitHub/IWAC-SEO/.integration/omeka-s \
+  php tests/Integration/run.php --configuration phpunit.integration.xml.dist
 ```
 
-Both are on PATH in any newly started shell: PHP 8.2.33 lives in the winget
-package directory (`$LOCALAPPDATA/Microsoft/WinGet/Packages/PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe`,
-added to the user PATH by the install), and `composer` is a one-line `.bat` in
-`$LOCALAPPDATA/Microsoft/WindowsApps` forwarding to the `composer.phar` beside
-`php.exe`. A shell started *before* the install will not see either — that
-looks exactly like "PHP is not installed", so open a new one before concluding
-anything.
-
-The `php.ini` was written from `php.ini-development`, and three settings in it
-are load-bearing. If a tool fails oddly, check these before anything else:
+A shell started before an install will not see the new PHP — that looks
+exactly like "PHP is not installed", so open a new one before concluding
+anything. `php --ini` names the ini in use. Three of its settings are
+load-bearing; if a tool fails oddly, check these first:
 
 - `extension_dir` uncommented, plus `mbstring`, `openssl`, `curl`, `zip`,
   `fileinfo`, `intl`, `sqlite3`, `pdo_sqlite` and `pdo_mysql` (Omeka's own
   `composer install` refuses to resolve without the last one).
 - `memory_limit = 1G`. PHPStan's parallel workers OOM at the stock 128M and
   report it as a crash, not as an analysis failure.
-- `curl.cainfo` / `openssl.cafile` pointing at a downloaded `cacert.pem`.
-  Without them `composer hreflang:check` cannot verify islam.zmo.de's
-  certificate and dies on a TLS error that looks like a site outage.
+- `curl.cainfo` / `openssl.cafile` pointing at a `cacert.pem` (one sits beside
+  the 8.2 `php.exe`). The 8.5 ini sets neither; without them
+  `composer hreflang:check` cannot verify islam.zmo.de's certificate and dies
+  on a TLS error that looks like a site outage.
 
-`vendor/bin` needs the Windows `.bat` shims, and Composer only writes those
-when `composer install` runs *on Windows*. A `vendor/` restored from elsewhere
-gives `'phpcs' is not recognised`; delete it and reinstall.
+If PHPStan reports a permission error on its result cache in `%TEMP%`, another
+project's run is sharing it: run it again.
 
 `tests/Integration` needs `OMEKA_PATH` set to a real Omeka S tree. A v4.2.1
 checkout lives in the gitignored `.integration/omeka-s` — the same path CI's
@@ -64,8 +70,7 @@ only). Composer downloads are cached in both jobs. The `quality` checks carry
 revealing them a re-run at a time.
 
 A local run is now a genuine gate rather than a rehearsal, but it is one PHP
-version. CI is what covers the 8.4 floor and production 8.5, and it boots Omeka on
-8.5 where the local integration tree runs 8.2. Watch it before tagging: a tag
+version: 8.5, as in production. CI is what covers the 8.4 floor. Watch it before tagging: a tag
 is not retractable. The release workflow now runs the `quality` gates and
 PHPUnit on the tag before it builds the zip (and publishes a `.sha256` beside
 it), but only at the 8.4 floor and without the integration suite — it is a last
