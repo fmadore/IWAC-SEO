@@ -18,6 +18,7 @@ final class HeadMetadataFactory implements FactoryInterface
             $container->get(Hreflang::class),
             $container->get(ZoteroRdf::class),
             $container->get(ImageDimensions::class),
+            $container->get(Signposting::class),
         );
     }
 }

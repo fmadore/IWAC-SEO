@@ -60,10 +60,7 @@ class StructuredData
         ?string $thumbnail = null,
         string $locale = 'en'
     ): ?array {
-        $type = $this->classTypes[ResourceUrl::classId($resource)] ?? $this->defaultType;
-        if ($type === 'VideoObject' && MetadataValue::isAudio($resource)) {
-            $type = 'AudioObject';
-        }
+        $type = $this->typeFor($resource);
 
         $data = [
             '@context' => 'https://schema.org',
@@ -85,7 +82,7 @@ class StructuredData
             $data['description'] = $description;
         }
 
-        $sameAs = $this->sameAs($resource);
+        $sameAs = $this->sameAsFor($resource);
         if ($sameAs) {
             $data['sameAs'] = $sameAs;
         }
@@ -97,6 +94,17 @@ class StructuredData
         }
 
         return $data;
+    }
+
+    /**
+     * The schema.org @type the resource is published as: its class's, with a
+     * sound recording in the audiovisual class as an AudioObject.
+     */
+    public function typeFor(AbstractResourceEntityRepresentation $resource): string
+    {
+        $classId = ResourceUrl::classId($resource);
+        $type = ($classId !== null ? $this->classTypes[$classId] ?? null : null) ?? $this->defaultType;
+        return $type === 'VideoObject' && MetadataValue::isAudio($resource) ? 'AudioObject' : $type;
     }
 
     /** @return array<mixed>|null */
@@ -667,10 +675,12 @@ class StructuredData
      * dcterms:identifier as URI values (Wikidata, GeoNames, VIAF …). The same
      * property also holds opaque internal ids ("iwac-article-0000001") as plain
      * literals, so only URI-typed (or http-looking) values are emitted.
+     * Public, because a Signposting `author` link names a person by the same
+     * authority URIs.
      *
      * @return string[]
      */
-    private function sameAs(AbstractResourceEntityRepresentation $resource): array
+    public function sameAsFor(AbstractResourceEntityRepresentation $resource): array
     {
         $out = [];
         foreach ($resource->value('dcterms:identifier', ['all' => true]) as $value) {

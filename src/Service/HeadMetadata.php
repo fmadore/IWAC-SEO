@@ -6,6 +6,7 @@ namespace IwacSeo\Service;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
+use Omeka\Api\Representation\ItemSetRepresentation;
 use Omeka\Api\Representation\MediaRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
@@ -43,6 +44,7 @@ class HeadMetadata
     /**
      * @param ImageDimensions|null $imageDimensions null leaves og:image:width
      *   and og:image:height out, as for any image whose size is unknown
+     * @param Signposting|null $signposting null emits no FAIR Signposting links
      */
     public function __construct(
         private readonly SettingsGate $settings,
@@ -52,6 +54,7 @@ class HeadMetadata
         private readonly Hreflang $hreflang,
         private readonly ZoteroRdf $zoteroRdf,
         private readonly ?ImageDimensions $imageDimensions = null,
+        private readonly ?Signposting $signposting = null,
     ) {
     }
 
@@ -118,6 +121,12 @@ class HeadMetadata
             $this->citationMeta->apply($view, $resource, ResourceUrl::classId($resource), $canonical);
         }
 
+        // FAIR Signposting: the same record pointed out to machines — what to
+        // cite, its citation downloads, its type, authors, licence and files.
+        if ($canonical !== null) {
+            $this->signpost($view, $resource, $canonical, $site);
+        }
+
         // Bilingual: link this item to its counterpart on the other-language
         // site (the same o:id, different site slug).
         $this->alternates($view, $this->hreflang->forResource($resource));
@@ -145,6 +154,17 @@ class HeadMetadata
             );
         }
         return null;
+    }
+
+    /**
+     * The Signposting links the page emitted, for the Module to repeat as an
+     * HTTP `Link` header. Empty on any page that is not a record's.
+     *
+     * @return array<int,array{rel:string,href:string,type?:string}>
+     */
+    public function signposts(): array
+    {
+        return $this->head->writtenSignposts();
     }
 
     // ─── Phase 1: static site pages ─────────────────────────────────────────
@@ -210,7 +230,11 @@ class HeadMetadata
 
     // ─── Phase 1: browse / search listing pages ─────────────────────────────
 
-    public function applyBrowse(PhpRenderer $view, SiteRepresentation $site): void
+    /**
+     * @param ItemSetRepresentation|null $itemSet the item set whose page this
+     *   is: Omeka renders /item-set/{id} as a browse of its items
+     */
+    public function applyBrowse(PhpRenderer $view, SiteRepresentation $site, ?ItemSetRepresentation $itemSet = null): void
     {
         // Self-referential canonical (full current URL) keeps facet/sort
         // variants from looking like duplicate content while staying safe for
@@ -224,6 +248,12 @@ class HeadMetadata
         // marking them noindex made Search Console reject that sitemap.
         if ($this->isVariant($current) && $this->settings->isOn('iwac_seo_noindex_browse')) {
             $this->head->robots($view, 'noindex, follow');
+        }
+
+        // An item set's landing page is the set's own page, signposted like a
+        // record — on its clean URL only, not on a filtered or later page.
+        if ($itemSet !== null && Text::withoutQuery($current) === $current) {
+            $this->signpost($view, $itemSet, $current, $site);
         }
     }
 
@@ -319,6 +349,23 @@ class HeadMetadata
     }
 
     // ─── Helpers ────────────────────────────────────────────────────────────
+
+    /** Write the record's Signposting links, kept for the HTTP Link header too. */
+    private function signpost(
+        PhpRenderer $view,
+        AbstractResourceEntityRepresentation $resource,
+        string $canonical,
+        SiteRepresentation $site
+    ): void {
+        if ($this->signposting === null) {
+            return;
+        }
+        $origin = UrlPolicy::publicUrl($view->serverUrl('/'));
+        $this->head->signposts(
+            $view,
+            $this->signposting->links($resource, $canonical, $site->slug(), $origin)
+        );
+    }
 
     private function resourceDescription(
         AbstractResourceEntityRepresentation $resource,

@@ -37,6 +37,9 @@ final class HeadWriter
 
     private bool $largeImagePreview = false;
 
+    /** @var array<int,array{rel:string,href:string,type?:string}> The Signposting links, for the Link header. */
+    private array $signposts = [];
+
     public function description(PhpRenderer $view, string $description): void
     {
         $view->headMeta()->setName('description', $description);
@@ -205,6 +208,36 @@ final class HeadWriter
         if ($xDefaultHref !== null) {
             $view->headLink(['rel' => 'alternate', 'hreflang' => 'x-default', 'href' => $xDefaultHref]);
         }
+    }
+
+    /**
+     * The page's FAIR Signposting links, as `<link>` elements, kept for the
+     * Module to repeat as an HTTP `Link` header once the page is rendered.
+     * A page signposts one record: the first to be written, as resource
+     * values win over later ones.
+     *
+     * @param array<int,array{rel:string,href:string,type?:string}> $links
+     */
+    public function signposts(PhpRenderer $view, array $links): void
+    {
+        if ($this->signposts !== []) {
+            return;
+        }
+        foreach ($links as $link) {
+            $view->headLink($link);
+        }
+        $this->signposts = $links;
+    }
+
+    /**
+     * The Signposting links written this request; empty on a page that has
+     * none (a static page, a listing).
+     *
+     * @return array<int,array{rel:string,href:string,type?:string}>
+     */
+    public function writtenSignposts(): array
+    {
+        return $this->signposts;
     }
 
     /** Replace the title stack with a single segment (an editor's override). */

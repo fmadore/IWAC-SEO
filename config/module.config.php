@@ -40,6 +40,7 @@ return $instance + [
             Service\RobotsTxt::class       => Service\RobotsTxtFactory::class,
             Service\OmekaJsonLdEmbed::class => Service\OmekaJsonLdEmbedFactory::class,
             Service\ImageDimensions::class  => Service\ImageDimensionsFactory::class,
+            Service\Signposting::class      => Service\SignpostingFactory::class,
         ],
         // Dependency-free (no bundled vendor/): plain instantiation. Shared,
         // like every service-manager entry — HeadWriter relies on that: its

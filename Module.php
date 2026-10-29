@@ -11,6 +11,8 @@ declare(strict_types=1);
  *     canonical links and schema.org JSON-LD into the <head> — derived
  *     automatically from each resource's metadata + resource class, set by
  *     hand for static site pages, with site-wide defaults filling the gaps.
+ *   • Signposts record pages for FAIR harvesters, in the head and in an HTTP
+ *     Link header.
  *   • Serves /sitemap.xml (index + per-type children) and /robots.txt.
  *   • Injects the Google Search Console verification tag from a pasted snippet.
  *   • Optionally pings IndexNow when public content changes.
@@ -28,15 +30,19 @@ use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\PingQueue;
 use IwacSeo\Service\ResourceUrl;
 use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\Signposting;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use Laminas\EventManager\EventInterface;
 use Laminas\EventManager\SharedEventManagerInterface;
+use Laminas\Http\Header\GenericMultiHeader;
+use Laminas\Http\Response as HttpResponse;
 use Laminas\Mvc\Controller\AbstractController;
 use Laminas\Mvc\MvcEvent;
 use Laminas\ServiceManager\ServiceLocatorInterface;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
+use Omeka\Api\Representation\ItemSetRepresentation;
 use Omeka\Api\Representation\SitePageRepresentation;
 use Omeka\Api\Representation\SiteRepresentation;
 use Omeka\Api\Request as ApiRequest;
@@ -295,7 +301,14 @@ class Module extends AbstractModule
         }
         $site = $this->currentSite($view);
         if ($site) {
-            $this->headMetadata()->applyBrowse($view, $site);
+            // An item set's page (/item-set/{id}) is a browse of its items;
+            // Omeka hands the set to the view, and the page is signposted as it.
+            $itemSet = $view->itemSet ?? null;
+            $this->headMetadata()->applyBrowse(
+                $view,
+                $site,
+                $itemSet instanceof ItemSetRepresentation ? $itemSet : null
+            );
         }
     }
 
@@ -332,7 +345,10 @@ class Module extends AbstractModule
         if (!$site) {
             return;
         }
-        $this->headMetadata()->applyGlobals($view, $site);
+        $headMetadata = $this->headMetadata();
+        $headMetadata->applyGlobals($view, $site);
+        // Once per page, after the action render has said what the page is.
+        $this->addLinkHeader($headMetadata->signposts());
     }
 
     // ─── API listener: queue IndexNow pings ─────────────────────────────────
@@ -541,6 +557,41 @@ class Module extends AbstractModule
     private function headMetadata(): HeadMetadata
     {
         return $this->getServiceLocator()->get(HeadMetadata::class);
+    }
+
+    /**
+     * Repeat the page's Signposting links as an HTTP `Link` header (FAIR
+     * Signposting level 1), for harvesters that read headers only.
+     *
+     * Joined to any Link header another module set, never replacing it.
+     * Laminas decides whether a header may repeat by the class registered for
+     * its name, not by the object handed in, and registers none for Link: a
+     * second addHeader() would overwrite the first, and a raw header line
+     * would be sent as a single header that PHP lets the last one replace.
+     * Registering the multi-header class for Link on this response makes every
+     * Link header in it one of several, each sent without replacing the rest.
+     *
+     * @param array<int,array{rel:string,href:string,type?:string}> $links
+     */
+    private function addLinkHeader(array $links): void
+    {
+        $value = Signposting::header($links);
+        if ($value === '') {
+            return;
+        }
+        try {
+            $response = $this->getServiceLocator()->get('Application')->getResponse();
+            if ($response instanceof HttpResponse) {
+                $headers = $response->getHeaders();
+                $headers->getPluginClassLoader()->registerPlugin('link', GenericMultiHeader::class);
+                $headers->addHeader(new GenericMultiHeader('Link', $value));
+            }
+        } catch (\Throwable $e) {
+            // The head <link> elements carry the same set; the header is extra.
+            $this->getServiceLocator()->get('Omeka\Logger')->warn('IwacSeo: could not add the Signposting Link header.', [
+                'exception' => $e,
+            ]);
+        }
     }
 
     private function view(EventInterface $event): ?PhpRenderer

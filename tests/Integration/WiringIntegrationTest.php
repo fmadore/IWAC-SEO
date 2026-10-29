@@ -18,6 +18,7 @@ use IwacSeo\Service\OmekaJsonLdEmbed;
 use IwacSeo\Service\PageSeoStore;
 use IwacSeo\Service\RobotsTxt;
 use IwacSeo\Service\SettingsGate;
+use IwacSeo\Service\Signposting;
 use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\ZoteroRdf;
@@ -60,6 +61,7 @@ final class WiringIntegrationTest extends TestCase
         self::assertInstanceOf(HeadMetadata::class, $services->get(HeadMetadata::class));
         self::assertSame($services->get(HeadMetadata::class), $services->get(HeadMetadata::class));
         self::assertInstanceOf(PageCitationData::class, $services->get(PageCitationData::class));
+        self::assertInstanceOf(Signposting::class, $services->get(Signposting::class));
 
         $services->setService('Omeka\ApiManager', $this->withoutConstructor(ApiManager::class));
         $services->setService('Omeka\Settings\Site', $this->withoutConstructor(\Omeka\Settings\SiteSettings::class));
