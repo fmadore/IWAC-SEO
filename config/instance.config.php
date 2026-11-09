@@ -234,6 +234,7 @@ return [
                 ['afrique_ouest' => 'references_visualisations',       'westafrica' => 'references_visualisations'],
                 ['afrique_ouest' => 'reseaux-entites',                 'westafrica' => 'entity-networks'],
                 ['afrique_ouest' => 'roc',                             'westafrica' => 'ocr'],
+                ['afrique_ouest' => 'sermons-albani-zaria',            'westafrica' => 'albani-zaria-sermons'],
                 ['afrique_ouest' => 'togo',                            'westafrica' => 'togo'],
                 ['afrique_ouest' => 'topic-modelling',                 'westafrica' => 'topic-modelling'],
                 ['afrique_ouest' => 'visualisations',                  'westafrica' => 'explore'],
