@@ -99,7 +99,7 @@ the template filled with Omeka's own strings.
   so both the schema.org and the citation maps key off class id. README, "Why
   dispatch on resource class, not template".
 - **`config/module.config.php` is wiring; `config/instance.config.php` is IWAC
-  data** — the class→`@type` map, the class→citation-kind map, and the 38
+  data** — the class→`@type` map, the class→citation-kind map, and the
   hreflang `page_pairs`. They're combined with `+`, not `array_merge_recursive`,
   so the top-level keys must stay disjoint. `page_pairs` is *generated* from the
   Internationalisation module, not authored: adding or renaming a static page
