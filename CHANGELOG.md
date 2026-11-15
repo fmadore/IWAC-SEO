@@ -3,6 +3,10 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.4.2 — 2026-11-15
+
+- The Albani Zaria sermons page is paired across the two sites in the hreflang alternates (`sermons-albani-zaria` ↔ `albani-zaria-sermons`), so search engines link its French and English versions.
+
 ## 1.4.1 — 2026-10-29
 
 - Fix a PHP 8.5 deprecation on every record page whose author, publisher or other linked record has no resource class: the JSON-LD looked that record's type up under a null array key. The output is unchanged.
