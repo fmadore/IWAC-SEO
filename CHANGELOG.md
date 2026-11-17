@@ -3,6 +3,19 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+Found by checking the live citations of every item type on both sites.
+
+- An Islamic-periodical issue titled after its periodical ("*Islam Info #721*") no longer repeats it: the citation begins with the periodical and number, and keeps the issue's theme when the title has one ("*Cohabitation pacifique : le remède de l'islam*").
+- Videos and audio recordings carry their full release date in Chicago and MLA, as they already did in APA.
+- Chicago and MLA describe the medium without brackets ("Photograph.", "Online video."); brackets after the title stay APA's.
+- The English site renders YouTube's stored medium, "Vidéo sur le web", as "Online video".
+- MLA presentations read "Event, date, place. Presentation.", with the host in the event's place when no event is recorded. They used to print a stray year and the host before the event.
+- MLA theses end with the degree ("Thèse de doctorat."), as Chicago and APA already showed it.
+- MLA writes "edited by Alice Degorce et al." without a comma. The French site elides "sous la dir. d'Alice" before a vowel.
+- When the sole author is an organisation that also published the work (an International Crisis Group report), APA omits the publisher and MLA the author, so it is named once. Chicago still lists it in both places, as CMOS allows.
+
 ## 1.4.3 — 2026-11-17
 
 - Fix the punctuation of a journal or periodical issue that has a number but no volume (*Cahiers d'études africaines*, for example). APA now reads "*Journal* (264), 879–895", without the comma before the parenthesis. Chicago now reads "*Journal*, no. 264 (2026)", with the comma it was missing before "no.". Citations with a volume are unchanged.

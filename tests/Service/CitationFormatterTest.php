@@ -384,12 +384,178 @@ final class CitationFormatterTest extends TestCase
         ]);
     }
 
-    public function testApaIssueWithoutVolumeIsSeparatedFromThePeriodical(): void
+    public function testAnIssueTitledAfterItsPeriodicalIsNotRepeated(): void
+    {
+        // "Al Mawadda #48-49" says nothing the container does not: with no
+        // creator, the periodical takes the first slot in every style.
+        $issue = $this->combinedIssue();
+        $this->assertSame('<em>Al Mawadda</em> (48–49). (2009, May–August).', $this->formatter->format($issue, 'apa', 'en'));
+        $this->assertSame('<em>Al Mawadda</em>, no. 48–49, May–August 2009.', $this->formatter->format($issue, 'chicago', 'en'));
+        $this->assertSame('<em>Al Mawadda</em>, no. 48–49, May–Aug. 2009.', $this->formatter->format($issue, 'mla', 'en'));
+    }
+
+    public function testAnIssueKeepsItsThemeAndCreator(): void
+    {
+        // Item 11997's shape: the theme in parentheses after "#327" survives.
+        $record = $this->record([
+            'kind'      => 'periodical-issue',
+            'title'     => 'An-Nasr Vendredi #327 (Cohabitation pacifique : le remède de l\'islam)',
+            'authors'   => [$this->institution('Niangane')],
+            'container' => 'An-Nasr Vendredi',
+            'issue'     => '327',
+            'issued'    => ['year' => 2010, 'month' => 2, 'day' => 5, 'literal' => '2010-02-05'],
+        ]);
+        $this->assertSame(
+            'Niangane. <em>Cohabitation pacifique : le remède de l&#039;islam</em>. <em>An-Nasr Vendredi</em>, no. 327, February 5, 2010.',
+            $this->formatter->format($record, 'chicago', 'en')
+        );
+        $this->assertSame(
+            'Niangane. (2010, February 5). <em>Cohabitation pacifique : le remède de l&#039;islam</em>. <em>An-Nasr Vendredi</em> (327).',
+            $this->formatter->format($record, 'apa', 'en')
+        );
+    }
+
+    public function testAnIssueTitleThatDoesNotRepeatThePeriodicalIsKept(): void
+    {
+        $record = $this->record([
+            'kind' => 'periodical-issue', 'title' => 'Spécial Ramadan',
+            'container' => 'Islam Info', 'issue' => '12',
+        ]);
+        $this->assertStringStartsWith('<em>Spécial Ramadan</em>. <em>Islam Info</em>, no. 12', $this->formatter->format($record, 'chicago', 'en'));
+    }
+
+    // ─── Media, presentations, theses, shared authorship ─────────────────────
+
+    /** Item 108854's shape: a YouTube video whose medium is stored in French. */
+    private function onlineVideo(): CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'av',
+            'title'     => 'Mois de Ramadan',
+            'publisher' => 'RTB',
+            'medium'    => 'Vidéo sur le web',
+            'issued'    => ['year' => 2024, 'month' => 3, 'day' => 25, 'literal' => '2024-03-25'],
+        ]);
+    }
+
+    public function testAVideoCarriesItsFullDateAndAnUnbracketedMediumInChicagoAndMla(): void
+    {
+        $this->assertSame('<em>Mois de Ramadan</em>. RTB, March 25, 2024. Online video.', $this->formatter->format($this->onlineVideo(), 'chicago', 'en'));
+        $this->assertSame('<em>Mois de Ramadan</em>. RTB, 25 Mar. 2024. Online video.', $this->formatter->format($this->onlineVideo(), 'mla', 'en'));
+        $this->assertSame('<em>Mois de Ramadan</em>. RTB, 25 mars 2024. Vidéo sur le web.', $this->formatter->format($this->onlineVideo(), 'mla', 'fr'));
+    }
+
+    public function testTheMediumIsTranslatedForTheEnglishSiteOnly(): void
+    {
+        $this->assertStringContainsString('[Online video]', $this->formatter->format($this->onlineVideo(), 'apa', 'en'));
+        $this->assertStringContainsString('[Vidéo sur le web]', $this->formatter->format($this->onlineVideo(), 'apa', 'fr'));
+    }
+
+    public function testAPhotographsMediumIsUnbracketedInChicago(): void
+    {
+        $record = $this->record([
+            'kind' => 'photo', 'title' => 'Radio Ridwane', 'authors' => [$this->person('Frédérick', 'Madore')],
+            'issued' => ['year' => 2015, 'month' => null, 'day' => null, 'literal' => '2015'],
+        ]);
+        $this->assertSame('Madore, Frédérick. <em>Radio Ridwane</em>. 2015. Photograph.', $this->formatter->format($record, 'chicago', 'en'));
+    }
+
+    /** Item 12805's shape. */
+    private function presentation(?string $event = 'Lancement de la Collection'): CitationRecord
+    {
+        return $this->record([
+            'kind'       => 'communication',
+            'title'      => 'Digitalisation des données',
+            'authors'    => [$this->person('Issouf', 'Binaté')],
+            'container'  => 'Chaire Islam contemporain',
+            'eventTitle' => $event,
+            'eventPlace' => 'Côte d\'Ivoire',
+            'issued'     => ['year' => 2023, 'month' => 11, 'day' => 9, 'literal' => '2023-11-09'],
+        ]);
+    }
+
+    public function testMlaPresentationReadsEventDatePlaceThenPresentation(): void
     {
         $this->assertSame(
-            '<em>Al Mawadda #48-49</em>. (2009, May–August). <em>Al Mawadda</em> (48–49).',
-            $this->formatter->format($this->combinedIssue(), 'apa', 'en')
+            'Binaté, Issouf. “Digitalisation des données.” Lancement de la Collection, 9 Nov. 2023, Côte d&#039;Ivoire. Presentation.',
+            $this->formatter->format($this->presentation(), 'mla', 'en')
         );
+        $this->assertStringEndsWith('Côte d&#039;Ivoire. Communication.', $this->formatter->format($this->presentation(), 'mla', 'fr'));
+    }
+
+    public function testMlaPresentationWithNoEventNamesItsHost(): void
+    {
+        $this->assertSame(
+            'Binaté, Issouf. “Digitalisation des données.” Chaire Islam contemporain, 9 Nov. 2023, Côte d&#039;Ivoire. Presentation.',
+            $this->formatter->format($this->presentation(null), 'mla', 'en')
+        );
+    }
+
+    public function testMlaThesisEndsWithItsDegree(): void
+    {
+        $record = $this->record([
+            'kind' => 'thesis', 'title' => 'Rivalités', 'authors' => [$this->person('Frédérick', 'Madore')],
+            'publisher' => 'Université Laval', 'genre' => 'Thèse de doctorat',
+            'issued' => ['year' => 2018, 'month' => null, 'day' => null, 'literal' => '2018'],
+        ]);
+        $this->assertSame('Madore, Frédérick. <em>Rivalités</em>. Université Laval, 2018. Thèse de doctorat.', $this->formatter->format($record, 'mla', 'en'));
+        $this->assertStringEndsWith('Université Laval, 2018. Thesis.', $this->formatter->format($this->record([
+            'kind' => 'thesis', 'title' => 'X', 'publisher' => 'Université Laval',
+            'issued' => ['year' => 2018, 'month' => null, 'day' => null, 'literal' => '2018'],
+        ]), 'mla', 'en'));
+    }
+
+    /** A chapter in a book with three editors, the first beginning with a vowel. */
+    private function chapterWithThreeEditors(): CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'chapter',
+            'title'     => 'Le religieux',
+            'authors'   => [$this->person('Maud', 'Saint-Lary')],
+            'editors'   => [$this->person('Alice', 'Degorce'), $this->person('Ludovic O.', 'Kibora'), $this->person('Katrin', 'Langewiesche')],
+            'bookTitle' => 'Rencontres religieuses',
+            'publisher' => 'Amalion',
+            'issued'    => ['year' => 2019, 'month' => null, 'day' => null, 'literal' => '2019'],
+        ]);
+    }
+
+    public function testMlaEtAlTakesNoCommaAfterANaturalOrderName(): void
+    {
+        $this->assertStringContainsString('edited by Alice Degorce et al., Amalion', $this->formatter->format($this->chapterWithThreeEditors(), 'mla', 'en'));
+        // An inverted first name keeps it.
+        $book = $this->record([
+            'kind' => 'book', 'title' => 'Rencontres religieuses', 'editors' => $this->chapterWithThreeEditors()->toArray()['editors'],
+        ]);
+        $this->assertStringStartsWith('Degorce, Alice, et al., editors.', $this->formatter->format($book, 'mla', 'en'));
+    }
+
+    public function testFrenchEditorPhraseElidesBeforeAVowel(): void
+    {
+        $chapter = $this->chapterWithThreeEditors();
+        $this->assertStringContainsString('sous la dir. d’Alice Degorce et al.', $this->formatter->format($chapter, 'mla', 'fr'));
+        $this->assertStringContainsString('sous la dir. d’Alice Degorce, Ludovic O. Kibora, et Katrin Langewiesche', $this->formatter->format($chapter, 'chicago', 'fr'));
+        $other = $this->record(array_merge($chapter->toArray(), ['editors' => [$this->person('Gilles', 'Holder')]]));
+        $this->assertStringContainsString('sous la dir. de Gilles Holder', $this->formatter->format($other, 'chicago', 'fr'));
+    }
+
+    /** Item 15761's shape: the Crisis Group is both author and publisher. */
+    private function selfPublishedReport(): CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'report',
+            'title'     => 'Keeping Jihadists Out',
+            'authors'   => [$this->institution('International Crisis Group')],
+            'publisher' => 'International Crisis Group',
+            'issued'    => ['year' => 2023, 'month' => null, 'day' => null, 'literal' => '2023'],
+        ]);
+    }
+
+    public function testAnAuthorWhoIsAlsoThePublisherIsNamedOnce(): void
+    {
+        $this->assertSame('International Crisis Group. (2023). <em>Keeping Jihadists Out</em>.', $this->formatter->format($this->selfPublishedReport(), 'apa', 'en'));
+        $this->assertSame('<em>Keeping Jihadists Out</em>. International Crisis Group, 2023.', $this->formatter->format($this->selfPublishedReport(), 'mla', 'en'));
+        // CMOS 14.84 lists the organisation as author even when it publishes.
+        $this->assertSame('International Crisis Group. <em>Keeping Jihadists Out</em>. International Crisis Group, 2023.', $this->formatter->format($this->selfPublishedReport(), 'chicago', 'en'));
     }
 
     public function testDateIntervalsReadAsDatesInEveryStyle(): void

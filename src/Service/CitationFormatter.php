@@ -58,6 +58,16 @@ final class CitationFormatter
         ],
     ];
 
+    /**
+     * Medium labels the corpus stores in French (linked dcterms:medium items),
+     * rendered for the English site. DVD and CD read the same in both.
+     *
+     * @var array<string,array<string,string>>
+     */
+    private const MEDIUM = [
+        'en' => ['Vidéo sur le web' => 'Online video'],
+    ];
+
     public function format(CitationRecord $record, string $style, string $locale = 'en'): string
     {
         $style = in_array($style, self::STYLES, true) ? $style : 'chicago';
@@ -116,7 +126,7 @@ final class CitationFormatter
                 $seg = $record->bookTitle !== null ? $this->str($locale, 'in') . ' ' . $this->italic($record->bookTitle) : '';
                 $eds = $this->nameList($record->editors, $locale, 'chicago', false);
                 if ($eds !== '') {
-                    $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
+                    $seg .= ', ' . $this->editedBy($eds, $locale);
                 }
                 $pages = $this->pages($record);
                 if ($pages !== null) {
@@ -171,7 +181,7 @@ final class CitationFormatter
                 break;
 
             default: // book, report, av, photo, document, item
-                $py = $this->publisherYear($record);
+                $py = $this->publisherYear($record, $locale, 'chicago');
                 if ($py !== '') {
                     $parts[] = $this->terminate($py);
                 }
@@ -267,6 +277,12 @@ final class CitationFormatter
                 if ($pages !== null) {
                     $seg .= ', ' . $this->esc($pages);
                 }
+                if ($creator === '' && $title === '') {
+                    // An issue titled only "Periodical #721" and with no
+                    // creator: the periodical takes the author slot.
+                    $parts = [$this->terminate($seg), $dateSeg];
+                    break;
+                }
                 $parts[] = $this->terminate($seg);
                 break;
 
@@ -280,7 +296,8 @@ final class CitationFormatter
                 break;
 
             default: // book, report, av, photo, document, communication, item
-                if ($this->esc($record->publisher) !== '') {
+                // APA omits the publisher when it is also the author.
+                if ($this->esc($record->publisher) !== '' && !$this->authorIsPublisher($record)) {
                     $parts[] = $this->terminate($this->esc($record->publisher));
                 }
                 break;
@@ -303,9 +320,13 @@ final class CitationFormatter
         $kind = $record->kind;
         $parts = [];
 
-        $creator = $kind === CitationKind::Chapter
-            ? $this->nameList($record->authors, $locale, 'mla')
-            : $this->creators($record, $locale, 'mla');
+        // MLA skips an organisation author that is also the publisher and
+        // names it once, as publisher.
+        $creator = match (true) {
+            $kind === CitationKind::Chapter => $this->nameList($record->authors, $locale, 'mla'),
+            $this->authorIsPublisher($record) => '',
+            default => $this->creators($record, $locale, 'mla'),
+        };
         if ($creator !== '') {
             $parts[] = $this->terminate($creator);
         }
@@ -337,7 +358,7 @@ final class CitationFormatter
                 $seg = $this->italic($record->bookTitle);
                 $eds = $this->nameList($record->editors, $locale, 'mla', false);
                 if ($eds !== '') {
-                    $seg .= ', ' . $this->str($locale, 'eds') . ' ' . $eds;
+                    $seg .= ', ' . $this->editedBy($eds, $locale);
                 }
                 $py = $this->publisherYear($record); // publisher, year
                 if ($py !== '') {
@@ -380,17 +401,31 @@ final class CitationFormatter
                 $parts[] = $this->terminate($seg);
                 break;
 
-            default: // book, thesis, report, av, photo, document, communication, item
-                $py = $this->publisherYear($record);
+            case CitationKind::Communication:
+                // MLA 9: "Title." Event, date, place. Presentation. A talk
+                // with no event names its host in the event's place.
+                $parts[] = $this->terminate(implode(', ', array_filter([
+                    $this->esc($record->eventTitle ?? $record->container ?? $record->publisher),
+                    $this->fullDate($record, $locale, 'mla'),
+                    $this->esc($record->eventPlace),
+                ])));
+                $parts[] = $this->terminate($this->ucfirst($this->str($locale, 'presentation')));
+                break;
+
+            case CitationKind::Thesis:
+                // Institution, year, then the degree as a description.
+                $parts[] = $this->terminate($this->publisherYear($record));
+                $parts[] = $this->terminate($this->ucfirst($this->esc($record->genre) ?: $this->str($locale, 'phd')));
+                break;
+
+            default: // book, report, av, photo, document, item
+                $py = $this->publisherYear($record, $locale, 'mla');
                 if ($py !== '') {
                     $parts[] = $this->terminate($py);
                 }
                 break;
         }
 
-        if ($kind === CitationKind::Communication) {
-            $parts[] = $this->terminate(trim($this->eventSegment($record, $locale, 'mla'), ', '));
-        }
         $parts[] = $this->details($record, $locale);
         $parts[] = $this->linkSegment($record);
         return $this->join($parts);
@@ -400,7 +435,12 @@ final class CitationFormatter
 
     private function titleSegment(CitationRecord $record, string $locale, string $style): string
     {
-        $title = $record->title ?: $this->str($locale, 'untitled');
+        $title = $this->issueTitle($record);
+        if ($title === '') {
+            // An issue titled only "Periodical #721": the container says it all.
+            return '';
+        }
+        $title = $title ?: $this->str($locale, 'untitled');
         $kind = $record->kind;
 
         if ($style === 'apa') {
@@ -409,13 +449,9 @@ final class CitationFormatter
             // page, which APA treats as a work of its own on a site.
             $plain = $kind->isPartOfWork() && $kind !== CitationKind::Communication && $kind !== CitationKind::Webpage;
             $segment = $plain ? $this->esc($title) : $this->italic($title);
-            $medium = $record->medium ?? match ($kind) {
-                CitationKind::Av => $this->str($locale, 'video'),
-                CitationKind::Audio => $this->str($locale, 'audio'),
-                CitationKind::Photo => $this->str($locale, 'photograph'),
-                CitationKind::Communication => $this->str($locale, 'presentation'),
-                default => null,
-            };
+            $medium = $kind === CitationKind::Communication && $record->medium === null
+                ? $this->str($locale, 'presentation')
+                : $this->medium($record, $locale);
             if ($kind === CitationKind::Thesis) {
                 $segment .= ' [' . $this->esc($record->genre ?? $this->str($locale, 'phd'))
                     . ($record->publisher !== null ? ', ' . $this->esc($record->publisher) : '') . ']';
@@ -511,7 +547,9 @@ final class CitationFormatter
         }
 
         if ($style === 'mla' && $n >= 3) {
-            return $first . ', ' . $this->str($locale, 'et_al');
+            // "Degorce, Alice, et al." but "edited by Alice Degorce et al.":
+            // the comma belongs to the inversion only.
+            return $first . ($invertFirst ? ', ' : ' ') . $this->str($locale, 'et_al');
         }
 
         // Subsequent names: natural order for Chicago/MLA; APA follows the list's
@@ -608,15 +646,87 @@ final class CitationFormatter
         return $out;
     }
 
-    /** "Publisher, Year" (Chicago/MLA book-like). */
-    private function publisherYear(CitationRecord $record): string
+    /**
+     * "Publisher, Year" (Chicago/MLA book-like). Given a style, a recording
+     * carries its full release date ("RTB, March 25, 2024"), as APA's does.
+     */
+    private function publisherYear(CitationRecord $record, string $locale = 'en', ?string $style = null): string
     {
         $seg = $this->esc($record->publisher ?? $record->container);
-        $year = $this->year($record);
+        $recording = in_array($record->kind, [CitationKind::Av, CitationKind::Audio], true);
+        $year = $style !== null && $recording
+            ? ($this->fullDate($record, $locale, $style) ?: null)
+            : ($this->year($record) !== null ? $this->esc($this->year($record)) : null);
         if ($year !== null) {
-            $seg = $seg !== '' ? $seg . ', ' . $this->esc($year) : $this->esc($year);
+            $seg = $seg !== '' ? $seg . ', ' . $year : $year;
         }
         return $seg;
+    }
+
+    /** "edited by A and B" / "sous la dir. d’Alice Degorce" (French elides before a vowel). */
+    private function editedBy(string $names, string $locale): string
+    {
+        $lead = $this->str($locale, 'eds');
+        if ($locale === 'fr' && preg_match('/^[aeiouyàâäéèêëîïôöùûüœæ]/iu', strip_tags($names))) {
+            return mb_substr($lead, 0, -2) . 'd’' . $names;
+        }
+        return $lead . ' ' . $names;
+    }
+
+    /**
+     * Whether the sole author is an institution that is also the publisher
+     * ("International Crisis Group" for a Crisis Group report) — APA then
+     * omits the publisher and MLA the author, so it is named once.
+     */
+    private function authorIsPublisher(CitationRecord $record): bool
+    {
+        if (count($record->authors) !== 1 || $record->publisher === null) {
+            return false;
+        }
+        $author = $record->authors[0];
+        return $author->isSingleField()
+            && mb_strtolower(trim($author->literal)) === mb_strtolower(trim($record->publisher));
+    }
+
+    /**
+     * The title to cite. An Islamic-periodical issue is titled after its
+     * periodical and number ("Islam Info #721"), which the container segment
+     * already prints: that prefix is dropped, leaving the issue's theme if it
+     * has one ("Cohabitation pacifique : le remède de l'islam") or '' if not.
+     * Every other title, and an issue whose title does not repeat its
+     * periodical, is returned as stored.
+     */
+    private function issueTitle(CitationRecord $record): ?string
+    {
+        $title = $record->title;
+        $applies = $record->kind === CitationKind::PeriodicalIssue && $title !== null
+            && $record->container !== null && $record->issue !== null;
+        if (!$applies) {
+            return $title;
+        }
+        $prefix = '/^' . preg_quote($record->container, '/') . '\s*(?:#|n°|no\.?)?\s*\d[\d\s\/–-]*/iu';
+        if (!preg_match($prefix, $title, $m)) {
+            return $title;
+        }
+        $rest = trim(mb_substr($title, mb_strlen($m[0])), " \t:–-");
+        if (preg_match('/^\((.*)\)$/u', $rest, $inner)) {
+            $rest = trim($inner[1]);
+        }
+        return $rest;
+    }
+
+    /** The medium label, translated for the site's language, or the kind's default. */
+    private function medium(CitationRecord $record, string $locale): ?string
+    {
+        if ($record->medium !== null) {
+            return self::MEDIUM[$locale][$record->medium] ?? $record->medium;
+        }
+        return match ($record->kind) {
+            CitationKind::Av => $this->str($locale, 'video'),
+            CitationKind::Audio => $this->str($locale, 'audio'),
+            CitationKind::Photo => $this->str($locale, 'photograph'),
+            default => null,
+        };
     }
 
     /**
@@ -658,15 +768,12 @@ final class CitationFormatter
 
     private function details(CitationRecord $record, string $locale): string
     {
-        $medium = $record->medium ?? match ($record->kind) {
-            CitationKind::Av => $this->str($locale, 'video'),
-            CitationKind::Audio => $this->str($locale, 'audio'),
-            CitationKind::Photo => $this->str($locale, 'photograph'),
-            default => null,
-        };
+        // Chicago and MLA describe the medium in roman, unbracketed
+        // ("Photograph.", "Online video."); brackets are APA's, after the title.
+        $medium = $this->medium($record, $locale);
         $parts = [];
         if ($medium !== null) {
-            $parts[] = '[' . $this->esc($medium) . '].';
+            $parts[] = $this->terminate($this->ucfirst($this->esc($medium)));
         }
         if ($record->number !== null) {
             $parts[] = $this->terminate($this->str($locale, 'no') . ' ' . $this->esc($record->number));
