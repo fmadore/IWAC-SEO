@@ -3,7 +3,7 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
-## Unreleased
+## 1.4.3 — 2026-11-17
 
 - Fix the punctuation of a journal or periodical issue that has a number but no volume (*Cahiers d'études africaines*, for example). APA now reads "*Journal* (264), 879–895", without the comma before the parenthesis. Chicago now reads "*Journal*, no. 264 (2026)", with the comma it was missing before "no.". Citations with a volume are unchanged.
 
