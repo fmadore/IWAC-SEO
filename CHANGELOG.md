@@ -3,7 +3,7 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
-## Unreleased
+## 1.5.0 — 2026-11-17
 
 Found by checking the live citations of every item type on both sites.
 
