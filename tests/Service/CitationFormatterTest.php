@@ -110,6 +110,37 @@ final class CitationFormatterTest extends TestCase
         );
     }
 
+    /** Cahiers d'études africaines numbers its issues and carries no volume. */
+    private function articleWithoutVolume(): \IwacSeo\Service\Citation\CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'article',
+            'title'     => 'Positionnalité',
+            'authors'   => [$this->person('Zakaria', 'Soré')],
+            'container' => 'Cahiers d’études africaines',
+            'issue'     => '264',
+            'pageFirst' => '879',
+            'pageLast'  => '895',
+            'issued'    => ['year' => 2026, 'month' => null, 'day' => null, 'literal' => '2026'],
+        ]);
+    }
+
+    public function testChicagoJournalArticleWithoutVolumeSetsTheNumberOffByAComma(): void
+    {
+        $this->assertSame(
+            'Soré, Zakaria. “Positionnalité.” <em>Cahiers d’études africaines</em>, no. 264 (2026): 879–895.',
+            $this->formatter->format($this->articleWithoutVolume(), 'chicago', 'en')
+        );
+    }
+
+    public function testApaJournalArticleWithoutVolumeHasNoCommaBeforeTheIssue(): void
+    {
+        $this->assertSame(
+            'Soré, Z. (2026). Positionnalité. <em>Cahiers d’études africaines</em> (264), 879–895.',
+            $this->formatter->format($this->articleWithoutVolume(), 'apa', 'en')
+        );
+    }
+
     public function testChicagoBook(): void
     {
         $record = $this->record([
@@ -356,7 +387,7 @@ final class CitationFormatterTest extends TestCase
     public function testApaIssueWithoutVolumeIsSeparatedFromThePeriodical(): void
     {
         $this->assertSame(
-            '<em>Al Mawadda #48-49</em>. (2009, May–August). <em>Al Mawadda</em>, (48–49).',
+            '<em>Al Mawadda #48-49</em>. (2009, May–August). <em>Al Mawadda</em> (48–49).',
             $this->formatter->format($this->combinedIssue(), 'apa', 'en')
         );
     }

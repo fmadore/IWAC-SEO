@@ -94,9 +94,12 @@ final class CitationFormatter
             case CitationKind::Article:
             case CitationKind::Review:
                 $seg = $this->italic($record->container);
+                // "Journal 66, no. 4" — but with no volume the number is set
+                // off by a comma: "Journal, no. 264" (CMOS 14.171).
                 $vi = $this->volumeIssue($record, $locale);
                 if ($vi !== '') {
-                    $seg = trim($seg . ' ' . $vi);
+                    $sep = $record->volume === null && $seg !== '' ? ', ' : ' ';
+                    $seg = trim($seg . $sep . $vi);
                 }
                 $year = $this->year($record);
                 if ($year !== null) {
@@ -218,7 +221,8 @@ final class CitationFormatter
                     $seg .= ', ' . $this->italic($record->volume);
                 }
                 if ($record->issue !== null) {
-                    $seg .= ($vol === '' ? ', ' : '') . '(' . $this->esc($record->issue) . ')';
+                    // "Journal, 12(3)" — with no volume, "Journal (264)": no comma.
+                    $seg .= ($vol === '' && $seg !== '' ? ' ' : '') . '(' . $this->esc($record->issue) . ')';
                 }
                 $pages = $this->pages($record);
                 if ($pages !== null) {
@@ -254,9 +258,9 @@ final class CitationFormatter
                     $seg .= ', ' . $this->italic($record->volume);
                 }
                 if ($record->issue !== null) {
-                    // "Periodical, 12(3)" — but with no volume the issue is its
-                    // own element: "Periodical, (48–49)", never "Periodical(48–49)".
-                    $seg .= ($record->volume === null && $seg !== '' ? ', ' : '')
+                    // "Periodical, 12(3)" — with no volume, "Periodical (48–49)":
+                    // no comma, but never "Periodical(48–49)" either.
+                    $seg .= ($record->volume === null && $seg !== '' ? ' ' : '')
                         . '(' . $this->esc($record->issue) . ')';
                 }
                 $pages = $this->pages($record);
