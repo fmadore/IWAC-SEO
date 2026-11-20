@@ -41,13 +41,6 @@ final class HreflangTest extends TestCase
         $this->assertNull((new Hreflang($this->config(['x_default' => null])))->xDefaultSlug());
     }
 
-    public function testCoveredSlugsPerSite(): void
-    {
-        $hreflang = new Hreflang($this->config());
-        $this->assertSame(['accueil', 'a-propos'], $hreflang->coveredSlugs('afrique_ouest'));
-        $this->assertSame(['home', 'about'], $hreflang->coveredSlugs('westafrica'));
-        $this->assertSame([], $hreflang->coveredSlugs('unknown-site'));
-    }
 
     public function testPartnersForNamesTheOtherSiteOnly(): void
     {
@@ -80,7 +73,7 @@ final class HreflangTest extends TestCase
         $hreflang = new Hreflang(['sites' => 'not-an-array', 'page_pairs' => 'nope']);
         $this->assertFalse($hreflang->isEnabled());
         $this->assertSame([], $hreflang->sites());
-        $this->assertSame([], $hreflang->coveredSlugs('afrique_ouest'));
+
         $this->assertSame([], $hreflang->partnersFor('afrique_ouest', 'accueil'));
     }
 }

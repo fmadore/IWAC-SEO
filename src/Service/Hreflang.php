@@ -146,26 +146,15 @@ class Hreflang
         return $out;
     }
 
-    /**
-     * The page slugs of $siteSlug that have a page_pairs entry — i.e. the
-     * static pages that will emit cross-language alternates. Used by the admin
-     * dashboard to report pages missing from the map.
-     *
-     * @return string[]
-     */
-    public function coveredSlugs(string $siteSlug): array
-    {
-        return array_keys($this->pairIndex[$siteSlug] ?? []);
-    }
 
     /**
      * The counterpart slugs $pageSlug is paired with on the *other* configured
      * sites — the alternates `forPage()` would advertise. Empty when the page
      * has no row at all.
      *
-     * This answers the question `coveredSlugs()` cannot. A row naming a page
-     * that no longer exists still counts the page as covered, while the
-     * alternate it emits 404s — worse for search engines than emitting none.
+     * A row naming a page that no longer exists would count the page as
+     * covered, while the alternate it emits 404s — worse for search engines
+     * than emitting none.
      * Only a caller that can see the other site's pages can tell the two
      * apart, so the check lives in the dashboard and this exposes what to
      * check.

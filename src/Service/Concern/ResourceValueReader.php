@@ -3,7 +3,6 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service\Concern;
 
-use IwacSeo\Service\Citation\CitationRecord;
 use IwacSeo\Service\MetadataValue;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ValueRepresentation;
@@ -125,18 +124,6 @@ trait ResourceValueReader
         return MetadataValue::pdfUrl($resource);
     }
 
-    /**
-     * The resource's citation page range, read from bibo:pageStart/pageEnd.
-     * The join rule itself belongs to the record, so a page range reads the
-     * same whether it came from a resource or from a built citation.
-     */
-    private function pageRange(AbstractResourceEntityRepresentation $resource): ?string
-    {
-        return CitationRecord::joinPages(
-            $this->firstString($resource, ['bibo:pageStart']),
-            $this->firstString($resource, ['bibo:pageEnd'])
-        );
-    }
 
     /** Whitespace-normalise, strip tags and clip to $max characters. */
     private function clip(string $text, int $max = self::ABSTRACT_MAX): string

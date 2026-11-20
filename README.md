@@ -54,7 +54,7 @@ Both the schema.org typing and the citation typing key off the Omeka **resource 
 - The bibliographic references share templates across classes (e.g. template 10 covers
   `bibo:Book`, `bibo:EditedBook` and `bibo:Thesis`).
 
-So the maps in `config/module.config.php` are keyed by class id. This matches how the
+So the maps in `config/instance.config.php` are keyed by class id. This matches how the
 IWAC → Hugging Face pipeline derives its subsets (also by class). See the `iwac-data`
 skill (`omeka-structure.md`) for the full class catalogue.
 
@@ -168,12 +168,14 @@ The head signals are written into Omeka's request-global head placeholder helper
   values always win because the resource listeners run before the layout listener. The
   Signposting `Link` header is added here, once the page has said what it is.
 
-The two canonicals differ deliberately. On the browse routes this module owns, page 2 of a
-listing is a real page in a series, so its canonical is **self-referential** and `noindex`
-is what keeps it out of the index. On a route no phase-1 listener claimed — the IwacSearch
-`/search` app, any other module's controller — the layout gap-fill has no such knowledge, so
-it canonicalises to the **query-less** URL and marks any query-carrying variant `noindex,
-follow`. `og:url` mirrors whichever canonical was written, so a share never disagrees with it.
+Both paths apply one URL policy (`UrlPolicy::canonical()`). On the browse routes this module
+owns, page 2 of a listing is a real page in a series, so its canonical is **self-referential**
+and `noindex` is what keeps a filtered variant out of the index. A route no phase-1 listener
+claimed — the IwacSearch `/search` app, any other module's controller — gets the same
+treatment from the layout gap-fill: a self-referential canonical that keeps the query, minus
+tracking parameters (`utm_*`, `gclid`, `fbclid`, `msclkid`) and a redundant `page=1`, and
+`noindex, follow` on any variant still carrying a query. `og:url` mirrors whichever canonical
+was written, so a share never disagrees with it.
 
 > **Turn off Omeka's own JSON-LD embed.** Independently of this module, Omeka S core echoes
 > `AbstractResourceRepresentation::embeddedJsonLd()` — the resource's *entire* API
@@ -188,7 +190,7 @@ follow`. `og:url` mirrors whichever canonical was written, so a share never disa
 
 ### schema.org `@type` map
 
-Driven by `config/module.config.php → iwac_seo.structured_data.class_types` (overridable via
+Driven by `config/instance.config.php → iwac_seo.structured_data.class_types` (overridable via
 `config/local.config.php`), keyed by Omeka **resource class** id:
 
 | Resource class | `@type` |
@@ -337,8 +339,9 @@ IWAC's field conventions are baked into that record and the per-kind tags (see
 - the **journal / newspaper / publication title** lives in `dcterms:publisher` (often a
   linked item set), not `dcterms:isPartOf`;
 - a **book chapter's book title** lives in `dcterms:alternative`;
-- **DOIs** live in `bibo:doi` (a URI value); **ISBN/ISSN are not recorded** in IWAC, so
-  those tags are not emitted;
+- **DOIs** live in `bibo:doi` (a URI value). **ISBN/ISSN** are rarely recorded in IWAC: the
+  citation tags do not carry them, but where a record has one the JSON-LD gives a `Book` its
+  `isbn` and the BibTeX / RIS / CSL-JSON downloads carry both;
 - **Zotero tags** are built from both `dcterms:subject` (*Sujet*) and `dcterms:spatial`
   (*Couverture spatiale*). Both sets are emitted as repeated `DC.subject` — the channel
   Zotero's *Embedded Metadata* translator turns into tags via its RDF backend (it pre-empts
@@ -685,8 +688,10 @@ IwacSeo/
 
 ## Uninstalling
 
-Removes every `iwac_seo_*` global setting, the per-site `iwac_seo_pages` overrides and the
-sitemap cache directory (`files/iwac-seo-cache/`).
+Drops the `iwac_seo_ping` IndexNow outbox table and removes every `iwac_seo_*` global
+setting, the per-site `iwac_seo_pages` overrides and the sitemap cache directory
+(`files/iwac-seo-cache/`) — the last by path, so it goes even when the module is uninstalled
+while inactive.
 
 ---
 

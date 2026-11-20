@@ -20,6 +20,7 @@ All notable changes to the IWAC SEO module. Versions follow
 - A fresh cached sitemap is served without taking the rebuild lock, so crawlers reading the same document are no longer queued behind one another. A miss still rebuilds under the lock, and a reader that waits more than five seconds for someone else's rebuild now gets the previous copy instead of a 503.
 - A cached item chunk past the first is served before its bound is checked, so it no longer costs a `COUNT(*)` on every request.
 - `robots.txt` also disallows filtered or sorted item-set pages (`/s/*/item-set/*?`, clean `?page=` still allowed), any query on a record page (`/s/*/item/*?`, such as the theme's `?lr_page=` pager) and IwacSearch's `/discovery/health`.
+- Housekeeping: a `SECURITY.md`; unused code removed (`ResourceValueReader::pageRange()`, `UrlsetWriter::now()`, `Hreflang::coveredSlugs()`, `SitemapGenerator::destroyCache()` and two unused dashboard strings); README, OPERATIONS and CLAUDE.md corrected where they contradicted the code (where the class maps live, the layout gap-fill's canonical, ISBN output, what uninstall removes, the CI jobs); `check-hreflang-pairs.php` no longer calls the deprecated `curl_close()`.
 
 ## 1.5.0 — 2026-11-17
 

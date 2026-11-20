@@ -62,10 +62,11 @@ excuse for that, and none for reporting a change as verified by reading.
 
 ## CI still sees things a local run cannot
 
-`.github/workflows/ci.yml` has two jobs, together covering `composer check`:
+`.github/workflows/ci.yml` has three jobs. Two together cover `composer check`:
 `test` (a `php -l` sweep plus PHPUnit on 8.4 and production 8.5) and
 `quality` (strict Composer validation, `i18n:check`, `lint`, `analyse`, on 8.4
-only). Composer downloads are cached in both jobs. The `quality` checks carry
+only). The third, `integration`, runs `tests/Integration` against Omeka S 4.2.1
+on 8.5. Composer downloads are cached in both jobs. The `quality` checks carry
 `if: ${{ !cancelled() }}` so one push reports every category at once instead of
 revealing them a re-run at a time.
 

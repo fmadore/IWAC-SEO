@@ -1,6 +1,6 @@
-# IWAC SEO 1.1 operations
+# IWAC SEO operations
 
-Upgrade the module through Omeka's module manager. Version 1.1 creates the
+Upgrade the module through Omeka's module manager. Version 1.1 created the
 `iwac_seo_ping` outbox and migrates pending URLs from the old setting. Keep a normal
 database backup before upgrading. This repository change does not deploy the module,
 change Google permissions, or install a server cron job.
@@ -189,9 +189,9 @@ language/privacy selection, ranges, audio, timestamp provenance, stale admin wri
 outbox acknowledgement and lease expiry. Tests validate the available metadata; they
 cannot establish the accuracy of uncatalogued facts.
 
-Local release validation on 10 September 2026: `composer check` passed on PHP 8.2.33
-(160 unit tests, 665 assertions; lint, PHPStan and translation freshness). Omeka S
-4.2.1 integration passed 43 tests / 407 assertions. All seven Python tests, script
-syntax checks and workflow YAML parsing passed. The PHP 8.3–8.5 matrix remains a CI
-check; it was not executed locally. Neither the authenticated Google monitor nor the
-production cron was activated during implementation.
+Validation runs on the supported PHP versions only: 8.4 (the declared floor) and 8.5 (production),
+both in CI. Locally the whole suite runs on 8.5 — `composer check`, PHPUnit and the Omeka S 4.2.1
+integration suite (`CLAUDE.md` gives the commands); 8.4 remains a CI check. The 1.1
+release was first validated on 10 September 2026, on PHP 8.2 before the 8.4 floor was set.
+Neither the authenticated Google monitor nor the production cron was activated during that
+implementation.

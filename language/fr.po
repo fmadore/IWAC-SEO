@@ -109,9 +109,6 @@ msgstr "Méta-description"
 msgid "Meta title"
 msgstr "Titre méta"
 
-msgid "No"
-msgstr "Non"
-
 msgid "No site found."
 msgstr "Aucun site trouvé."
 
@@ -222,9 +219,6 @@ msgstr "Utilisée sur les pages dépourvues de description propre (accueil, navi
 
 msgid "XML sitemap & robots.txt"
 msgstr "Sitemap XML et robots.txt"
-
-msgid "Yes"
-msgstr "Oui"
 
 msgid "key is not 8–128 hex characters, so /{key}.txt cannot be served and verification will fail"
 msgstr "la clé ne comporte pas de 8 à 128 caractères hexadécimaux : /{clé}.txt ne peut pas être publié et la vérification échouera"

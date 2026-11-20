@@ -81,7 +81,8 @@ function fetchJson(string $url): array
         $body = curl_exec($ch);
         $status = (int) curl_getinfo($ch, CURLINFO_RESPONSE_CODE);
         $error = curl_error($ch);
-        curl_close($ch);
+        // No curl_close(): a no-op since PHP 8.0 and deprecated in 8.5; the
+        // handle is freed when $ch goes out of scope.
         if ($body === false || $status < 200 || $status >= 300) {
             fwrite(STDERR, sprintf("Request failed (%d) %s %s\n", $status, $url, $error));
             exit(2);

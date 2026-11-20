@@ -96,11 +96,6 @@ final class UrlsetWriter
         }
     }
 
-    /** The current moment as a W3C timestamp. */
-    public static function now(): string
-    {
-        return (new \DateTimeImmutable('now', new \DateTimeZone('UTC')))->format('c');
-    }
 
     /** Declare the xhtml/image namespaces only when the document uses them. */
     private function namespaces(array $urls): string

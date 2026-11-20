@@ -22,8 +22,6 @@
  */
 
 $this->headLink()->appendStylesheet($this->assetUrl('css/admin.css', 'IwacSeo'));
-$yes = $this->translate('Yes');
-$no = $this->translate('No');
 $on = '<span class="iwac-seo-on">' . $this->translate('On') . '</span>';
 $off = '<span class="iwac-seo-off">' . $this->translate('Off') . '</span>';
 $configureUrl = $this->url('admin/default', ['controller' => 'module', 'action' => 'configure'], ['query' => ['id' => 'IwacSeo']]);

@@ -17,8 +17,9 @@ declare(strict_types=1);
  *   • Injects the Google Search Console verification tag from a pasted snippet.
  *   • Optionally pings IndexNow when public content changes.
  *
- * Settings-only: it owns a handful of `iwac_seo_*` settings and one site setting
- * (iwac_seo_pages); install/uninstall just create and drop those. No third-party
+ * It owns a handful of `iwac_seo_*` settings, one site setting (iwac_seo_pages)
+ * and one table, the iwac_seo_ping IndexNow outbox; install/uninstall create and
+ * drop those, and uninstall also removes files/iwac-seo-cache. No third-party
  * Composer dependencies, so there is no bundled vendor/ — Omeka autoloads the
  * IwacSeo\ namespace from src/.
  */

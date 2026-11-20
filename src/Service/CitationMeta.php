@@ -30,7 +30,8 @@ use Omeka\Api\Representation\ItemRepresentation;
  *   • the journal / newspaper / publication title lives in **dcterms:publisher**
  *     (often a linked item set), not dcterms:isPartOf;
  *   • a book chapter's **book title** lives in **dcterms:alternative**;
- *   • DOIs live in **bibo:doi** (a URI value); ISBN/ISSN are not recorded;
+ *   • DOIs live in **bibo:doi** (a URI value); ISBN/ISSN are rarely recorded,
+ *     and these tags do not carry them;
  *   • Zotero **tags** come from both **dcterms:subject** (Sujet) and
  *     **dcterms:spatial** (Couverture spatiale) — see {@see keywords()}.
  *
