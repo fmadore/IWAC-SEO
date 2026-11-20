@@ -127,6 +127,11 @@ final class InstanceConfigTest extends TestCase
             '/s/westafrica/item-set?sort_by=created',
             '/s/westafrica/media?resource_class_id=36',
             '/discovery/token',
+            '/discovery/health',
+            '/s/westafrica/item-set/12?b0.country_ss=Benin',
+            '/s/westafrica/item-set/12?sort_by=title&page=2',
+            '/s/afrique_ouest/item/2231?lr_page=3',
+            '/s/afrique_ouest/item/2231?lr_q=hajj&lr_sort=date',
         ];
         foreach ($blocked as $path) {
             self::assertFalse($robots->allows($path), $path);
@@ -141,6 +146,7 @@ final class InstanceConfigTest extends TestCase
             '/s/afrique_ouest/item',
             '/s/afrique_ouest/item?page=3',
             '/s/westafrica/item-set?page=2',
+            '/s/westafrica/item-set/12?page=2',
             // Every URL shape the sitemaps list.
             '/s/afrique_ouest/item/2231',
             '/s/westafrica/item-set/12',

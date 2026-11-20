@@ -26,8 +26,10 @@ pages retain their resource canonical even when a linked-record widget is pagina
 guidance: a `noindex` has to be crawled to be read, so it spends the crawl budget it is
 meant to save. The rules live in `iwac_seo.robots` (`config/instance.config.php`) and cover
 the IwacSearch pages (`/search?`, `/s/*/recherche?`, their `everything`/`tout` tabs, the
-`/discovery/token` endpoint) and Omeka's browse filters (`/s/*/item?` and siblings, including
-the `?property[…]` link every metadata value carries), with `?page=` allowed. The landing
+`/discovery/token` and `/discovery/health` endpoints), Omeka's browse filters (`/s/*/item?` and
+siblings, including the `?property[…]` link every metadata value carries), filtered or sorted
+item-set pages (`/s/*/item-set/*?`) and any query on a record page (`/s/*/item/*?`, such as
+the linked-resources pager's `?lr_page=`), with `?page=` allowed on browse and item-set pages. The landing
 pages, clean pagination and every sitemap URL stay crawlable; `InstanceConfigTest` asserts
 it. A URL Google indexed before the rule appeared keeps its entry until it drops out: if
 Search Console lists such URLs as "Indexed, though blocked by robots.txt", remove the rule

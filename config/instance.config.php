@@ -58,17 +58,25 @@ return [
                 '/s/*/recherche?',
                 '/s/*/recherche/tout?',
                 '/discovery/token', // IwacSearch's scoped-key endpoint
+                '/discovery/health', // IwacSearch's JSON health check
                 // Omeka browse filters and sorts — among them the
                 // ?property[…] link every metadata value carries on every page.
                 '/s/*/item?',
                 '/s/*/item-set?',
                 '/s/*/media?',
+                // An item set's page filtered by IwacSearch (?b0.…=) or sorted.
+                '/s/*/item-set/*?',
+                // Any query on a record page — the theme's linked-resources
+                // pager and filter (?lr_page=, ?lr_q=, ?lr_sort=) among them.
+                // Every such variant canonicalises to the record itself.
+                '/s/*/item/*?',
             ],
             'allow' => [
                 // Clean pagination stays crawlable, as it stays indexable.
                 '/s/*/item?page=',
                 '/s/*/item-set?page=',
                 '/s/*/media?page=',
+                '/s/*/item-set/*?page=',
             ],
         ],
         'structured_data' => [
