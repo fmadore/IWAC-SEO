@@ -148,8 +148,11 @@ final class VideoDescription
             return [$year, false];
         }
         $name = MonthNames::full($month, $locale);
-        if ($day < 1 || $day > 31) {
+        if ($day === 0) {
             return [$name . ' ' . $year, false];
+        }
+        if (!checkdate($month, $day, (int) $year)) {
+            return null; // 2022-02-30 is no date, not "30 February 2022"
         }
         return [$day . ' ' . $name . ' ' . $year, true];
     }

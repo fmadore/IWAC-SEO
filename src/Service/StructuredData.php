@@ -43,11 +43,12 @@ class StructuredData
     }
 
     /**
-     * @param ?string $image     the share image, which falls back to the site default
+     * @param ?string $image     the JSON-LD image, or null. HeadMetadata passes the
+     *   resource's own thumbnail here too: the site's default share graphic
+     *   stands in for og:image, never for a record's schema.org image
      * @param ?string $thumbnail the resource's *own* media thumbnail, or null. Kept
-     *   apart from $image because schema.org's thumbnailUrl must depict the
-     *   resource: the site's default share graphic is an honest og:image and a
-     *   dishonest video thumbnail.
+     *   a separate parameter because schema.org's thumbnailUrl must depict the
+     *   resource whatever a caller passes as $image.
      * @param string  $locale    the page language ('fr' or 'en'), for the one
      *   sentence the module composes itself: {@see VideoDescription}
      * @return array<mixed>|null
@@ -286,8 +287,8 @@ class StructuredData
         // Audiovisual: an ISO-8601 duration and an upload date round out the
         // VideoObject (which schema.org expects for video rich results).
         if ($type === 'VideoObject') {
-            $duration = $this->firstString($resource, ['dcterms:extent']);
-            if ($duration !== null && str_starts_with($duration, 'P')) {
+            $duration = self::duration($this->firstString($resource, ['dcterms:extent']));
+            if ($duration !== null) {
                 $data['duration'] = $duration;
             }
             $published = $this->firstString($resource, ['dcterms:issued']);
@@ -318,8 +319,8 @@ class StructuredData
                     }
                 }
             }
-            $duration = $this->firstString($resource, ['dcterms:extent']);
-            if ($duration !== null && preg_match('/^PT(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?$/', $duration) && $duration !== 'PT') {
+            $duration = self::duration($this->firstString($resource, ['dcterms:extent']));
+            if ($duration !== null) {
                 $data['duration'] = $duration;
             }
         }
@@ -634,14 +635,36 @@ class StructuredData
         return array_values($out);
     }
 
+    /**
+     * An ISO 8601 time duration (PT2M49S, PT181M, PT1H2M3S) or null. Every
+     * audiovisual extent IWAC holds has this shape; anything else in
+     * dcterms:extent ("Pages: 12", "PAL") is not a duration and would make
+     * the node invalid.
+     */
+    private static function duration(?string $extent): ?string
+    {
+        return $extent !== null && $extent !== 'PT'
+            && preg_match('/^PT(?:\d+H)?(?:\d+M)?(?:\d+(?:\.\d+)?S)?$/D', $extent) === 1
+            ? $extent
+            : null;
+    }
+
     /** @return array{name:string,url:?string}|null */
     private function firstLink(
         AbstractResourceEntityRepresentation $resource,
         string $term,
         SiteRepresentation $site
     ): ?array {
-        $value = $resource->value($term);
-        if (!$value instanceof ValueRepresentation || MetadataValue::text($value) === null) {
+        // The first *public* value: a private first value must not hide a
+        // public second one.
+        $value = null;
+        foreach ($resource->value($term, ['all' => true]) as $candidate) {
+            if ($candidate instanceof ValueRepresentation && MetadataValue::text($candidate) !== null) {
+                $value = $candidate;
+                break;
+            }
+        }
+        if ($value === null) {
             return null;
         }
         $linked = $value->valueResource();

@@ -240,8 +240,9 @@ with either side that is not a plain ISO date dropped rather than emitted, since
 validator cannot read invalidates the node around it.
 
 `thumbnailUrl` is taken only from a picture of the resource itself, never from the site's
-default share image — unlike `image`, which may fall back to it. A share card needs some
-picture; a claim that the site logo depicts the video is a different kind of statement. Two
+default share image, and so is the JSON-LD `image`: on a resource page both carry the record's
+own picture or nothing. Only `og:image` falls back to the default, because a share card needs
+some picture; a claim that the site logo depicts the record is a different kind of statement. Two
 sources qualify, in this order: an asset assigned as the item's own thumbnail (the editor's
 explicit choice, and the way to give a video whose file yielded no still one that is actually
 of it), then the primary media's derivative. A media *without* derivatives is skipped, because
@@ -527,6 +528,8 @@ IWAC is the same collection under two Omeka sites — `afrique_ouest` (fr) and `
   right language and treats the pair as one set instead of duplicate content.
   - **Resources** (items, item sets, media) are shared across both sites under the same
     `o:id`, so the alternate is just the same path under the other site slug — fully automatic.
+    An item set's page carries them on its clean URL only; its filtered, sorted or later pages
+    are variants with their own canonical, and an alternate must name the page's canonical.
   - **Static pages** have different slugs per language (`accueil`/`home`, `a-propos`/`about` …);
     they are mapped by the `iwac_seo.hreflang.page_pairs` table in `config/instance.config.php`.
     A page with no entry simply gets no alternate (never a broken one). Update the table when

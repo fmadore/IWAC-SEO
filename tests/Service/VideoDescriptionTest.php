@@ -86,6 +86,19 @@ final class VideoDescriptionTest extends TestCase
         );
     }
 
+    public function testAnImpossibleDayIsNoDate(): void
+    {
+        // The pattern admits day 31 of any month; checkdate() does not.
+        $this->assertSame(
+            'Video recording by A.',
+            VideoDescription::compose(['authors' => ['A'], 'date' => '2022-02-30'], 'en')
+        );
+        $this->assertSame(
+            'Video recording by A, 29 February 2024.',
+            VideoDescription::compose(['authors' => ['A'], 'date' => '2024-02-29'], 'en')
+        );
+    }
+
     public function testYearAndMonthPrecisionReadAsPeriodsNotDays(): void
     {
         // Six records are dated to the year or the month; "on 2022" is not a

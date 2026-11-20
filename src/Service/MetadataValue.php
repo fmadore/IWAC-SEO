@@ -21,8 +21,15 @@ final class MetadataValue
         if ($linked !== null && method_exists($linked, 'isPublic') && !$linked->isPublic()) {
             return null;
         }
-        $text = $linked !== null ? $linked->displayTitle() : ($value->value() ?? $value->uri());
-        $text = trim(strip_tags((string) $text));
+        if ($linked !== null) {
+            $text = trim(strip_tags((string) $linked->displayTitle()));
+        } else {
+            // An empty label ('' rather than null) falls back to the URI too.
+            $text = trim(strip_tags((string) $value->value()));
+            if ($text === '') {
+                $text = trim(strip_tags((string) $value->uri()));
+            }
+        }
         return $text !== '' ? $text : null;
     }
 

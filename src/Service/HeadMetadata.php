@@ -251,9 +251,12 @@ class HeadMetadata
         }
 
         // An item set's landing page is the set's own page, signposted like a
-        // record — on its clean URL only, not on a filtered or later page.
+        // record and paired with its other-language twin, as the sitemap pairs
+        // it — on its clean URL only: a filtered or later page is noindex or a
+        // series member, and an alternate must name the page's own canonical.
         if ($itemSet !== null && Text::withoutQuery($current) === $current) {
             $this->signpost($view, $itemSet, $current, $site);
+            $this->alternates($view, $this->hreflang->forResource($itemSet));
         }
     }
 

@@ -223,6 +223,42 @@ final class MetadataIntegrationTest extends TestCase
         self::assertStringContainsString('content="noindex, follow"', $this->decoded($view->headMeta()->toString()));
     }
 
+    /**
+     * The sitemap pairs every item set's page across the two sites; the page
+     * itself must say the same, on its clean URL only.
+     */
+    public function testAnItemSetPageCarriesItsHreflangAlternates(): void
+    {
+        $itemSet = $this->getMockBuilder(\Omeka\Api\Representation\ItemSetRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['siteUrl'])
+            ->getMock();
+        $itemSet->method('siteUrl')->willReturnCallback(
+            static fn (string $slug): string => 'https://example.test/s/' . $slug . '/item-set/9'
+        );
+        $metadata = new HeadMetadata(
+            new SettingsGate($this->settings(['iwac_seo_noindex_browse' => '1'])),
+            new HeadWriter(),
+            new StructuredData([], 'CreativeWork'),
+            new CitationMeta($this->kinds),
+            new Hreflang(['sites' => ['afrique_ouest' => 'fr', 'westafrica' => 'en'], 'x_default' => 'afrique_ouest']),
+            new ZoteroRdf($this->kinds, new CitationData($this->kinds)),
+        );
+
+        $view = $this->renderer('https://example.test/s/afrique_ouest/item-set/9');
+        $metadata->applyBrowse($view, $this->site(), $itemSet);
+        $links = $this->decoded($view->headLink()->toString());
+        self::assertStringContainsString('href="https://example.test/s/westafrica/item-set/9" hreflang="en"', $links);
+        self::assertStringContainsString('href="https://example.test/s/afrique_ouest/item-set/9" hreflang="fr"', $links);
+        self::assertStringContainsString('hreflang="x-default"', $links);
+
+        // A filtered view of the set names no alternates: they would point
+        // away from its own (self-referential, noindexed) canonical.
+        $view = $this->renderer('https://example.test/s/afrique_ouest/item-set/9?sort_by=title');
+        $metadata->applyBrowse($view, $this->site(), $itemSet);
+        self::assertStringNotContainsString('hreflang=', $this->decoded($view->headLink()->toString()));
+    }
+
     public function testResourceCanonicalSurvivesTheLayoutGapFill(): void
     {
         // A paginated resource page (?page=N on the linked-resources table)
@@ -377,10 +413,70 @@ final class MetadataIntegrationTest extends TestCase
         self::assertArrayNotHasKey('uploadDate', $data);
     }
 
+    /** @return array<string,array{string,?string}> */
+    public static function videoExtents(): array
+    {
+        return [
+            'minutes and seconds' => ['PT2M49S', 'PT2M49S'],
+            'hours' => ['PT1H2M3S', 'PT1H2M3S'],
+            'a page count' => ['Pages: 12', null],
+            'a video standard' => ['PAL', null],
+            'a date duration' => ['P3D', null],
+            'empty designator' => ['PT', null],
+        ];
+    }
+
+    /** VideoObject and AudioObject share one strict ISO 8601 duration check. */
+    #[\PHPUnit\Framework\Attributes\DataProvider('videoExtents')]
+    public function testOnlyAnIsoTimeDurationBecomesTheDuration(string $extent, ?string $expected): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(38, ['dcterms:title' => 'Video', 'dcterms:extent' => $extent]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame($expected, $data['duration'] ?? null);
+    }
+
+    public function testAPrivateFirstPublisherDoesNotHideAPublicOne(): void
+    {
+        $data = $this->structuredData()->forResource(
+            $this->resource(36, [
+                'dcterms:title' => 'Article',
+                'dcterms:publisher' => [
+                    $this->value('Hidden Gazette', public: false),
+                    $this->value('Fraternité Matin'),
+                ],
+            ]),
+            $this->site(),
+            self::CANONICAL,
+            null
+        );
+
+        self::assertSame('Fraternité Matin', $data['isPartOf']['name'] ?? null);
+    }
+
+    public function testAnEmptyLabelFallsBackToTheUri(): void
+    {
+        $value = $this->getMockBuilder(ValueRepresentation::class)
+            ->disableOriginalConstructor()
+            ->onlyMethods(['value', 'isPublic', 'valueResource', 'uri'])
+            ->getMock();
+        $value->method('value')->willReturn('');
+        $value->method('isPublic')->willReturn(true);
+        $value->method('valueResource')->willReturn(null);
+        $value->method('uri')->willReturn('https://www.wikidata.org/wiki/Q1');
+
+        self::assertSame('https://www.wikidata.org/wiki/Q1', \IwacSeo\Service\MetadataValue::text($value));
+    }
+
     public function testVideoWithoutItsOwnThumbnailClaimsNone(): void
     {
-        // image may fall back to the site's default share graphic; thumbnailUrl
-        // may not — it would tell Google the logo is a still from the video.
+        // HeadMetadata never passes the site default as image; this pins that
+        // StructuredData still keeps thumbnailUrl to the record's own picture
+        // whatever a caller passes — it would tell Google the logo is a still.
         $data = $this->structuredData()->forResource(
             $this->resource(38, ['dcterms:date' => '2022-07-01']),
             $this->site(),

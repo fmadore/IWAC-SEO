@@ -7,6 +7,12 @@ All notable changes to the IWAC SEO module. Versions follow
 
 - Fix an HTTP 500 on any page whose query string has a numeric key (`?0=1`): the canonical URL policy lower-cased the key, which `parse_str()` had turned into an integer. Browse pages and every route without its own canonical were affected.
 - The module's French catalogue is now loaded: Omeka reads a module's `language/*.mo` only when the module registers it, and this one never did, so its admin screens stayed in English on a French admin. The compiled catalogue no longer declares a two-form plural rule, which clashed with core's three-form French rule and would have made Laminas refuse the merge on every French request.
+- Item-set pages carry their `hreflang` alternates (on the clean URL), as the item-set sitemap already did; the two used to disagree.
+- A video's `duration` is emitted only when `dcterms:extent` is an ISO 8601 time duration (`PT2M49S`), the check audio already used; any value starting with "P" ("Pages: 12", "PAL") used to pass.
+- A periodical or containing place is read from the first *public* value, so a private first value no longer hides a public second one.
+- A URI value with an empty label falls back to its URI, as one with no label did.
+- A video's composed description drops an impossible day (`2022-02-30`) instead of reading it out.
+- The README and the `StructuredData` docblock now say what the code does: on a resource page the JSON-LD `image`, like `thumbnailUrl`, is the record's own picture or nothing; only `og:image` falls back to the site's default share image.
 
 ## 1.5.0 — 2026-11-17
 
