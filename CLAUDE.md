@@ -48,7 +48,8 @@ project's run is sharing it: run it again.
 
 `tests/Integration` needs `OMEKA_PATH` set to a real Omeka S tree. A v4.2.1
 checkout lives in the gitignored `.integration/omeka-s` — the same path CI's
-integration job uses:
+integration job uses (CI unpacks the release zip there, checked against its
+SHA-256, rather than cloning):
 
 ```bash
 git clone --depth 1 --branch v4.2.1 https://github.com/omeka/omeka-s.git .integration/omeka-s
@@ -73,9 +74,14 @@ revealing them a re-run at a time.
 A local run is now a genuine gate rather than a rehearsal, but it is one PHP
 version: 8.5, as in production. CI is what covers the 8.4 floor. Watch it before tagging: a tag
 is not retractable. The release workflow now runs the `quality` gates and
-PHPUnit on the tag before it builds the zip (and publishes a `.sha256` beside
-it), but only at the 8.4 floor and without the integration suite — it is a last
-gate, not a substitute for a green CI run.
+PHPUnit on the tag before it builds the zip (and publishes a `.sha256` and a
+build-provenance attestation with it), but only at the 8.4 floor and without the integration suite — it is a last
+gate, not a substitute for a green CI run. Ordinary CI already checks that
+`module.ini`, `CITATION.cff` and the newest CHANGELOG release agree
+(`.github/scripts/check-version.sh`, which the release reuses with the tag);
+an `## Unreleased` section above them is fine. Actions are pinned by commit
+SHA with the release in a trailing comment — look the SHA up
+(`gh api repos/<owner>/<repo>/commits/<tag> -q .sha`), never copy one from memory.
 
 `phpstan-baseline.neon` records 59 findings that predate enforcement — 56
 missing array value types plus three judgement calls. Level 6 applies in full

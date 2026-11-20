@@ -3,14 +3,20 @@
 # composer.json. There are no runtime dependencies and vendor/ is never
 # committed, so none of this is about security patches — it is about learning
 # that a new major exists, on a branch where CI can say whether it breaks the
-# gate. That matters here because the module is developed without PHP: pushing
-# a bump and reading the result is the only way to evaluate one.
+# gate.
+#
+# Cooldown: a release is proposed only once it is five days old, as in
+# IwacSearch, IWAC-theme and IwacVisualizations. A compromised or broken
+# publish is usually yanked within days. It applies to the actions too: their
+# pins are commit SHAs, but Dependabot is what moves a pin onto a new release.
 version: 2
 updates:
   - package-ecosystem: github-actions
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 5
     groups:
       actions:
         patterns: ["*"]
@@ -23,6 +29,8 @@ updates:
     directory: /
     schedule:
       interval: monthly
+    cooldown:
+      default-days: 5
     groups:
       dev-tools:
         patterns: ["*"]

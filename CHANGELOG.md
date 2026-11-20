@@ -21,6 +21,7 @@ All notable changes to the IWAC SEO module. Versions follow
 - A cached item chunk past the first is served before its bound is checked, so it no longer costs a `COUNT(*)` on every request.
 - `robots.txt` also disallows filtered or sorted item-set pages (`/s/*/item-set/*?`, clean `?page=` still allowed), any query on a record page (`/s/*/item/*?`, such as the theme's `?lr_page=` pager) and IwacSearch's `/discovery/health`.
 - Housekeeping: a `SECURITY.md`; unused code removed (`ResourceValueReader::pageRange()`, `UrlsetWriter::now()`, `Hreflang::coveredSlugs()`, `SitemapGenerator::destroyCache()` and two unused dashboard strings); README, OPERATIONS and CLAUDE.md corrected where they contradicted the code (where the class maps live, the layout gap-fill's canonical, ISBN output, what uninstall removes, the CI jobs); `check-hreflang-pairs.php` no longer calls the deprecated `curl_close()`.
+- CI: every action is pinned by commit SHA; Dependabot waits five days before proposing a release; the integration job runs on the Omeka S 4.2.1 release zip, checked against its SHA-256, instead of a tag checkout plus `composer install`; and the version check (`module.ini`, `CITATION.cff`, newest CHANGELOG release) runs on every push, not only at tag time. Releases carry a build-provenance attestation, signed in a job of its own.
 
 ## 1.5.0 — 2026-11-17
 

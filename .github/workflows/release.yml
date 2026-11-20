@@ -13,6 +13,15 @@ name: Release
 # retractable. The checks below are CI's `quality` gates plus PHPUnit, at the
 # 8.4 floor — the CI matrix is what covers production 8.5.
 #
+# Three jobs, so that each holds only the permissions it needs:
+#   build    runs the gates, builds and verifies the zip and its checksum, and
+#            uploads them as an artefact. Read-only.
+#   attest   (tags only) signs the zip's build provenance. It alone holds
+#            `id-token: write` + `attestations: write`, and runs nothing but
+#            the download, a checksum and the attest action — not the build's
+#            Composer packages, which would otherwise see the OIDC token.
+#   publish  (tags only) creates the release. It alone holds `contents: write`.
+#
 # Push a tag to publish:  git tag v0.9.0 && git push origin v0.9.0
 # Run manually to rehearse: runs the same checks, builds the zip and its
 # checksum and uploads them as an artefact, and publishes nothing.
@@ -26,43 +35,33 @@ permissions:
   contents: read
 
 jobs:
-  release:
+  build:
     runs-on: ubuntu-latest
     timeout-minutes: 15
-    permissions:
-      contents: write
+    outputs:
+      version: ${{ steps.version.outputs.version }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # The version lives in three files that nothing else keeps in step.
       # A tag is not retractable once pushed, so disagreement fails the build
       # rather than shipping a zip whose module.ini contradicts its filename.
+      # Ordinary CI runs the same script without a tag, so a mismatch is
+      # normally caught long before this point.
       - name: Resolve and cross-check the version
         id: version
         run: |
           set -euo pipefail
-          ini=$(sed -n 's/^version *= *"\(.*\)"/\1/p' config/module.ini)
-          cff=$(sed -n 's/^version: *"\(.*\)"/\1/p' CITATION.cff)
-
           if [ "${GITHUB_REF_TYPE}" = tag ]; then
-            version="${GITHUB_REF_NAME#v}"
+            version=$(.github/scripts/check-version.sh "${GITHUB_REF_NAME#v}")
           else
-            version="$ini"
+            version=$(.github/scripts/check-version.sh)
             echo "::notice::Rehearsal for $version — nothing will be published."
           fi
-
-          fail=
-          [ "$ini" = "$version" ] || fail="config/module.ini says '$ini'"
-          [ "$cff" = "$version" ] || fail="${fail:+$fail; }CITATION.cff says '$cff'"
-          if [ -n "$fail" ]; then
-            echo "::error::Version mismatch — expected '$version' but $fail."
-            exit 1
-          fi
-
           echo "version=$version" >> "$GITHUB_OUTPUT"
 
       # 8.4 is the floor declared in composer.json, as in CI's quality job.
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.4'
           coverage: none
@@ -131,9 +130,9 @@ jobs:
 
           sha256sum -c "$zip.sha256"
 
-      - name: Upload the rehearsal build
-        if: ${{ github.ref_type != 'tag' }}
-        uses: actions/upload-artifact@v7
+      # The rehearsal's result, and what the attest and publish jobs take up.
+      - name: Upload the build
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: module-zip
           path: |
@@ -141,13 +140,53 @@ jobs:
             IwacSeo-*.zip.sha256
           if-no-files-found: error
 
+  # Build provenance: a signed statement, kept by GitHub, that this workflow
+  # built this zip from this commit. `gh attestation verify <zip> --repo
+  # fmadore/IWAC-SEO` checks it; the release notes say so.
+  attest:
+    name: Attest the zip's build provenance
+    needs: build
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      id-token: write
+      attestations: write
+    steps:
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: module-zip
+
+      - name: The zip is the one the build checked
+        run: sha256sum -c "IwacSeo-${{ needs.build.outputs.version }}.zip.sha256"
+
+      - uses: actions/attest-build-provenance@4d101475d8b20a2381f78447822ac1eab6504dd8 # v4.2.2
+        with:
+          subject-path: IwacSeo-${{ needs.build.outputs.version }}.zip
+
+  publish:
+    name: Publish the release
+    needs: [build, attest]
+    if: ${{ github.ref_type == 'tag' }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: write
+    steps:
+      # For CHANGELOG.md, which the notes are cut from.
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+
+      - uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          name: module-zip
+
       # Notes come from the matching CHANGELOG section, so the release page and
       # the file in the repository cannot tell different stories.
       - name: Publish the release
-        if: ${{ github.ref_type == 'tag' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          VERSION: ${{ steps.version.outputs.version }}
+          VERSION: ${{ needs.build.outputs.version }}
         run: |
           set -euo pipefail
           awk -v v="$VERSION" '
@@ -173,13 +212,18 @@ jobs:
           To check the download first, save `IwacSeo-@VERSION@.zip.sha256`
           beside it and run `sha256sum -c IwacSeo-@VERSION@.zip.sha256`
           (on macOS, `shasum -a 256 -c IwacSeo-@VERSION@.zip.sha256`).
+          `gh attestation verify IwacSeo-@VERSION@.zip --repo fmadore/IWAC-SEO`
+          confirms it was built by this repository's release workflow.
 
           Do not use the "Source code" archives: they unpack to a folder named
           after the repository, which the namespace will not resolve.
           EOF
           sed -i "s/@VERSION@/$VERSION/g" notes.md
 
-          gh release create "$GITHUB_REF_NAME" \
+          sha256sum -c "IwacSeo-$VERSION.zip.sha256"
+          # --verify-tag: never let gh create a missing tag on the default
+          # branch's head, a release of a commit no gate checked.
+          gh release create "$GITHUB_REF_NAME" --verify-tag \
             --title "$VERSION" \
             --notes-file notes.md \
             "IwacSeo-$VERSION.zip" \

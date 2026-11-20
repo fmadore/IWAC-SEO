@@ -69,7 +69,9 @@ Download `IwacSeo-<version>.zip` from the
 [latest release](https://github.com/fmadore/IWAC-SEO/releases/latest) and unzip it into
 `modules/` — it already unpacks to a correctly named folder and contains only the runtime.
 Each release also carries `IwacSeo-<version>.zip.sha256`; with both files in one directory,
-`sha256sum -c IwacSeo-<version>.zip.sha256` verifies the download. The zip is built only
+`sha256sum -c IwacSeo-<version>.zip.sha256` verifies the download, and
+`gh attestation verify IwacSeo-<version>.zip --repo fmadore/IWAC-SEO` that this repository's
+release workflow built it. The zip is built only
 after the tagged commit has passed the lint, analysis, translation and unit-test checks.
 **Do not use GitHub's "Source code" archives:** they unpack to `IWAC-SEO-<version>/`, which
 the namespace will not resolve. Cloning works too, provided you name the target directory:
@@ -739,4 +741,5 @@ out of scope.
 Use the **Cite this repository** button on GitHub, or [`CITATION.cff`](CITATION.cff)
 directly — it carries the ORCID and the released version, and GitHub renders it as APA or
 BibTeX. Keep its `version` and `date-released` in step with `config/module.ini` when
-releasing; the release workflow fails the build if they disagree.
+releasing, and give the release its CHANGELOG section; CI reports any disagreement on every
+push, and the release workflow refuses the tag.

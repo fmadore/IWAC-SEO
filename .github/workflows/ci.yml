@@ -29,9 +29,9 @@ jobs:
         php: ['8.4', '8.5']
     name: PHP ${{ matrix.php }}
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: ${{ matrix.php }}
           coverage: none
@@ -41,7 +41,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Composer downloads
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
@@ -67,13 +67,13 @@ jobs:
     timeout-minutes: 10
     name: Lint & analyse
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       # 8.4 is the module's declared floor, and phpstan.neon.dist sets no
       # phpVersion — PHPStan reports against the version it runs on, so
       # analysing at the floor is what would catch a violation of it. The
       # matrix above is what covers 8.5, the deployed version.
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.4'
           coverage: none
@@ -81,7 +81,14 @@ jobs:
       - name: Validate Composer metadata
         run: composer validate --strict
 
+      # The release workflow refuses a tag whose module.ini, CITATION.cff and
+      # CHANGELOG disagree; checking on every push finds that before the tag.
+      - name: Version is consistent across module.ini, CITATION.cff and CHANGELOG
+        if: ${{ !cancelled() }}
+        run: .github/scripts/check-version.sh
+
       - name: Test Search Console monitor without credentials
+        if: ${{ !cancelled() }}
         run: python3 -m unittest discover -s tests -p 'test_*.py'
 
       - name: Locate Composer cache
@@ -89,7 +96,7 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Composer downloads
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
           key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
@@ -97,12 +104,15 @@ jobs:
             ${{ runner.os }}-composer-
 
       - name: Install dependencies
+        if: ${{ !cancelled() }}
         run: composer install --prefer-dist --no-interaction --no-progress
 
       # Each check runs even when an earlier one fails, so a push reports every
       # category at once rather than revealing them one re-run at a time. The
       # job still fails if any of them does.
       - name: Translation template is current
+        id: i18n
+        if: ${{ !cancelled() }}
         run: composer i18n:check
 
       - name: Coding standard (PSR-12)
@@ -126,12 +136,12 @@ jobs:
       # *new* errors and silently drop the recorded debt. Regenerating it is a
       # deliberate act — see the header of phpstan.neon.dist.
       - name: Regenerate the translation template
-        if: ${{ failure() }}
+        if: ${{ failure() && steps.i18n.outcome == 'failure' }}
         run: composer i18n
 
       - name: Upload the regenerated template
-        if: ${{ failure() }}
-        uses: actions/upload-artifact@v7
+        if: ${{ failure() && steps.i18n.outcome == 'failure' }}
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
         with:
           name: language
           path: language/
@@ -146,16 +156,23 @@ jobs:
     timeout-minutes: 15
     name: Omeka S 4.2.1 / PHP 8.5
     steps:
-      - uses: actions/checkout@v7
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      - name: Check out Omeka S
-        uses: actions/checkout@v7
-        with:
-          repository: omeka/omeka-s
-          ref: v4.2.1
-          path: .integration/omeka-s
+      # The release zip, vendor/ included, checked against its SHA-256 (the
+      # digest GitHub records for the release asset) before anything in it
+      # runs — as IWAC-theme and IwacSearch do. A tag checkout plus our own
+      # `composer install` verified neither the tree nor its dependencies.
+      - name: Download and verify Omeka S 4.2.1
+        run: |
+          set -euo pipefail
+          curl --fail --location --retry 3 -o /tmp/omeka-s.zip \
+            https://github.com/omeka/omeka-s/releases/download/v4.2.1/omeka-s-4.2.1.zip
+          echo "cc27d1c7aca0209523d19aa285f4a08e29e34950dcc446951a7c1311de348e82  /tmp/omeka-s.zip" | sha256sum -c -
+          mkdir -p .integration
+          unzip -q /tmp/omeka-s.zip -d .integration
+          test -f .integration/omeka-s/vendor/autoload.php
 
-      - uses: shivammathur/setup-php@v2
+      - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:
           php-version: '8.5'
           coverage: none
@@ -166,19 +183,15 @@ jobs:
         run: echo "dir=$(composer config cache-files-dir)" >> "$GITHUB_OUTPUT"
 
       - name: Cache Composer downloads
-        uses: actions/cache@v6
+        uses: actions/cache@55cc8345863c7cc4c66a329aec7e433d2d1c52a9 # v6.1.0
         with:
           path: ${{ steps.composer-cache.outputs.dir }}
-          key: ${{ runner.os }}-composer-integration-${{ hashFiles('composer.json', '.integration/omeka-s/composer.json') }}
+          key: ${{ runner.os }}-composer-${{ hashFiles('composer.json') }}
           restore-keys: |
-            ${{ runner.os }}-composer-integration-
             ${{ runner.os }}-composer-
 
       - name: Install module development tools
         run: composer install --prefer-dist --no-interaction --no-progress
-
-      - name: Install Omeka runtime
-        run: composer install --working-dir=.integration/omeka-s --no-dev --prefer-dist --no-interaction --no-progress
 
       - name: Run real-framework integration tests
         env:
