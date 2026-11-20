@@ -180,6 +180,10 @@ class SitemapGenerator
 
     /**
      * @param array<int,array{lang:string,base:string}> $altBases per-language site bases for hreflang
+     * @return SitemapDocument|null null when the chunk is beyond the last one.
+     *   A cached chunk is served before that bound is checked, so only a miss
+     *   pays for the COUNT query; chunk 1 always exists (an empty urlset is
+     *   still valid) and is never counted.
      */
     public function buildItems(
         string $siteUrl,
@@ -188,10 +192,20 @@ class SitemapGenerator
         int $ttl,
         array $altBases = [],
         ?string $xDefaultBase = null
-    ): SitemapDocument {
+    ): ?SitemapDocument {
         $chunk = max(1, $chunk);
+        $key = $this->key($siteId, 'items-' . $chunk, $siteUrl . serialize([$altBases, $xDefaultBase]));
+        if ($chunk > 1) {
+            $hit = $this->cache->cached($key, $ttl);
+            if ($hit !== null) {
+                return $hit;
+            }
+            if ($chunk > $this->itemChunkCount($siteId)) {
+                return null;
+            }
+        }
         return $this->cache->remember(
-            $this->key($siteId, 'items-' . $chunk, $siteUrl . serialize([$altBases, $xDefaultBase])),
+            $key,
             $ttl,
             function () use ($siteUrl, $siteId, $chunk, $altBases, $xDefaultBase): string {
                 $size = $this->chunkSize();
@@ -228,8 +242,9 @@ class SitemapGenerator
     /** @return array{items:int,itemSets:int,pages:int} */
     public function counts(int $siteId): array
     {
-        $pageCount = $this->repository->countPages($siteId);
-        if ($this->pageSeoStore !== null) {
+        if ($this->pageSeoStore === null) {
+            $pageCount = $this->repository->countPages($siteId);
+        } else {
             $this->pageSeoStore->setSite($siteId);
             $pageCount = 0;
             foreach ($this->repository->fetchPages($siteId) as $row) {

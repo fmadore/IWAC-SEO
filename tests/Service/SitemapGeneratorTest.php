@@ -146,13 +146,38 @@ final class SitemapGeneratorTest extends TestCase
         );
     }
 
+    /**
+     * A chunk past the first used to cost a COUNT(*) before the cache was
+     * even consulted; a cached one is now served without it.
+     */
+    public function testACachedHigherChunkIsServedWithoutCounting(): void
+    {
+        $dir = sys_get_temp_dir() . '/iwac-seo-chunk-test-' . bin2hex(random_bytes(6));
+        $this->repository->itemCount = 5;
+        $generator = $this->generator(['item_chunk_size' => 2], null, $dir);
+        try {
+            self::assertNotNull($generator->buildItems('https://islam.zmo.de/s/westafrica', 7, 2, 3600));
+            self::assertSame(1, $this->repository->itemCounts, 'a miss checks the bound');
+
+            self::assertNotNull($generator->buildItems('https://islam.zmo.de/s/westafrica', 7, 2, 3600));
+            self::assertSame(1, $this->repository->itemCounts, 'a hit does not');
+
+            self::assertNull($generator->buildItems('https://islam.zmo.de/s/westafrica', 7, 4, 3600), 'past the last chunk');
+            self::assertNotNull($generator->buildItems('https://islam.zmo.de/s/westafrica', 7, 1, 3600));
+            self::assertSame(2, $this->repository->itemCounts, 'chunk 1 is never counted');
+        } finally {
+            array_map('unlink', array_filter(glob($dir . '/*') ?: [], 'is_file'));
+            @rmdir($dir);
+        }
+    }
+
     /** @param array<string,mixed> $config */
-    private function generator(array $config, ?string $fileBaseUri = null): SitemapGenerator
+    private function generator(array $config, ?string $fileBaseUri = null, ?string $cacheDir = null): SitemapGenerator
     {
         return new SitemapGenerator(
             $this->repository,
             new UrlsetWriter(),
-            new XmlCache(null),
+            new XmlCache($cacheDir),
             $config,
             $fileBaseUri,
         );

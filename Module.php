@@ -534,8 +534,10 @@ class Module extends AbstractModule
      * Invalidate the sitemap cache so a change shows up on the next crawl
      * instead of after the TTL. Any create/update can affect the URL set or a
      * <lastmod> (including a public→private edit), so there is no public check.
-     * The clear is debounced per request, so a bulk import pays for it once
-     * rather than once per saved item.
+     * The sweep of the cached files is debounced per request, so a bulk import
+     * pays for it once; the generation stamp is still renewed on every save,
+     * which is what keeps a concurrent rebuild from publishing a stale
+     * document ({@see Service\Sitemap\XmlCache::clear()}).
      */
     private function invalidateSitemap(): void
     {

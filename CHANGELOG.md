@@ -17,6 +17,8 @@ All notable changes to the IWAC SEO module. Versions follow
 - An IndexNow network or TLS failure is logged by the drain job as an error. The Pinger used to swallow it and report "not sent", so the job's logging never ran.
 - The citation blocks render nothing under a theme without a `common/citation` partial, instead of throwing. The module still relies on the theme for the panel and its script.
 - A 304 from the citation downloads carries `Access-Control-Allow-Origin` like the 200 it stands for.
+- A fresh cached sitemap is served without taking the rebuild lock, so crawlers reading the same document are no longer queued behind one another. A miss still rebuilds under the lock, and a reader that waits more than five seconds for someone else's rebuild now gets the previous copy instead of a 503.
+- A cached item chunk past the first is served before its bound is checked, so it no longer costs a `COUNT(*)` on every request.
 
 ## 1.5.0 — 2026-11-17
 

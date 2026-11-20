@@ -3,13 +3,27 @@ declare(strict_types=1);
 
 namespace IwacSeo\Service\Sitemap;
 
-/** Atomic publication, generation invalidation and a per-document build lock. */
+/**
+ * Atomic publication, generation invalidation and a per-document build lock.
+ *
+ * A fresh hit is read without the lock: store() publishes by rename(), so a
+ * reader sees either the old document or the new one, never half of either.
+ * Only a miss takes the lock, and re-checks under it, so that one process
+ * rebuilds while the others wait — and, should the rebuild outlast the wait,
+ * get the previous document rather than an error.
+ */
 final class XmlCache
 {
     private bool $cleared = false;
 
-    public function __construct(private readonly ?string $directory)
-    {
+    /**
+     * @param float $lockWait seconds a miss waits for another process's
+     *   rebuild of the same document before serving the previous one
+     */
+    public function __construct(
+        private readonly ?string $directory,
+        private readonly float $lockWait = 5.0,
+    ) {
     }
 
     /** @param callable():string $build */
@@ -17,6 +31,10 @@ final class XmlCache
     {
         if ($this->directory === null || $ttl <= 0) {
             return new SitemapDocument($build(), time());
+        }
+        $hit = $this->cached($key, $ttl);
+        if ($hit !== null) {
+            return $hit;
         }
         if (!is_dir($this->directory)) {
             @mkdir($this->directory, 0775, true);
@@ -27,9 +45,15 @@ final class XmlCache
             return new SitemapDocument($build(), time());
         }
         try {
-            $deadline = microtime(true) + 5;
+            $deadline = microtime(true) + $this->lockWait;
             while (!flock($lock, LOCK_EX | LOCK_NB)) {
                 if (microtime(true) >= $deadline) {
+                    // Another process is rebuilding this document: serve the
+                    // copy it is replacing, if it is of the current generation.
+                    $stale = $this->read($file, PHP_INT_MAX);
+                    if ($stale !== null) {
+                        return $stale;
+                    }
                     throw new \RuntimeException('Sitemap rebuild is already running.');
                 }
                 usleep(50000);
@@ -75,6 +99,14 @@ final class XmlCache
         }
     }
 
+    /**
+     * Invalidate every document. Only the sweep of the files is debounced
+     * within a request; the generation is rewritten on every call, and must
+     * be: during a bulk import another process may have started a rebuild
+     * between two saves, and only a new generation stops it publishing a
+     * document that misses the later ones. One small file write per save is
+     * the price.
+     */
     public function clear(): void
     {
         if ($this->directory === null || !is_dir($this->directory)) {
@@ -116,6 +148,42 @@ final class XmlCache
             }
             @rmdir($this->directory);
         }
+    }
+
+    /**
+     * The cached document if it is fresh and of the current generation, read
+     * without taking any lock; null on a miss. Costs no database query, which
+     * is what lets a caller try it before a bounds check that does.
+     */
+    public function cached(string $key, int $ttl): ?SitemapDocument
+    {
+        if ($this->directory === null || $ttl <= 0) {
+            return null;
+        }
+        return $this->read($this->path($key), $ttl);
+    }
+
+    /**
+     * Lock-free read. The generation sidecar is read before the document and
+     * is written only after the document's rename(), so a current sidecar
+     * guarantees the document read next is the one it describes.
+     */
+    private function read(string $file, int $ttl): ?SitemapDocument
+    {
+        $generation = $this->generation();
+        if (@file_get_contents($file . '.generation') !== $generation) {
+            return null;
+        }
+        clearstatcache(true, $file);
+        $mtime = is_file($file) ? filemtime($file) : false;
+        if ($mtime === false || time() - $mtime >= $ttl) {
+            return null;
+        }
+        $xml = @file_get_contents($file);
+        if ($xml === false || $xml === '' || $this->generation() !== $generation) {
+            return null;
+        }
+        return new SitemapDocument($xml, $mtime);
     }
 
     private function generation(): string

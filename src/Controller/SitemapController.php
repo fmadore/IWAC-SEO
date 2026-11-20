@@ -21,7 +21,7 @@ use Omeka\Api\Representation\SiteRepresentation;
  *   /sitemap.xml               sitemap index
  *   /sitemap-pages.xml         site pages (+ home)
  *   /sitemap-item-sets.xml     item-set browse pages
- *   /sitemap-items-{n}.xml     items, chunked at 50k
+ *   /sitemap-items-{n}.xml     items, chunked at iwac_seo.sitemap.item_chunk_size
  *   /robots.txt                points crawlers at the sitemap
  *   /{indexnow-key}.txt        IndexNow ownership key
  */
@@ -122,20 +122,17 @@ class SitemapController extends AbstractActionController
         if ($chunk < 1) {
             return $this->notFound();
         }
-        // Chunk 1 always exists (an empty urlset is still valid), so only the
-        // higher chunks pay for the bound-checking COUNT query — at IWAC's
-        // scale chunk 1 is the only chunk, so cached requests stay query-free.
-        if ($chunk > 1 && $chunk > $this->generator->itemChunkCount($site->id())) {
-            return $this->notFound();
-        }
-        return $this->xml($this->generator->buildItems(
+        // Null past the last chunk. A cached chunk is served first, so cached
+        // requests stay query-free whichever chunk they ask for.
+        $document = $this->generator->buildItems(
             $this->siteUrl($site),
             $site->id(),
             $chunk,
             $this->ttl(),
             $this->altBases($site),
             $this->xDefaultBase($site)
-        ));
+        );
+        return $document === null ? $this->notFound() : $this->xml($document);
     }
 
     public function robotsAction(): Response

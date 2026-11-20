@@ -23,8 +23,12 @@ final class InMemorySitemapRepository implements SitemapRepositoryInterface
     /** @var array{siteId:int,offset:int,limit:int,withImages:bool}|null */
     public ?array $lastItemFetch = null;
 
+    /** How many times countItems() ran: a COUNT(*) on the real repository. */
+    public int $itemCounts = 0;
+
     public function countItems(int $siteId): int
     {
+        $this->itemCounts++;
         return $this->itemCount ?? count($this->items);
     }
 

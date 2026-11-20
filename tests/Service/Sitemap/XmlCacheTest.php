@@ -27,6 +27,68 @@ final class XmlCacheTest extends TestCase
         @rmdir($this->dir);
     }
 
+    /**
+     * A fresh hit takes no lock: with another process holding this document's
+     * build lock, it is still served at once, and the builder never runs.
+     */
+    public function testAFreshHitIsReadWithoutTheBuildLock(): void
+    {
+        $cache = new XmlCache($this->dir, 10.0);
+        $cache->remember('k', 3600, static fn (): string => 'cached');
+
+        $lock = $this->holdLock('k');
+        try {
+            $started = microtime(true);
+            $document = $cache->remember('k', 3600, static fn (): string => self::fail('a hit must not rebuild'));
+            self::assertSame('cached', $document->xml);
+            self::assertLessThan(1.0, microtime(true) - $started, 'did not wait for the lock');
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /** A rebuild that outlasts the wait leaves the waiting reader the previous copy, not a 503. */
+    public function testAReaderWaitingOnALongRebuildGetsThePreviousCopy(): void
+    {
+        $cache = new XmlCache($this->dir, 0.2);
+        $cache->remember('k', 60, static fn (): string => 'previous');
+        touch($this->dir . '/k.xml', time() - 120); // expired: a miss
+
+        $lock = $this->holdLock('k');
+        try {
+            $document = $cache->remember('k', 60, static fn (): string => self::fail('the lock is held'));
+            self::assertSame('previous', $document->xml);
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    public function testAReaderWaitingWithNothingToFallBackOnStillFails(): void
+    {
+        $cache = new XmlCache($this->dir, 0.2);
+        $cache->remember('other', 60, static fn (): string => 'makes the directory');
+
+        $lock = $this->holdLock('k');
+        try {
+            $this->expectException(\RuntimeException::class);
+            $cache->remember('k', 60, static fn (): string => 'never');
+        } finally {
+            flock($lock, LOCK_UN);
+            fclose($lock);
+        }
+    }
+
+    /** @return resource the build lock of $key, held as another process would */
+    private function holdLock(string $key)
+    {
+        $lock = fopen($this->dir . '/' . $key . '.xml.lock', 'c');
+        self::assertNotFalse($lock);
+        self::assertTrue(flock($lock, LOCK_EX | LOCK_NB));
+        return $lock;
+    }
+
     public function testFirstCallBuildsAndSecondCallHitsTheCache(): void
     {
         $cache = new XmlCache($this->dir);
