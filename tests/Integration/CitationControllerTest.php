@@ -89,6 +89,9 @@ final class CitationControllerTest extends TestCase
             self::assertSame($etag, $this->header($response, 'ETag'));
             self::assertSame('max-age=300, public', $this->header($response, 'Cache-Control'));
             self::assertNull($this->header($response, 'Content-Disposition'), 'no file, so no attachment');
+            // A cross-origin script revalidating with its own If-None-Match
+            // can read the 304 only if it is allowed to, like the 200.
+            self::assertSame('*', $this->header($response, 'Access-Control-Allow-Origin'));
         }
     }
 

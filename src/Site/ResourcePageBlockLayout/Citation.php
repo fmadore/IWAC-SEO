@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Site\ResourcePageBlockLayout;
 
+use IwacSeo\Site\CitationPartial;
 use Laminas\View\Renderer\PhpRenderer;
 use Omeka\Api\Representation\AbstractResourceEntityRepresentation;
 use Omeka\Api\Representation\ItemRepresentation;
@@ -49,9 +50,6 @@ class Citation implements ResourcePageBlockLayoutInterface
             return '';
         }
 
-        // The theme owns the UI: enqueue its citation script and render its
-        // partial. assetUrl()/partial() resolve against the active theme.
-        $view->headScript()->appendFile($view->assetUrl('js/citation.js'));
-        return $view->partial('common/citation', ['citation' => $citation]);
+        return CitationPartial::render($view, $citation);
     }
 }

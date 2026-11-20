@@ -28,7 +28,10 @@ class Pinger
     /**
      * @param string[] $urls
      * @return int the HTTP status IndexNow answered (200/202 when accepted), or
-     *             {@see NOT_SENT}; {@see PingOutcome::fromStatus()} classifies it
+     *             {@see NOT_SENT} when there was nothing valid to send;
+     *             {@see PingOutcome::fromStatus()} classifies it
+     * @throws \Throwable a transport failure (DNS, TLS, timeout), left to the
+     *   caller to log: swallowed here, it was never reported anywhere
      */
     public function submitIndexNow(string $host, string $key, string $keyLocation, array $urls): int
     {
@@ -48,18 +51,14 @@ class Pinger
             return self::NOT_SENT;
         }
 
-        try {
-            // Clone so per-request state never leaks into the shared client.
-            $client = clone $this->httpClient;
-            $client->setUri(self::ENDPOINT);
-            $client->setMethod('POST');
-            $client->setOptions(['timeout' => 10]);
-            $client->setHeaders(['Content-Type' => 'application/json; charset=utf-8']);
-            $client->setRawBody($payload);
-            return (int) $client->send()->getStatusCode();
-        } catch (\Throwable $e) {
-            return self::NOT_SENT;
-        }
+        // Clone so per-request state never leaks into the shared client.
+        $client = clone $this->httpClient;
+        $client->setUri(self::ENDPOINT);
+        $client->setMethod('POST');
+        $client->setOptions(['timeout' => 10]);
+        $client->setHeaders(['Content-Type' => 'application/json; charset=utf-8']);
+        $client->setRawBody($payload);
+        return (int) $client->send()->getStatusCode();
     }
 
     public static function accepted(int $status): bool

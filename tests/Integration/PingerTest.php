@@ -47,10 +47,12 @@ final class PingerTest extends TestCase
         $this->assertSame(503, $this->submit());
     }
 
-    public function testATransportFailureIsNotSent(): void
+    /** The caller (the drain job) logs it; swallowed here, nothing ever did. */
+    public function testATransportFailureReachesTheCaller(): void
     {
         $this->adapter->setNextRequestWillFail(true);
-        $this->assertSame(Pinger::NOT_SENT, $this->submit());
+        $this->expectException(\Laminas\Http\Client\Adapter\Exception\RuntimeException::class);
+        $this->submit();
     }
 
     /** A key IndexNow could never verify is not sent at all. */
@@ -64,7 +66,11 @@ final class PingerTest extends TestCase
         $this->assertSame(Pinger::NOT_SENT, $this->submit('not-hex!'));
         $this->assertSame(Pinger::NOT_SENT, $this->submit('abc'));
 
-        $this->assertSame(Pinger::NOT_SENT, $this->submit(), 'the first real connection fails as armed');
+        try {
+            $this->submit();
+            $this->fail('the first real connection fails as armed');
+        } catch (\Laminas\Http\Client\Adapter\Exception\RuntimeException) {
+        }
         $this->assertSame(200, $this->submit());
     }
 }

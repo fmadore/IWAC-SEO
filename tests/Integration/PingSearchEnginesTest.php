@@ -117,6 +117,19 @@ final class PingSearchEnginesTest extends TestCase
         self::assertSame([], $this->messages('WARN'));
     }
 
+    /** A network or TLS failure is logged as an error and retried later. */
+    public function testATransportFailureIsLoggedAndRetried(): void
+    {
+        $this->adapter->setNextRequestWillFail(true);
+        $this->drain();
+
+        self::assertSame(['pending' => 2, 'failed' => 0], $this->outbox->counts());
+        self::assertFalse($this->outbox->hasDue(), 'backing off');
+        $errors = $this->messages('ERR');
+        self::assertCount(1, $errors);
+        self::assertStringContainsString('IndexNow transport failed for islam.zmo.de', $errors[0]);
+    }
+
     /** Nothing is claimed, so the URLs go out untouched once a valid key is saved. */
     public function testAMalformedKeyLeavesTheQueueAlone(): void
     {

@@ -171,16 +171,22 @@ class Module extends AbstractModule
 
     public function uninstall(ServiceLocatorInterface $services): void
     {
+        // Omeka lets an inactive module be uninstalled: its classes are then
+        // not autoloadable and its services not registered.
+        $this->loadLifecycleDependencies();
         $services->get('Omeka\Connection')->executeStatement('DROP TABLE IF EXISTS iwac_seo_ping');
         $settings = $services->get('Omeka\Settings');
         foreach (self::SETTINGS as $key) {
             $settings->delete($key);
         }
-        // Remove the cached sitemap files (files/iwac-seo-cache).
+        // Remove the cached sitemap files (files/iwac-seo-cache) by path, not
+        // through the generator service, which an inactive module lacks.
         try {
-            $services->get(SitemapGenerator::class)->destroyCache();
+            (new Service\Sitemap\XmlCache(
+                Service\SitemapGeneratorFactory::cacheDirectory((array) $services->get('Config'))
+            ))->destroy();
         } catch (\Throwable $e) {
-            // best-effort
+            error_log('IwacSeo: could not remove the sitemap cache on uninstall: ' . $e->getMessage());
         }
         // Drop the per-site static-page overrides too.
         try {

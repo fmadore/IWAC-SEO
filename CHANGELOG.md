@@ -13,6 +13,10 @@ All notable changes to the IWAC SEO module. Versions follow
 - A URI value with an empty label falls back to its URI, as one with no label did.
 - A video's composed description drops an impossible day (`2022-02-30`) instead of reading it out.
 - The README and the `StructuredData` docblock now say what the code does: on a resource page the JSON-LD `image`, like `thumbnailUrl`, is the record's own picture or nothing; only `og:image` falls back to the site's default share image.
+- Uninstalling the module while it is inactive (which Omeka allows) now removes `files/iwac-seo-cache/`: the cache is deleted by path, as the generator service is not registered then. A failure is logged instead of silently ignored.
+- An IndexNow network or TLS failure is logged by the drain job as an error. The Pinger used to swallow it and report "not sent", so the job's logging never ran.
+- The citation blocks render nothing under a theme without a `common/citation` partial, instead of throwing. The module still relies on the theme for the panel and its script.
+- A 304 from the citation downloads carries `Access-Control-Allow-Origin` like the 200 it stands for.
 
 ## 1.5.0 — 2026-11-17
 

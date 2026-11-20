@@ -54,9 +54,12 @@ trait SendsResponses
      * ETag over the body, the record's last change as Last-Modified, and a
      * short public max-age, so a reference manager or a cache revalidates
      * cheaply. A conditional GET whose copy is current is answered 304, with
-     * the validators and no body.
+     * the validators, the extra headers that do not describe a body, and no body.
      *
-     * @param array<string,string> $headers extra header lines, sent with the body only
+     * @param array<string,string> $headers extra header lines; all but the
+     *   Content-* ones go on the 304 too: a cross-origin client revalidating
+     *   with its own If-None-Match can read the answer only if it carries
+     *   Access-Control-Allow-Origin
      */
     private function respondCacheable(
         string $body,
@@ -85,7 +88,13 @@ trait SendsResponses
             $response = $this->respondWithStatus(304);
             $response->setContent('');
             $responseHeaders = $response->getHeaders();
-            foreach ($validators + ['X-Robots-Tag' => 'noindex'] as $name => $value) {
+            // Content-* lines describe the body a 304 does not carry.
+            $kept = array_filter(
+                $headers,
+                static fn (string $name): bool => stripos($name, 'Content-') !== 0,
+                ARRAY_FILTER_USE_KEY
+            );
+            foreach ($validators + $kept + ['X-Robots-Tag' => 'noindex'] as $name => $value) {
                 $responseHeaders->addHeaderLine($name, $value);
             }
             return $response;

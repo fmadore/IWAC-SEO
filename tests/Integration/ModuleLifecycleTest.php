@@ -54,6 +54,43 @@ final class ModuleLifecycleTest extends TestCase
         }
     }
 
+    /**
+     * Omeka allows uninstalling an inactive module: no IwacSeo class is
+     * autoloadable and no IwacSeo service registered. The sitemap cache must
+     * still go, removed by path.
+     */
+    #[RunInSeparateProcess]
+    #[PreserveGlobalState(false)]
+    public function testUninstallOfAnInactiveModuleRemovesTheSitemapCache(): void
+    {
+        require_once dirname(__DIR__, 2) . '/Module.php';
+        $files = sys_get_temp_dir() . '/iwac-seo-uninstall-' . bin2hex(random_bytes(4));
+        $cache = $files . '/iwac-seo-cache';
+        mkdir($cache, 0777, true);
+        file_put_contents($cache . '/generation', 'abc');
+        file_put_contents($cache . '/sitemap-items-1.xml', '<urlset/>');
+
+        $services = new ServiceManager();
+        $services->setService('Omeka\\Connection', DriverManager::getConnection(['driver' => 'pdo_sqlite', 'memory' => true]));
+        $services->setService('Omeka\\Settings', $this->getMockBuilder(Settings::class)->disableOriginalConstructor()->getMock());
+        $services->setService('Config', ['file_store' => ['local' => ['base_path' => $files]]]);
+        $blocker = static function (string $class): void {
+            if (str_starts_with($class, 'IwacSeo\\Service\\')) {
+                throw new \RuntimeException('Inactive module cannot autoload ' . $class);
+            }
+        };
+        spl_autoload_register($blocker, true, true);
+        try {
+            (new \IwacSeo\Module())->uninstall($services);
+            self::assertDirectoryDoesNotExist($cache);
+        } finally {
+            spl_autoload_unregister($blocker);
+            array_map('unlink', glob($cache . '/*') ?: []);
+            @rmdir($cache);
+            @rmdir($files);
+        }
+    }
+
     private function runModuleLifecycle(bool $upgrade): void
     {
         require_once dirname(__DIR__, 2) . '/Module.php';

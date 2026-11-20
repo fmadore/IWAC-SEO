@@ -250,12 +250,6 @@ class SitemapGenerator
         $this->cache->clear();
     }
 
-    /** Clear the cache and remove the cache directory itself (uninstall). */
-    public function destroyCache(): void
-    {
-        $this->cache->destroy();
-    }
-
     // ─── Helpers ────────────────────────────────────────────────────────────
 
     /**
