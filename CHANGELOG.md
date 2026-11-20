@@ -6,6 +6,7 @@ All notable changes to the IWAC SEO module. Versions follow
 ## Unreleased
 
 - Fix an HTTP 500 on any page whose query string has a numeric key (`?0=1`): the canonical URL policy lower-cased the key, which `parse_str()` had turned into an integer. Browse pages and every route without its own canonical were affected.
+- The module's French catalogue is now loaded: Omeka reads a module's `language/*.mo` only when the module registers it, and this one never did, so its admin screens stayed in English on a French admin. The compiled catalogue no longer declares a two-form plural rule, which clashed with core's three-form French rule and would have made Laminas refuse the merge on every French request.
 
 ## 1.5.0 — 2026-11-17
 

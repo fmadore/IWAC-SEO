@@ -227,6 +227,19 @@ return $instance + [
         ],
     ],
 
+    // Omeka loads .mo files only for core and the active theme; a module's
+    // catalogue is read only if the module registers it here.
+    'translator' => [
+        'translation_file_patterns' => [
+            [
+                'type' => 'gettext',
+                'base_dir' => dirname(__DIR__) . '/language',
+                'pattern' => '%s.mo',
+                'text_domain' => null,
+            ],
+        ],
+    ],
+
     'view_manager' => [
         'template_path_stack' => [
             __DIR__ . '/../view',

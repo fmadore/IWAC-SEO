@@ -2,6 +2,9 @@
 #
 # This file is distributed under the same license as the IWAC SEO module.
 # Compile with: php .github/scripts/compile-po.php
+# The compiler leaves Plural-Forms out of fr.mo on purpose: Laminas merges
+# this catalogue into core's and throws if the plural counts differ (see the
+# note in compile-po.php). Compiling with another tool would copy it back in.
 #
 msgid ""
 msgstr ""

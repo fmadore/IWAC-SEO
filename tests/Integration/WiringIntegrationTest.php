@@ -69,6 +69,34 @@ final class WiringIntegrationTest extends TestCase
     }
 
     /**
+     * Omeka reads no module's .mo by itself: only core's and the active
+     * theme's. The module's catalogue must reach MvcTranslator through the
+     * merged translator config, as Laminas's ConfigListener merges it.
+     */
+    public function testTheFrenchCatalogueReachesOmekasTranslator(): void
+    {
+        if (!defined('OMEKA_PATH')) {
+            define('OMEKA_PATH', rtrim((string) getenv('OMEKA_PATH'), "\/"));
+        }
+        $core = require OMEKA_PATH . '/application/config/module.config.php';
+        $string = 'Bilingual (hreflang) coverage';
+
+        $translate = static function (array $config) use ($string): string {
+            $services = new ServiceManager();
+            $services->setService('config', $config);
+            $translator = (new \Laminas\Mvc\I18n\TranslatorFactory())($services, 'MvcTranslator');
+            $translator->setLocale('fr');
+            return $translator->translate($string);
+        };
+
+        // Core's catalogue alone does not know the module's strings.
+        self::assertSame($string, $translate(['translator' => $core['translator']]));
+
+        $merged = \Laminas\Stdlib\ArrayUtils::merge(['translator' => $core['translator']], $this->config);
+        self::assertSame('Couverture bilingue (hreflang)', $translate($merged));
+    }
+
+    /**
      * The page block is registered under the name PageCitationData looks
      * for — the config spells it out, so the two are held equal here — and
      * is a real Omeka block layout.

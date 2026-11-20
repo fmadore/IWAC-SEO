@@ -39,6 +39,12 @@ function parsePo(string $path): array
             }
             continue;
         }
+        if (str_starts_with($line, 'msgid_plural') || str_starts_with($line, 'msgstr[')) {
+            // Plural entries would need a Plural-Forms header, and it would
+            // then have to match Omeka core's: see the header note below.
+            fwrite(STDERR, $path . ": plural entries are not supported by this compiler.\n");
+            exit(1);
+        }
         if (preg_match('/^msgid\s+"(.*)"$/s', $line, $m)) {
             $flush();
             $msgid = stripcslashes($m[1]);
@@ -106,9 +112,14 @@ $compiled = 0;
 foreach (glob($root . '/language/*.po') ?: [] as $po) {
     $locale = basename($po, '.po');
     $entries = parsePo($po);
+    // No Plural-Forms header. Laminas merges every catalogue for a locale into
+    // one text domain, core's first, and throws on a later one whose plural
+    // count differs: Omeka 4.2.1's fr.mo declares three forms, so the two this script
+    // used to hard-code for every locale broke every French request once the
+    // catalogue was registered. With no plural messages, no rule is needed.
     $header = "Project-Id-Version: IWAC SEO\nMIME-Version: 1.0\n"
         . "Content-Type: text/plain; charset=UTF-8\nContent-Transfer-Encoding: 8bit\n"
-        . 'Language: ' . $locale . "\nPlural-Forms: nplurals=2; plural=(n > 1);\n";
+        . 'Language: ' . $locale . "\n";
     file_put_contents($root . '/language/' . $locale . '.mo', compileMo($entries, $header));
     fwrite(STDOUT, sprintf("Compiled language/%s.mo (%d translated strings).\n", $locale, count($entries)));
     $compiled++;
