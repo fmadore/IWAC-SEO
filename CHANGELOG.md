@@ -3,6 +3,10 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+- Fix an HTTP 500 on any page whose query string has a numeric key (`?0=1`): the canonical URL policy lower-cased the key, which `parse_str()` had turned into an integer. Browse pages and every route without its own canonical were affected.
+
 ## 1.5.0 — 2026-11-17
 
 Found by checking the live citations of every item type on both sites.

@@ -20,7 +20,11 @@ final class UrlPolicy
         }
         parse_str($query, $params);
         foreach (array_keys($params) as $key) {
-            if (str_starts_with(strtolower($key), 'utm_') || in_array(strtolower($key), ['gclid', 'fbclid', 'msclkid'], true)) {
+            // parse_str() turns a numeric key ("?0=1") into an int, which
+            // strtolower() refuses under strict_types: cast, or any visitor
+            // can 500 the page with a one-character query string.
+            $name = strtolower((string) $key);
+            if (str_starts_with($name, 'utm_') || in_array($name, ['gclid', 'fbclid', 'msclkid'], true)) {
                 unset($params[$key]);
             }
         }

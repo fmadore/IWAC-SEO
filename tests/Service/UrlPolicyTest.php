@@ -57,4 +57,15 @@ final class UrlPolicyTest extends TestCase
         self::assertTrue(UrlPolicy::isFiltered('https://example.test/items?page=2&search=islam'));
         self::assertTrue(UrlPolicy::isFiltered('https://example.test/items?page[]=2'));
     }
+
+    public function testANumericQueryKeyIsKeptNotFatal(): void
+    {
+        // parse_str() yields int keys for these; strtolower() used to throw a
+        // TypeError under strict_types, turning "?0=1" into an HTTP 500.
+        $base = 'https://islam.zmo.de/s/afrique_ouest/item';
+        self::assertSame($base . '?0=1', UrlPolicy::canonical($base . '?0=1'));
+        self::assertSame($base . '?123=x&page=2', UrlPolicy::canonical($base . '?utm_source=a&123=x&page=2'));
+        self::assertTrue(UrlPolicy::isFiltered($base . '?0=1'));
+        self::assertTrue(UrlPolicy::isFiltered($base . '?7=&page=3'));
+    }
 }

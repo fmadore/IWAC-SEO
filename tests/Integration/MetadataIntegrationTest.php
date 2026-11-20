@@ -193,6 +193,36 @@ final class MetadataIntegrationTest extends TestCase
         );
     }
 
+    /** @return array<string,array{string}> */
+    public static function numericQueryKeys(): array
+    {
+        return [
+            'zero' => ['?0=1'],
+            'several digits beside a real filter' => ['?123=x&page=2'],
+        ];
+    }
+
+    /**
+     * A numeric query key reaches both canonical paths: the browse listener
+     * and the layout gap-fill for routes nothing else claims. parse_str()
+     * makes the key an int, which used to throw a TypeError (HTTP 500).
+     */
+    #[\PHPUnit\Framework\Attributes\DataProvider('numericQueryKeys')]
+    public function testANumericQueryKeyNeitherBreaksBrowseNorTheGapFill(string $query): void
+    {
+        $browse = 'https://example.test/s/afrique_ouest/item' . $query;
+        $view = $this->renderer($browse);
+        $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyBrowse($view, $this->site());
+        self::assertStringContainsString('href="' . $browse . '"', $this->decoded($view->headLink()->toString()));
+        self::assertStringContainsString('content="noindex, follow"', $this->decoded($view->headMeta()->toString()));
+
+        $other = 'https://example.test/s/afrique_ouest/search' . $query;
+        $view = $this->renderer($other);
+        $this->metadata(['iwac_seo_noindex_browse' => '1'])->applyGlobals($view, $this->site());
+        self::assertStringContainsString('href="' . $other . '"', $this->decoded($view->headLink()->toString()));
+        self::assertStringContainsString('content="noindex, follow"', $this->decoded($view->headMeta()->toString()));
+    }
+
     public function testResourceCanonicalSurvivesTheLayoutGapFill(): void
     {
         // A paginated resource page (?page=N on the linked-resources table)
