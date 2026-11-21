@@ -181,7 +181,7 @@ final class CitationControllerTest extends TestCase
         );
         $controller->setPluginManager(new PluginManager(new ServiceManager()));
         $event = new MvcEvent();
-        $event->setRouteMatch(new RouteMatch(['action' => 'index', 'id' => '42', 'format' => 'csljson']));
+        $event->setRouteMatch(new RouteMatch(['action' => 'item', 'id' => '42', 'format' => 'csljson']));
         $controller->setEvent($event);
 
         $request = new Request();

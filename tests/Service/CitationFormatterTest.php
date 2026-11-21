@@ -17,6 +17,7 @@ final class CitationFormatterTest extends TestCase
     }
 
     /** A CitationData::build() record, described as the array form for brevity. */
+    /** @param array<string,mixed> $overrides */
     private function record(array $overrides = []): CitationRecord
     {
         return CitationRecord::fromArray(array_merge([
@@ -43,6 +44,7 @@ final class CitationFormatterTest extends TestCase
         ], $overrides));
     }
 
+    /** @return array<string,mixed> */
     private function person(string $given, string $family): array
     {
         return [
@@ -53,6 +55,7 @@ final class CitationFormatterTest extends TestCase
         ];
     }
 
+    /** @return array<string,mixed> */
     private function institution(string $name): array
     {
         return ['family' => null, 'given' => null, 'literal' => $name, 'isInstitution' => true];

@@ -8,6 +8,10 @@ use PHPUnit\Framework\TestCase;
 
 final class HreflangTest extends TestCase
 {
+    /**
+     * @param array<string,mixed> $overrides
+     * @return array<string,mixed>
+     */
     private function config(array $overrides = []): array
     {
         return array_merge([

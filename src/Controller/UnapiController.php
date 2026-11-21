@@ -45,7 +45,7 @@ class UnapiController extends AbstractActionController
     ) {
     }
 
-    public function indexAction(): Response
+    public function unapiAction(): Response
     {
         if (!$this->enabled()) {
             return $this->status(404);
@@ -88,7 +88,7 @@ class UnapiController extends AbstractActionController
      */
     private function resolveItem(string $id): ?ItemRepresentation
     {
-        if (!UrlPolicy::isOwnHost($id, $this->getRequest()->getUri()->getHost())) {
+        if (!UrlPolicy::isOwnHost($id, $this->httpRequest()->getUri()->getHost())) {
             return null;
         }
         if (!preg_match('#/item/(\d+)#', $id, $m)) {

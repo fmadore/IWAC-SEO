@@ -24,6 +24,8 @@ use Laminas\Http\Response;
  */
 trait SendsResponses
 {
+    use HttpMessages;
+
     /**
      * @param array<string,string> $headers extra header lines
      */
@@ -34,7 +36,7 @@ trait SendsResponses
         array $headers = [],
         bool $noindex = true
     ): Response {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode($status);
         $response->setContent($body);
 
@@ -75,7 +77,7 @@ trait SendsResponses
             $validators['Last-Modified'] = $lastModified;
         }
 
-        $request = $this->getRequest();
+        $request = $this->httpRequest();
         if (
             ($request->isGet() || $request->isHead())
             && HttpCache::notModified(
@@ -116,7 +118,7 @@ trait SendsResponses
     /** A bare status response with no body (404, 406 …). */
     private function respondWithStatus(int $code): Response
     {
-        $response = $this->getResponse();
+        $response = $this->httpResponse();
         $response->setStatusCode($code);
         return $response;
     }

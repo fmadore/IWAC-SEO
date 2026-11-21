@@ -19,6 +19,8 @@ use Omeka\Form\Element\Asset;
  *
  * The settings keys here are the module's whole persistent surface; they are
  * created on configure and dropped on uninstall (see Module::SETTINGS).
+ *
+ * @extends Form<array<string,mixed>>
  */
 class ConfigForm extends Form
 {

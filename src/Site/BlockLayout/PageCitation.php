@@ -52,7 +52,12 @@ class PageCitation extends AbstractBlockLayout
         if (!$helpers->has('iwacCitation')) {
             return '';
         }
-        $citation = $view->iwacCitation($block->page());
+        // Omeka documents page() as returning the site; it returns the page.
+        $page = $block->page();
+        if (!$page instanceof SitePageRepresentation) {
+            return '';
+        }
+        $citation = $view->iwacCitation($page);
         if ($citation === null) {
             return '';
         }

@@ -40,7 +40,7 @@ class SitemapController extends AbstractActionController
     ) {
     }
 
-    public function indexAction(): Response
+    public function sitemapIndexAction(): Response
     {
         if (!$this->sitemapEnabled()) {
             return $this->notFound();

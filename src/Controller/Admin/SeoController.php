@@ -3,6 +3,7 @@ declare(strict_types=1);
 
 namespace IwacSeo\Controller\Admin;
 
+use IwacSeo\Controller\Concern\HttpMessages;
 use IwacSeo\Form\PageSeoForm;
 use IwacSeo\Service\CitationData;
 use IwacSeo\Service\CitationDiagnostics;
@@ -18,6 +19,7 @@ use IwacSeo\Service\SitemapGenerator;
 use IwacSeo\Service\SiteResolver;
 use IwacSeo\Service\UrlPolicy;
 use Laminas\Mvc\Controller\AbstractActionController;
+use Laminas\Http\Response;
 use Laminas\View\Model\ViewModel;
 use Omeka\Api\Manager as ApiManager;
 use Omeka\Api\Representation\SiteRepresentation;
@@ -28,6 +30,8 @@ use Omeka\Api\Representation\SiteRepresentation;
  */
 class SeoController extends AbstractActionController
 {
+    use HttpMessages;
+
     public function __construct(
         private readonly SitemapGenerator $generator,
         private readonly PageSeoStore $pageSeoStore,
@@ -168,9 +172,9 @@ class SeoController extends AbstractActionController
         return ['unpaired' => $unpaired, 'broken' => $broken];
     }
 
-    public function regenerateAction()
+    public function regenerateAction(): Response
     {
-        if ($this->getRequest()->isPost()) {
+        if ($this->httpRequest()->isPost()) {
             $form = $this->getForm(\Omeka\Form\ConfirmForm::class);
             $form->setData($this->params()->fromPost());
             if ($form->isValid()) {
@@ -183,7 +187,7 @@ class SeoController extends AbstractActionController
         return $this->redirect()->toRoute('admin/iwac-seo');
     }
 
-    public function pagesAction()
+    public function pagesAction(): ViewModel|Response
     {
         // IWAC is bilingual: the same collection is two Omeka sites
         // (afrique_ouest/fr, westafrica/en), each with its own static pages and
@@ -206,7 +210,7 @@ class SeoController extends AbstractActionController
             $pageTitles[$page->id()] = (string) $page->title();
         }
 
-        if ($this->getRequest()->isPost()) {
+        if ($this->httpRequest()->isPost()) {
             $post = $this->params()->fromPost();
             $form->setData($post);
             if ($form->isValid()) {

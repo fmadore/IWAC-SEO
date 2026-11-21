@@ -1,70 +1,32 @@
-# Findings that predate analysis being enforced, recorded rather than fixed:
-# 56 missing array value types, plus three judgement calls documented in the
-# commit that added this file. The point is the ratchet — level 6 applies in
-# full to new and changed code, while the standing debt stays visible and
-# shrinkable. It is a ledger, not a suppression list: delete entries as they
-# are fixed, and never regenerate it wholesale to make a new error disappear.
+# Analysed against the real Omeka S 4.2.1 application (OMEKA_PATH), not
+# stand-ins: tests/phpstan-bootstrap.php registers Omeka's autoloader, so every
+# Omeka and Laminas type the module touches is the real one and nothing at the
+# application boundary needs ignoring.
 #
-# Regenerating needs PHP, which this module is not developed with. Run
-# `vendor/bin/phpstan analyse --generate-baseline=phpstan-baseline.neon`
-# wherever PHP is available, or restore the CI steps removed in this commit.
-includes:
-    - phpstan-baseline.neon
+# There is no baseline: level 6 applies in full. Fix a new finding; do not
+# record it. The one ignore below is a known PHPStan limitation, explained.
 
 parameters:
     level: 6
+
+    # Analysis runs on whatever PHP CI's Omeka job uses (production 8.5);
+    # pinning the version keeps it reporting against the declared 8.4 floor.
+    phpVersion: 80400
 
     paths:
         - Module.php
         - src
         - tests
 
-    # tests/Shim/omeka.php is *executed*: it gives the two classes the suite
-    # instantiates (a settings store, a job dispatcher) real bodies, guarded by
-    # class_exists() so a real Omeka always wins.
     bootstrapFiles:
+        - tests/phpstan-bootstrap.php
+
+    excludePaths:
+        # Stand-ins for the unit suite, which runs without Omeka; with the
+        # real classes loaded they are dead code by construction.
         - tests/Shim/omeka.php
 
-    # tests/Stub/omeka-laminas.stub is only *parsed*, to declare the Omeka and
-    # Laminas supertypes the module extends or implements. It exists because
-    # "extends unknown class" is the one error PHPStan will not let
-    # ignoreErrors suppress — without it those files would have to leave
-    # analysis via excludePaths. See the file's own header.
-    #
-    # scanFiles, not stubFiles: stubs only override the PHPDoc of symbols that
-    # already exist, so they cannot introduce a class PHPStan has never seen.
-    # scanFiles is the symbol-discovery mechanism for code that is not a
-    # Composer dependency, which is exactly what Omeka is here.
-    scanFiles:
-        - tests/Stub/omeka-laminas.stub
-
     ignoreErrors:
-        # Omeka S is not a Composer dependency, so the application boundary is
-        # opaque by construction and everything downstream of it is noise:
-        # classes and interfaces that cannot resolve, calls to methods the
-        # module inherits from them (including $view->anyHelper(), which
-        # PhpRenderer dispatches through __call()), and argument types PHPStan
-        # cannot check because it does not know Omeka's representation
-        # hierarchy — that an ItemRepresentation is an
-        # AbstractResourceEntityRepresentation is an
-        # AbstractResourceRepresentation.
-        #
-        # argument.type is the broadest of these and the one to revisit: it
-        # would also mask a genuine mismatch between two of the module's own
-        # classes. Narrowing it means stubbing the representation hierarchy,
-        # which is a large speculative surface for the return.
-        #
-        # Analysis of the module's own logic is unaffected — nullability, dead
-        # branches, unused parameters and missing array value types all still
-        # report.
-        -
-            identifiers:
-                - class.notFound
-                - interface.notFound
-                - method.notFound
-                - staticMethod.notFound
-                - argument.type
-
         # ResourceValueReader is a trait, and PHPStan checks constant usage per
         # *using* class: DATE_TERMS and ABSTRACT_TERMS are reported unused
         # against StructuredData, the one of the four users that does not read
@@ -74,9 +36,12 @@ parameters:
             identifier: classConstant.unused
             path: src/Service/StructuredData.php
 
-    # The list above is broad by necessity, and which entries match shifts with
-    # every PHPStan release. An ignore that stops matching is not worth failing
-    # a build over.
-    reportUnmatchedIgnoredErrors: false
-
     treatPhpDocTypesAsCertain: false
+
+services:
+    # Types the Omeka view helpers and controller plugins the module calls by
+    # name through Laminas's __call(), from the real helper classes.
+    -
+        class: IwacSeo\Test\PHPStan\PluginMethodsExtension
+        tags:
+            - phpstan.broker.methodsClassReflectionExtension

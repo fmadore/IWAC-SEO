@@ -106,7 +106,7 @@ return $instance + [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/sitemap.xml',
-                    'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'index'],
+                    'defaults' => ['controller' => Controller\SitemapController::class, 'action' => 'sitemapIndex'],
                 ],
             ],
             'iwac-seo-sitemap-pages' => [
@@ -153,7 +153,7 @@ return $instance + [
                 'type'    => Literal::class,
                 'options' => [
                     'route'    => '/unapi',
-                    'defaults' => ['controller' => Controller\UnapiController::class, 'action' => 'index'],
+                    'defaults' => ['controller' => Controller\UnapiController::class, 'action' => 'unapi'],
                 ],
             ],
             // Single-item citation downloads: /cite/{item-id}/{format}. Host-root
@@ -165,7 +165,7 @@ return $instance + [
                 'options' => [
                     'route'       => '/cite/:id/:format',
                     'constraints' => ['id' => '\d+', 'format' => '[a-z]+'],
-                    'defaults'    => ['controller' => Controller\CitationController::class, 'action' => 'index'],
+                    'defaults'    => ['controller' => Controller\CitationController::class, 'action' => 'item'],
                 ],
             ],
             // Site-page citation downloads: /cite/page/{page-id}/{format}. A

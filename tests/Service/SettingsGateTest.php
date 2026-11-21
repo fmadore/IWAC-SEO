@@ -4,7 +4,7 @@ declare(strict_types=1);
 namespace IwacSeo\Test\Service;
 
 use IwacSeo\Service\SettingsGate;
-use Omeka\Settings\Settings;
+use IwacSeo\Test\Double\InMemorySettings;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -15,9 +15,10 @@ use PHPUnit\Framework\TestCase;
  */
 final class SettingsGateTest extends TestCase
 {
+    /** @param array<string,mixed> $values */
     private function gate(array $values): SettingsGate
     {
-        return new SettingsGate(new Settings($values));
+        return new SettingsGate(new InMemorySettings($values));
     }
 
     public function testTruthinessAcceptsEveryStoredForm(): void

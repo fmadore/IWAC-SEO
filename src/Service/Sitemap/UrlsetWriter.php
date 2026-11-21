@@ -97,7 +97,11 @@ final class UrlsetWriter
     }
 
 
-    /** Declare the xhtml/image namespaces only when the document uses them. */
+    /**
+     * Declare the xhtml/image namespaces only when the document uses them.
+     *
+     * @param array<int,array<string,mixed>> $urls
+     */
     private function namespaces(array $urls): string
     {
         $hasAlternates = false;

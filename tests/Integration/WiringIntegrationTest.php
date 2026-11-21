@@ -85,7 +85,9 @@ final class WiringIntegrationTest extends TestCase
             $services = new ServiceManager();
             $services->setService('config', $config);
             $translator = (new \Laminas\Mvc\I18n\TranslatorFactory())($services, 'MvcTranslator');
-            $translator->setLocale('fr');
+            $inner = $translator->getTranslator();
+            self::assertInstanceOf(\Laminas\I18n\Translator\Translator::class, $inner);
+            $inner->setLocale('fr');
             return $translator->translate($string);
         };
 
@@ -200,11 +202,11 @@ final class WiringIntegrationTest extends TestCase
         $router = TreeRouteStack::factory(['routes' => $routes]);
 
         $cases = [
-            '/sitemap.xml' => [SitemapController::class, 'index'],
+            '/sitemap.xml' => [SitemapController::class, 'sitemapIndex'],
             '/sitemap-items-3.xml' => [SitemapController::class, 'items'],
             '/robots.txt' => [SitemapController::class, 'robots'],
-            '/unapi' => [UnapiController::class, 'index'],
-            '/cite/42/ris' => [CitationController::class, 'index'],
+            '/unapi' => [UnapiController::class, 'unapi'],
+            '/cite/42/ris' => [CitationController::class, 'item'],
             '/cite/page/7/bibtex' => [CitationController::class, 'page'],
         ];
         foreach ($cases as $path => [$controller, $action]) {

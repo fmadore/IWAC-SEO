@@ -936,7 +936,11 @@ final class CitationFormatter
         return mb_strtoupper(mb_substr($text, 0, 1)) . mb_substr($text, 1);
     }
 
-    /** Join non-empty segments with single spaces. */
+    /**
+     * Join non-empty segments with single spaces.
+     *
+     * @param array<int,string|null> $parts
+     */
     private function join(array $parts): string
     {
         return implode(' ', array_filter(array_map('trim', $parts), static fn ($p) => $p !== ''));

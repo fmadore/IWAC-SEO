@@ -162,7 +162,7 @@ class Citation extends AbstractHelper
             }
             $downloads[$fmt] = [
                 'url'   => $view->serverUrl($downloadPath . $fmt) . $query,
-                'label' => self::FORMAT_LABELS[$fmt] ?? strtoupper($fmt),
+                'label' => self::FORMAT_LABELS[$fmt],
                 'ext'   => CitationExport::FORMATS[$fmt][0],
             ];
         }

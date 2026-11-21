@@ -82,8 +82,14 @@ jobs:
         if: ${{ !cancelled() }}
         run: composer lint
 
-      - name: Static analysis (PHPStan level 6)
+      - name: Download and verify Omeka S 4.2.1
         if: ${{ !cancelled() }}
+        run: .github/scripts/fetch-omeka.sh
+
+      - name: Static analysis (PHPStan level 6, against Omeka S 4.2.1)
+        if: ${{ !cancelled() }}
+        env:
+          OMEKA_PATH: ${{ github.workspace }}/.integration/omeka-s
         run: composer analyse
 
       - name: Run tests

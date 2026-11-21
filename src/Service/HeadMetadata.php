@@ -80,10 +80,9 @@ class HeadMetadata
             'og:title' => $title,
             'og:url'   => $canonical,
         ]);
-        if ($description !== null) {
-            $this->head->description($view, $description);
-            $this->head->openGraph($view, ['og:description' => $description]);
-        }
+        // Never empty: resourceDescription() falls back to the title.
+        $this->head->description($view, $description);
+        $this->head->openGraph($view, ['og:description' => $description]);
         if ($canonical !== null) {
             $this->head->canonical($view, $canonical);
         }
@@ -374,7 +373,7 @@ class HeadMetadata
         AbstractResourceEntityRepresentation $resource,
         SiteRepresentation $site,
         string $locale
-    ): ?string {
+    ): string {
         // Newspaper articles carry their summary in bibo:shortDescription (the
         // AI summary); references and publication issues use dcterms:abstract;
         // authority records (persons, organisations, events) use

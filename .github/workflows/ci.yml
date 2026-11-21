@@ -119,8 +119,15 @@ jobs:
         if: ${{ !cancelled() }}
         run: composer lint
 
-      - name: Static analysis (PHPStan level 6)
+      # PHPStan analyses against the real Omeka tree (phpstan.neon.dist).
+      - name: Download and verify Omeka S 4.2.1
         if: ${{ !cancelled() }}
+        run: .github/scripts/fetch-omeka.sh
+
+      - name: Static analysis (PHPStan level 6, against Omeka S 4.2.1)
+        if: ${{ !cancelled() }}
+        env:
+          OMEKA_PATH: ${{ github.workspace }}/.integration/omeka-s
         run: composer analyse
 
       # The translation template needs PHP to *fix*, not just to detect, and
@@ -129,12 +136,7 @@ jobs:
       # references carry no line numbers — but that still means a new string
       # cannot be extracted locally. On failure, regenerate and publish the
       # template so it can be committed back.
-      #
-      # Deliberately not doing the same for phpstan-baseline.neon: with the
-      # baseline in `includes`, its own entries are already suppressed during
-      # analysis, so regenerating here would emit a baseline covering only the
-      # *new* errors and silently drop the recorded debt. Regenerating it is a
-      # deliberate act — see the header of phpstan.neon.dist.
+
       - name: Regenerate the translation template
         if: ${{ failure() && steps.i18n.outcome == 'failure' }}
         run: composer i18n
@@ -158,19 +160,10 @@ jobs:
     steps:
       - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
-      # The release zip, vendor/ included, checked against its SHA-256 (the
-      # digest GitHub records for the release asset) before anything in it
-      # runs — as IWAC-theme and IwacSearch do. A tag checkout plus our own
-      # `composer install` verified neither the tree nor its dependencies.
+      # The release zip, vendor/ included, checked against its SHA-256 before
+      # anything in it runs — as IWAC-theme and IwacSearch do.
       - name: Download and verify Omeka S 4.2.1
-        run: |
-          set -euo pipefail
-          curl --fail --location --retry 3 -o /tmp/omeka-s.zip \
-            https://github.com/omeka/omeka-s/releases/download/v4.2.1/omeka-s-4.2.1.zip
-          echo "cc27d1c7aca0209523d19aa285f4a08e29e34950dcc446951a7c1311de348e82  /tmp/omeka-s.zip" | sha256sum -c -
-          mkdir -p .integration
-          unzip -q /tmp/omeka-s.zip -d .integration
-          test -f .integration/omeka-s/vendor/autoload.php
+        run: .github/scripts/fetch-omeka.sh
 
       - uses: shivammathur/setup-php@eb7c497e18156a6bbabfef1d3a82760b9eda3962 # 2.40.0
         with:

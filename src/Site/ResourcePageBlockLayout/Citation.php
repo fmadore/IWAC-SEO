@@ -29,6 +29,7 @@ class Citation implements ResourcePageBlockLayoutInterface
         return 'How to cite'; // @translate
     }
 
+    /** @return array<int,string> */
     public function getCompatibleResourceNames(): array
     {
         // Citations apply to items (the citable works); authority records and

@@ -99,7 +99,7 @@ final class UnapiControllerTest extends TestCase
         );
         $controller->setPluginManager(new PluginManager(new ServiceManager()));
         $event = new MvcEvent();
-        $event->setRouteMatch(new RouteMatch(['action' => 'index']));
+        $event->setRouteMatch(new RouteMatch(['action' => 'unapi']));
         $controller->setEvent($event);
 
         $request = new Request();

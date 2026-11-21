@@ -1473,7 +1473,9 @@ final class MetadataIntegrationTest extends TestCase
     /**
      * A resource mock carrying exactly $values, for the JSON-LD shape tests.
      *
-     * @param array<string,string> $values term => single literal value
+     * @param array<string,string|array<int,ValueRepresentation>> $values term =>
+     *   a single literal, or the term's values when a test needs several
+     *   (languages, visibility)
      * @param array<string,array{0:string,1:int}> $links term => [title, item id]
      *   for values that point at another record rather than holding a literal
      * @param array<MediaRepresentation&MockObject> $media the item's media, in order

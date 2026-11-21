@@ -10,6 +10,8 @@ use Laminas\Form\Form;
  * Carries just the CSRF token for the static-page SEO table. The per-page
  * fields are rendered by hand in the view (one row per site page) and read
  * straight from the POST, so they are not declared as form elements here.
+ *
+ * @extends Form<array<string,mixed>>
  */
 class PageSeoForm extends Form
 {

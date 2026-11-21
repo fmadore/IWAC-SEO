@@ -18,14 +18,15 @@ the obvious commands fail:
 - `composer test` (and so `composer check`) calls `phpunit`, which has no
   `.bat` shim in `vendor/bin` — Composer writes those only for the packages it
   installed on Windows (here phpcs and phpcbf). Run `php vendor/bin/phpunit`.
-- The integration suite needs `OMEKA_PATH` (below).
+- The integration suite and PHPStan both need `OMEKA_PATH` (below): PHPStan
+  analyses against the real Omeka classes, with no stubs and no baseline.
 
 ```bash
 C=C:/Users/frede/AppData/Local/Microsoft/WinGet/Packages/PHP.PHP.8.2_Microsoft.Winget.Source_8wekyb3d8bbwe/composer.phar
+export OMEKA_PATH=C:/Users/frede/GitHub/IWAC-SEO/.integration/omeka-s
 php $C i18n:check && php $C lint && php $C analyse   # composer check, bar the tests
 php vendor/bin/phpunit
-OMEKA_PATH=C:/Users/frede/GitHub/IWAC-SEO/.integration/omeka-s \
-  php tests/Integration/run.php --configuration phpunit.integration.xml.dist
+php tests/Integration/run.php --configuration phpunit.integration.xml.dist
 ```
 
 A shell started before an install will not see the new PHP — that looks
@@ -83,12 +84,14 @@ an `## Unreleased` section above them is fine. Actions are pinned by commit
 SHA with the release in a trailing comment — look the SHA up
 (`gh api repos/<owner>/<repo>/commits/<tag> -q .sha`), never copy one from memory.
 
-`phpstan-baseline.neon` records 59 findings that predate enforcement — 56
-missing array value types plus three judgement calls. Level 6 applies in full
-to anything new; the baseline is a ledger to shrink, not a suppression list.
-Delete entries as they are fixed. Do not regenerate it to make a new error go
-away, and note that regenerating while it sits in `includes` would emit a
-baseline covering only the *new* errors and silently drop the recorded debt.
+PHPStan runs at level 6 against Omeka S 4.2.1 itself (`tests/phpstan-bootstrap.php`
+loads the tree in `OMEKA_PATH`), with no baseline and one documented ignore.
+Fix a new finding; never add a baseline or an ignore to make it go away. Omeka's
+view helpers and controller plugins (`$view->translate()`, `$this->messenger()`)
+are typed by `tests/PHPStan/PluginMethodsExtension.php` from the real helper
+classes: when the module calls a helper it has not called before, add its row
+there. A stub cannot do this, because PHPStan validates stubs on their own,
+where no Omeka class exists.
 
 The translation template tracks *strings*, not layout: its `#:` references
 carry file paths without line numbers, precisely so that moving a string does
@@ -121,10 +124,11 @@ the template filled with Omeka's own strings.
   `view.layout` listener gap-fills afterwards; resource values win because they
   ran earlier. `HeadWriter` owns the placeholder setters and tracks what the
   request already set — write through it, not through the head helpers directly.
-- **Tests run against shims, not Omeka.** `tests/Shim/omeka.php` carries only the
-  narrow surface the module touches, guarded by `class_exists()` so a real
-  installation always wins. A test that needs more than the shim is a test that
-  belongs against a real installation, not a bigger shim.
+- **Unit tests run without Omeka.** `tests/Shim/omeka.php` only declares the two
+  Omeka classes the unit suite's doubles extend (`tests/Double/InMemorySettings`,
+  `RecordingDispatcher`), guarded by `class_exists()` so a real installation
+  always wins; PHPStan checks the doubles against the real classes. A test that
+  needs more than that belongs in `tests/Integration`, against Omeka.
 - **No runtime dependencies, and no bundled `vendor/`** — deliberate, and
   `composer.json` should stay that way. `composer install` pulls dev tools only.
 - The module folder must be named `IwacSeo` inside Omeka's `modules/`; the

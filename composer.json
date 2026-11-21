@@ -54,7 +54,7 @@
     "test": "Run the PHPUnit suite.",
     "test:integration": "Run the separate suite against the Omeka installation in OMEKA_PATH.",
     "lint": "Check PSR-12 compliance.",
-    "analyse": "Run PHPStan. Omeka S is not a dependency, so the application boundary is opaque — see phpstan.neon.dist.",
+    "analyse": "Run PHPStan against the Omeka S tree in OMEKA_PATH — see phpstan.neon.dist.",
     "i18n": "Regenerate language/template.pot and compile the .po catalogues.",
     "check": "Everything CI runs, plus the static analysis."
   },

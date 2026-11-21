@@ -16,6 +16,7 @@ final class CitationExportTest extends TestCase
         $this->export = new CitationExport();
     }
 
+    /** @param array<string,mixed> $overrides */
     private function record(array $overrides = []): CitationRecord
     {
         return CitationRecord::fromArray(array_merge([

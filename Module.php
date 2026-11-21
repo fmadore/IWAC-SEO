@@ -50,6 +50,12 @@ use Omeka\Api\Request as ApiRequest;
 use Omeka\Module\AbstractModule;
 use Omeka\Permissions\Acl;
 
+/**
+ * Laminas events are generic over target and params; the listeners take
+ * whatever Omeka fires and read both through getTarget() and getParam().
+ *
+ * @phpstan-type AnyEvent EventInterface<object|string|null, array<mixed>|\ArrayAccess<mixed, mixed>|object>
+ */
 class Module extends AbstractModule
 {
     /** Global settings owned by the module (created on install, dropped on uninstall). */
@@ -108,6 +114,7 @@ class Module extends AbstractModule
         $this->deletedUrls = new \WeakMap();
     }
 
+    /** @return array<string,mixed> */
     public function getConfig(): array
     {
         return include __DIR__ . '/config/module.config.php';
@@ -279,6 +286,7 @@ class Module extends AbstractModule
 
     // ─── View listeners ─────────────────────────────────────────────────────
 
+    /** @param AnyEvent $event */
     public function handleResourceShow(EventInterface $event): void
     {
         $view = $this->view($event);
@@ -300,6 +308,7 @@ class Module extends AbstractModule
         }
     }
 
+    /** @param AnyEvent $event */
     public function handleBrowse(EventInterface $event): void
     {
         $view = $this->view($event);
@@ -319,6 +328,7 @@ class Module extends AbstractModule
         }
     }
 
+    /** @param AnyEvent $event */
     public function handlePageShow(EventInterface $event): void
     {
         $view = $this->view($event);
@@ -341,6 +351,7 @@ class Module extends AbstractModule
         $this->headMetadata()->applyPage($view, $page, $site, $overrides, (bool) $isHomepage);
     }
 
+    /** @param AnyEvent $event */
     public function handleLayout(EventInterface $event): void
     {
         $view = $this->view($event);
@@ -364,6 +375,7 @@ class Module extends AbstractModule
      * Note whether a record was public before an update changes it, so an
      * edit that makes it private can be pinged too. api.hydrate.pre is the
      * last point at which the entity still holds its stored visibility.
+     * @param AnyEvent $event
      */
     public function noteVisibility(EventInterface $event): void
     {
@@ -384,6 +396,7 @@ class Module extends AbstractModule
      * Doctrine has cleared the entity's id, so the URL can no longer be built.
      * The ping itself waits for the post-event: a delete that fails pings
      * nothing.
+     * @param AnyEvent $event
      */
     public function noteDeletion(EventInterface $event): void
     {
@@ -407,6 +420,7 @@ class Module extends AbstractModule
         }
     }
 
+    /** @param AnyEvent $event */
     public function handleContentChange(EventInterface $event): void
     {
         $services = $this->getServiceLocator();
@@ -457,6 +471,7 @@ class Module extends AbstractModule
         }
     }
 
+    /** @param AnyEvent $event */
     public function handleSitemapChange(EventInterface $event): void
     {
         $this->invalidateSitemap();
@@ -469,6 +484,9 @@ class Module extends AbstractModule
         $services = $this->getServiceLocator();
         $settings = $services->get('Omeka\Settings');
         $form = $services->get('FormElementManager')->get(Form\ConfigForm::class);
+        if (!$form instanceof \Laminas\Form\Form) {
+            throw new \LogicException('The form manager did not build the module configuration form.');
+        }
 
         $data = [];
         foreach (self::SETTINGS as $key) {
@@ -603,6 +621,7 @@ class Module extends AbstractModule
         }
     }
 
+    /** @param AnyEvent $event */
     private function view(EventInterface $event): ?PhpRenderer
     {
         $view = $event->getParam('view');

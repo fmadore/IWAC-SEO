@@ -62,7 +62,7 @@ class CitationController extends AbstractActionController
     ) {
     }
 
-    public function indexAction(): Response
+    public function itemAction(): Response
     {
         if (!$this->enabled()) {
             return $this->status(404);

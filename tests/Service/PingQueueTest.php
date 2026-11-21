@@ -8,8 +8,8 @@ use IwacSeo\Service\PingOutcome;
 use IwacSeo\Service\PingQueue;
 use IwacSeo\Service\SettingsGate;
 use IwacSeo\Test\Double\InMemoryPingOutbox;
-use Omeka\Job\Dispatcher;
-use Omeka\Settings\Settings;
+use IwacSeo\Test\Double\InMemorySettings;
+use IwacSeo\Test\Double\RecordingDispatcher;
 use PHPUnit\Framework\TestCase;
 
 /**
@@ -19,16 +19,16 @@ use PHPUnit\Framework\TestCase;
  */
 final class PingQueueTest extends TestCase
 {
-    private Settings $settings;
-    private Dispatcher $dispatcher;
+    private InMemorySettings $settings;
+    private RecordingDispatcher $dispatcher;
     private InMemoryPingOutbox $outbox;
     private PingQueue $queue;
 
     /** @param array<string,mixed> $values */
     private function build(array $values = []): void
     {
-        $this->settings = new Settings($values);
-        $this->dispatcher = new Dispatcher();
+        $this->settings = new InMemorySettings($values);
+        $this->dispatcher = new RecordingDispatcher();
         $this->outbox = new InMemoryPingOutbox();
         $this->queue = new PingQueue(new SettingsGate($this->settings), $this->dispatcher, $this->outbox);
     }
