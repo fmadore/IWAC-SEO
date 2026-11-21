@@ -3,7 +3,9 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
-## Unreleased
+## 1.6.1 — 2026-11-21
+
+Static analysis against Omeka itself. No change to what the module serves.
 
 - PHPStan now analyses the module against Omeka S 4.2.1 itself instead of stand-in stubs, with the blanket ignores and the whole baseline gone. A small extension types the Omeka view helpers and controller plugins the module calls by name from the real helper classes. Fixing what it found: the module's controllers read their request and response as HTTP messages through one checked accessor; the raw-response actions are no longer named `indexAction()`, which Laminas types as returning a view model; a page-citation block checks that the block's page is a page (Omeka documents it as returning the site); and the unit tests' settings and job dispatcher are now doubles that extend the real Omeka classes.
 
