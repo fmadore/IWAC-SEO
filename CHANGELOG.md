@@ -3,6 +3,10 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## Unreleased
+
+- Chicago and MLA no longer open a title that has guillemets on two quotation marks (“« Bras ballants » …”). On the French site the title goes in guillemets with English quotes inside, and the period follows the closing guillemet: « “Bras ballants” contre “bras croisés” : … ». On the English site it goes in double quotes with single quotes inside, and the period comes inside them: “Le temps du ‘jihad.’” APA sets these titles without quotation marks, so its titles are unchanged.
+
 ## 1.6.1 — 2026-11-21
 
 Static analysis against Omeka itself. No change to what the module serves.

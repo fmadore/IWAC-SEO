@@ -53,7 +53,7 @@ final class PageCitationTest extends TestCase
     {
         $formatter = new CitationFormatter();
         self::assertSame(
-            'Madore, Frédérick. “Hadj au Burkina Faso.” Collection Islam Afrique de l&#039;Ouest. '
+            "Madore, Frédérick. «\u{00A0}Hadj au Burkina Faso\u{00A0}». Collection Islam Afrique de l&#039;Ouest. "
             . 'Leibniz-Zentrum Moderner Orient, 6 octobre 2022. ' . $this->link(self::URL_FR) . '.',
             $formatter->format($this->french(), 'chicago', 'fr')
         );

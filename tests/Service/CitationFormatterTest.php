@@ -113,6 +113,75 @@ final class CitationFormatterTest extends TestCase
         );
     }
 
+    private function quotedTitleArticle(string $title): \IwacSeo\Service\Citation\CitationRecord
+    {
+        return $this->record([
+            'kind'      => 'article',
+            'title'     => $title,
+            'authors'   => [$this->person('Bourahima', 'Diomandé')],
+            'container' => 'Mazayu',
+            'issue'     => '4',
+            'issued'    => ['year' => 2026, 'month' => null, 'day' => null, 'literal' => '2026'],
+        ]);
+    }
+
+    public function testFrenchQuotesATitleInGuillemetsAndNestsEnglishQuotesInside(): void
+    {
+        $record = $this->quotedTitleArticle('« Bras ballants » contre « bras croisés » : une relecture (1946 - 1980)');
+        $expected = "Diomandé, Bourahima. «\u{00A0}“Bras ballants” contre “bras croisés” : une relecture (1946 - 1980)\u{00A0}». <em>Mazayu</em>";
+
+        $this->assertStringContainsString($expected, $this->formatter->format($record, 'chicago', 'fr'));
+        $this->assertStringContainsString($expected, $this->formatter->format($record, 'mla', 'fr'));
+        // Straight quotes nest the same way; a final ? stands in for the period.
+        $this->assertStringContainsString(
+            "«\u{00A0}Le “jihad” ?\u{00A0}» <em>Mazayu</em>",
+            $this->formatter->format($this->quotedTitleArticle('Le "jihad" ?'), 'chicago', 'fr')
+        );
+    }
+
+    public function testGuillemetsInsideAQuotedTitleBecomeSingleQuotesInEnglish(): void
+    {
+        $record = $this->quotedTitleArticle('« Bras ballants » contre « bras croisés » : une relecture (1946 - 1980)');
+        $expected = '“‘Bras ballants’ contre ‘bras croisés’ : une relecture (1946 - 1980).”';
+
+        $this->assertStringContainsString($expected, $this->formatter->format($record, 'chicago', 'en'));
+        $this->assertStringContainsString($expected, $this->formatter->format($record, 'mla', 'en'));
+        // APA sets an article title plain, so the guillemets stay.
+        $this->assertStringContainsString(
+            '« Bras ballants » contre « bras croisés » : une relecture (1946 - 1980).',
+            $this->formatter->format($record, 'apa', 'en')
+        );
+    }
+
+    public function testDoubleQuotesInsideAQuotedTitleBecomeSingleQuotes(): void
+    {
+        $this->assertStringContainsString(
+            '“The ‘Ivorian’ Question and ‘Wahhabis.’”',
+            $this->formatter->format(
+                $this->quotedTitleArticle('The "Ivorian" Question and “Wahhabis”'),
+                'chicago',
+                'en'
+            )
+        );
+    }
+
+    public function testThePeriodGoesInsideAClosingInnerQuote(): void
+    {
+        $this->assertStringContainsString(
+            '“Le temps du ‘jihad.’”',
+            $this->formatter->format($this->quotedTitleArticle('Le temps du « jihad »'), 'chicago', 'en')
+        );
+        $this->assertStringContainsString(
+            '“Penser ‘l’islam.’”',
+            $this->formatter->format($this->quotedTitleArticle('Penser « l’islam »'), 'chicago', 'en')
+        );
+        // A trailing apostrophe is not an inner quote.
+        $this->assertStringContainsString(
+            '“Les talibés d’aujourd’hui.”',
+            $this->formatter->format($this->quotedTitleArticle('Les talibés d’aujourd’hui'), 'chicago', 'en')
+        );
+    }
+
     /** Cahiers d'études africaines numbers its issues and carries no volume. */
     private function articleWithoutVolume(): \IwacSeo\Service\Citation\CitationRecord
     {

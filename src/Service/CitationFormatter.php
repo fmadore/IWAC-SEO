@@ -475,10 +475,47 @@ final class CitationFormatter
         // (period inside); other standalone works are italic.
         $quoted = $kind->isPartOfWork() || ($kind === CitationKind::Thesis && $style === 'chicago');
         if ($quoted) {
-            return '“' . $this->terminate($this->esc($title)) . '”';
+            return $this->quotedTitle($title, $locale);
         }
         return $this->terminate($this->italic($title))
             . ($kind === CitationKind::Book && $record->edition !== null ? ' ' . $this->terminate($this->edition($record->edition, $locale)) : '');
+    }
+
+    /**
+     * A Chicago/MLA title in quotation marks, with the quotation marks inside
+     * it nested one level down, so a title such as « Bras ballants » contre
+     * « bras croisés » never opens on two marks. Escaped and terminated.
+     *
+     * - English: “…” outside, ‘…’ inside (CMOS 13.30, MLA 1.2.2); the period
+     *   goes inside the closing marks — “Le temps du ‘jihad.’”
+     * - French: « … » outside (non-breaking spaces), “…” inside, as French
+     *   typography nests them; the period follows the closing guillemet —
+     *   « Le temps du “jihad” ». — unless the title ends on ? or !.
+     */
+    private function quotedTitle(string $title, string $locale): string
+    {
+        $french = $locale === 'fr';
+        [$open, $close] = $french ? ["\u{201C}", "\u{201D}"] : ["\u{2018}", "\u{2019}"];
+        $title = trim((string) preg_replace(
+            [
+                '/«[\s\x{00A0}\x{202F}]*(.+?)[\s\x{00A0}\x{202F}]*»/u',
+                '/“(.+?)”/u',
+                '/(?<![\p{L}\p{N}])"(.+?)"(?![\p{L}\p{N}])/u',
+            ],
+            $open . '$1' . $close,
+            $title
+        ));
+
+        if ($french) {
+            $segment = "«\u{00A0}" . $this->esc($title) . "\u{00A0}»";
+            return preg_match('/[!?]$/u', $title) === 1 ? $segment : $segment . '.';
+        }
+        // Ends on a closing single quote that pairs with an opening one (an
+        // apostrophe inside, as in ‘l’islam’, is followed by a letter).
+        if (preg_match('/\x{2018}(?:[^\x{2018}\x{2019}]|\x{2019}(?=\p{L}))*\x{2019}$/u', $title) === 1) {
+            return '“' . $this->terminate($this->esc(mb_substr($title, 0, -1))) . '’”';
+        }
+        return '“' . $this->terminate($this->esc($title)) . '”';
     }
 
     private function edition(string $edition, string $locale): string
