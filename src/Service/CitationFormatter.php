@@ -172,8 +172,10 @@ final class CitationFormatter
                 break;
 
             case CitationKind::Webpage:
-                // CMOS 14.206: the website roman, then its owner and the date.
-                $parts[] = $this->terminate($this->esc($record->container));
+                // The collection italic, as the exhibits' own citations set
+                // it (CMOS 14.206 sets a plain website roman, but the IWAC
+                // is a published collection), then its owner and the date.
+                $parts[] = $this->terminate($this->italic($record->container));
                 $parts[] = $this->terminate(implode(', ', array_filter([
                     $this->esc($record->publisher),
                     $this->fullDate($record, $locale, 'chicago'),
@@ -291,8 +293,9 @@ final class CitationFormatter
                 break;
 
             case CitationKind::Webpage:
-                // A page on a website: the site's name, plain, and no publisher.
-                $parts[] = $this->terminate($this->esc($record->container));
+                // A page on a website: the collection's name, italic as in the
+                // other styles, and no publisher.
+                $parts[] = $this->terminate($this->italic($record->container));
                 break;
 
             default: // book, report, av, photo, document, communication, item

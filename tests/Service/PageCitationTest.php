@@ -22,20 +22,20 @@ final class PageCitationTest extends TestCase
     private const URL_EN = 'https://islam.zmo.de/s/westafrica/page/hajj-bf';
     private const URL_FR = 'https://islam.zmo.de/s/afrique_ouest/page/hadj-bf';
 
-    public function testChicagoSetsTheWebsiteRomanThenItsOwnerAndTheDate(): void
+    public function testChicagoItalicisesTheCollectionThenItsOwnerAndTheDate(): void
     {
         self::assertSame(
-            'Madore, Frédérick. “Hajj (pilgrimage to Mecca) in Burkina Faso.” Islam West Africa Collection. '
+            'Madore, Frédérick. “Hajj (pilgrimage to Mecca) in Burkina Faso.” <em>Islam West Africa Collection</em>. '
             . 'Leibniz-Zentrum Moderner Orient, October 6, 2022. ' . $this->link(self::URL_EN) . '.',
             (new CitationFormatter())->format($this->english(), 'chicago', 'en')
         );
     }
 
-    public function testApaItalicisesThePageAndNamesOnlyTheSite(): void
+    public function testApaItalicisesThePageAndTheCollection(): void
     {
         self::assertSame(
             'Madore, F. (2022, October 6). <em>Hajj (pilgrimage to Mecca) in Burkina Faso</em>. '
-            . 'Islam West Africa Collection. ' . $this->link(self::URL_EN),
+            . '<em>Islam West Africa Collection</em>. ' . $this->link(self::URL_EN),
             (new CitationFormatter())->format($this->english(), 'apa', 'en')
         );
     }
@@ -53,13 +53,13 @@ final class PageCitationTest extends TestCase
     {
         $formatter = new CitationFormatter();
         self::assertSame(
-            "Madore, Frédérick. «\u{00A0}Hadj au Burkina Faso\u{00A0}». Collection Islam Afrique de l&#039;Ouest. "
+            "Madore, Frédérick. «\u{00A0}Hadj au Burkina Faso\u{00A0}». <em>Collection Islam Afrique de l&#039;Ouest</em>. "
             . 'Leibniz-Zentrum Moderner Orient, 6 octobre 2022. ' . $this->link(self::URL_FR) . '.',
             $formatter->format($this->french(), 'chicago', 'fr')
         );
         self::assertSame(
             'Madore, F. (2022, 6 octobre). <em>Hadj au Burkina Faso</em>. '
-            . 'Collection Islam Afrique de l&#039;Ouest. ' . $this->link(self::URL_FR),
+            . '<em>Collection Islam Afrique de l&#039;Ouest</em>. ' . $this->link(self::URL_FR),
             $formatter->format($this->french(), 'apa', 'fr')
         );
     }
@@ -73,7 +73,7 @@ final class PageCitationTest extends TestCase
             issued: IssuedDate::parse('2024'),
             container: 'Islam West Africa Collection',
         );
-        self::assertSame('“About.” Islam West Africa Collection. 2024.', (new CitationFormatter())->format($record, 'chicago'));
+        self::assertSame('“About.” <em>Islam West Africa Collection</em>. 2024.', (new CitationFormatter())->format($record, 'chicago'));
     }
 
     public function testExportsTypeThePageAsAWebPageNamedByItsSlug(): void

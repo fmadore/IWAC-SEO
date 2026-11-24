@@ -3,6 +3,12 @@
 All notable changes to the IWAC SEO module. Versions follow
 [semantic versioning](https://semver.org/); dates are ISO 8601.
 
+## 1.6.3 — 2026-11-24
+
+The collection's name in italics on a cited page.
+
+- A page citation ("How to cite this page", as on the timeline exhibits) now sets the collection's name in italics in Chicago and APA, as MLA already did and as the exhibits' own citations set it: *Islam West Africa Collection* / *Collection Islam Afrique de l'Ouest*. Item citations are unchanged.
+
 ## 1.6.2 — 2026-11-21
 
 Quotation marks inside a quoted title.
